@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 import pytest
+import yaml
 
 from redagent_platform import local_stack as local_stack_module
 from redagent_platform.identity.config import REQUIRED_FIELDS, load_oidc_provider_config
@@ -595,8 +596,12 @@ def test_compose_manifest_expands_with_digest_pins_and_loopback(tmp_path: Path) 
         assert 'published: "57233"' in completed.stdout
         assert "@sha256:" in completed.stdout
         assert "privileged: true" not in completed.stdout
-        assert "internal: true" not in completed.stdout
         assert "driver: bridge" in completed.stdout
+        expanded = yaml.safe_load(completed.stdout)
+        assert expanded["networks"]["redagent_openbao_db"]["internal"] is True
+        assert "redagent_openbao_db" in expanded["services"]["postgres"]["networks"]
+        for service in ("keycloak", "temporal", "rustfs"):
+            assert "redagent_openbao_db" not in expanded["services"][service]["networks"]
     finally:
         shutil.rmtree(config.state_dir, ignore_errors=True)
 

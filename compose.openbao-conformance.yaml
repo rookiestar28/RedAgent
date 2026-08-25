@@ -24,9 +24,6 @@ services:
     mem_swappiness: 0
     pids_limit: 128
     cpus: 0.5
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
 volumes:
   redagent_openbao_data:
   redagent_openbao_audit:

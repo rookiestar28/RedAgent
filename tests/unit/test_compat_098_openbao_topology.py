@@ -5,11 +5,25 @@ from pathlib import Path
 import subprocess
 
 import pytest
+import yaml
 
 from scripts import openbao_conformance
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_openbao_direct_script_entrypoint_has_no_package_import_trap() -> None:
+    completed = subprocess.run(
+        (str(Path(openbao_conformance.sys.executable)), "scripts/openbao_conformance.py", "--help"),
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        shell=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_openbao_conformance_image_is_exact_digest_pinned_and_local_only() -> None:
@@ -24,6 +38,7 @@ def test_openbao_conformance_image_is_exact_digest_pinned_and_local_only() -> No
 
 def test_openbao_conformance_compose_is_loopback_persistent_and_non_dev() -> None:
     compose = (ROOT / "compose.openbao-conformance.yaml").read_text(encoding="utf-8")
+    stack = yaml.safe_load((ROOT / "compose.yaml").read_text(encoding="utf-8"))
     config = (ROOT / "config" / "openbao" / "openbao-local.hcl").read_text(encoding="utf-8")
     assert "REDAGENT_OPENBAO_IMAGE" in compose
     assert "127.0.0.1" in compose and "58200:8200" in compose
@@ -32,6 +47,11 @@ def test_openbao_conformance_compose_is_loopback_persistent_and_non_dev() -> Non
     assert "read_only: true" in compose
     assert "cap_drop:" in compose and "no-new-privileges:true" in compose
     assert "redagent_openbao_data" in compose and "redagent_openbao_audit" in compose
+    assert "host.docker.internal" not in compose
+    assert stack["networks"]["redagent_openbao_db"]["internal"] is True
+    assert "redagent_openbao_db" in stack["services"]["postgres"]["networks"]
+    for service in ("keycloak", "temporal", "rustfs"):
+        assert "redagent_openbao_db" not in stack["services"][service]["networks"]
     assert 'storage "file"' in config
     assert 'tls_disable = true' in config
     assert "disable_mlock = true" in config
@@ -84,13 +104,116 @@ def test_openbao_project_name_is_deterministic_and_workspace_unique(
     assert len(first) == len("redagent-openbao-") + 16
 
 
-@pytest.mark.parametrize("value", ("", "not-a-port", "1023", "65536"))
-def test_openbao_rejects_missing_or_invalid_persisted_postgres_port(value: str) -> None:
-    with pytest.raises(openbao_conformance.ConformanceError, match="openbao_postgres_port_invalid"):
-        openbao_conformance._postgres_runtime_port({"REDAGENT_POSTGRES_PORT": value})
+@pytest.mark.parametrize("value", ("", "UPPERCASE", "../other", "project.with.dot"))
+def test_openbao_rejects_invalid_persisted_local_stack_project(value: str) -> None:
+    with pytest.raises(openbao_conformance.ConformanceError, match="openbao_local_stack_project_invalid"):
+        openbao_conformance._verified_local_stack_network({"REDAGENT_COMPOSE_PROJECT_NAME": value})
 
 
-def test_openbao_provision_uses_persisted_postgres_port(
+def test_openbao_accepts_only_the_exact_database_bridge_network_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commands: list[tuple[str, ...]] = []
+
+    def docker(*arguments: str) -> str:
+        commands.append(arguments)
+        return json.dumps(
+            {
+                "com.docker.compose.project": "redagent-public-gate-default",
+                "com.docker.compose.network": "redagent_openbao_db",
+            }
+        )
+
+    monkeypatch.setattr(openbao_conformance, "_docker", docker)
+
+    network = openbao_conformance._verified_local_stack_network(
+        {"REDAGENT_COMPOSE_PROJECT_NAME": "redagent-public-gate-default"}
+    )
+
+    assert network == "redagent-public-gate-default_redagent_openbao_db"
+    assert commands == [
+        (
+            "network",
+            "inspect",
+            "--format",
+            "{{json .Labels}}",
+            "redagent-public-gate-default_redagent_openbao_db",
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "labels",
+    (
+        {},
+        {"com.docker.compose.project": "other", "com.docker.compose.network": "redagent_openbao_db"},
+        {
+            "com.docker.compose.project": "redagent-public-gate-default",
+            "com.docker.compose.network": "other",
+        },
+    ),
+)
+def test_openbao_rejects_mismatched_local_stack_network_labels(
+    monkeypatch: pytest.MonkeyPatch,
+    labels: dict[str, str],
+) -> None:
+    monkeypatch.setattr(openbao_conformance, "_docker", lambda *_args: json.dumps(labels))
+
+    with pytest.raises(openbao_conformance.ConformanceError, match="openbao_local_stack_network_invalid"):
+        openbao_conformance._verified_local_stack_network(
+            {"REDAGENT_COMPOSE_PROJECT_NAME": "redagent-public-gate-default"}
+        )
+
+
+def test_openbao_attaches_only_the_exact_container_to_the_verified_network(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    container_id = "a" * 64
+    docker_calls: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        openbao_conformance,
+        "_verified_local_stack_network",
+        lambda _values: "redagent-public-gate-default_redagent_openbao_db",
+    )
+    monkeypatch.setattr(
+        openbao_conformance,
+        "_compose",
+        lambda *arguments: f"{container_id}\n" if arguments == ("ps", "--quiet", "openbao") else "",
+    )
+    monkeypatch.setattr(
+        openbao_conformance,
+        "_docker",
+        lambda *arguments: docker_calls.append(arguments) or "",
+    )
+
+    openbao_conformance._attach_to_local_stack_network(
+        {"REDAGENT_COMPOSE_PROJECT_NAME": "redagent-public-gate-default"}
+    )
+
+    assert docker_calls == [
+        ("network", "connect", "redagent-public-gate-default_redagent_openbao_db", container_id)
+    ]
+
+
+@pytest.mark.parametrize("container_ids", ("", "short", f"{'a' * 64}\n{'b' * 64}\n"))
+def test_openbao_rejects_missing_ambiguous_or_invalid_container_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    container_ids: str,
+) -> None:
+    monkeypatch.setattr(
+        openbao_conformance,
+        "_verified_local_stack_network",
+        lambda _values: "redagent-public-gate-default_redagent_openbao_db",
+    )
+    monkeypatch.setattr(openbao_conformance, "_compose", lambda *_args: container_ids)
+
+    with pytest.raises(openbao_conformance.ConformanceError, match="openbao_container_identity_invalid"):
+        openbao_conformance._attach_to_local_stack_network(
+            {"REDAGENT_COMPOSE_PROJECT_NAME": "redagent-public-gate-default"}
+        )
+
+
+def test_openbao_provision_uses_the_verified_local_stack_network(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -103,6 +226,7 @@ def test_openbao_provision_uses_persisted_postgres_port(
         )
     )
     requests: list[tuple[str, str, dict[str, object] | None]] = []
+    network_attachments: list[dict[str, str]] = []
     root.mkdir()
     monkeypatch.setattr(openbao_conformance, "ROOT", root)
     monkeypatch.setattr(openbao_conformance, "RUNTIME", runtime)
@@ -114,9 +238,16 @@ def test_openbao_provision_uses_persisted_postgres_port(
         lambda: {
             "REDAGENT_POSTGRES_PASSWORD": "fixture-database-value",  # pragma: allowlist secret
             "REDAGENT_POSTGRES_PORT": "55433",
+            "REDAGENT_COMPOSE_PROJECT_NAME": "redagent-public-gate-default",
         },
     )
     monkeypatch.setattr(openbao_conformance, "_token_is_valid", lambda _token: False)
+    monkeypatch.setattr(
+        openbao_conformance,
+        "_attach_to_local_stack_network",
+        lambda values: network_attachments.append(values),
+        raising=False,
+    )
 
     def request(
         method: str,
@@ -145,8 +276,15 @@ def test_openbao_provision_uses_persisted_postgres_port(
     database_request = next(row for row in requests if row[1] == "/database/config/redagent-r098")
     assert database_request[2] is not None
     assert database_request[2]["connection_url"] == (
-        "postgresql://{{username}}:{{password}}@host.docker.internal:55433/redagent?sslmode=disable"
+        "postgresql://{{username}}:{{password}}@postgres:5432/redagent?sslmode=disable"
     )
+    assert network_attachments == [
+        {
+            "REDAGENT_POSTGRES_PASSWORD": "fixture-database-value",  # pragma: allowlist secret
+            "REDAGENT_POSTGRES_PORT": "55433",
+            "REDAGENT_COMPOSE_PROJECT_NAME": "redagent-public-gate-default",
+        }
+    ]
     assert result["ok"] is True
 
 

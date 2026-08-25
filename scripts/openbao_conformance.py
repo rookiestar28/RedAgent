@@ -9,6 +9,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -27,6 +28,9 @@ COMPOSE = ROOT / "compose.openbao-conformance.yaml"
 IMAGE_LOCK = ROOT / "config" / "openbao-conformance-image.json"
 LOCAL_ENV = ROOT / ".local" / "redagent" / "runtime" / "local-stack.env"
 _COMPOSE_PROJECT_PREFIX = "redagent-openbao"
+# CRITICAL: keep direct script execution package-independent; the gate invokes
+# this file before repository-root package imports are guaranteed.
+_LOCAL_STACK_PROJECT_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 
 
 class ConformanceError(RuntimeError):
@@ -125,6 +129,51 @@ def _compose(*arguments: str) -> str:
     if result.returncode:
         raise ConformanceError(f"openbao_compose_failed:{result.returncode}")
     return result.stdout
+
+
+def _docker(*arguments: str) -> str:
+    result = subprocess.run(
+        ["docker", "--context", "default", *arguments],
+        cwd=_workspace_root(),
+        env=_safe_compose_environment(),
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        shell=False,
+    )
+    if result.returncode:
+        raise ConformanceError(f"openbao_docker_command_failed:{arguments[0]}")
+    return result.stdout
+
+
+def _verified_local_stack_network(values: dict[str, str]) -> str:
+    project = values.get("REDAGENT_COMPOSE_PROJECT_NAME", "")
+    if _LOCAL_STACK_PROJECT_NAME.fullmatch(project) is None:
+        raise ConformanceError("openbao_local_stack_project_invalid")
+    network = f"{project}_redagent_openbao_db"
+    raw_labels = _docker("network", "inspect", "--format", "{{json .Labels}}", network).strip()
+    try:
+        labels = json.loads(raw_labels)
+    except (TypeError, ValueError) as exc:
+        raise ConformanceError("openbao_local_stack_network_invalid") from exc
+    if not isinstance(labels, dict) or labels.get("com.docker.compose.project") != project or labels.get(
+        "com.docker.compose.network"
+    ) != "redagent_openbao_db":
+        raise ConformanceError("openbao_local_stack_network_invalid")
+    return network
+
+
+def _attach_to_local_stack_network(values: dict[str, str]) -> None:
+    network = _verified_local_stack_network(values)
+    container_ids = tuple(
+        line.strip() for line in _compose("ps", "--quiet", "openbao").splitlines() if line.strip()
+    )
+    if len(container_ids) != 1 or re.fullmatch(r"[0-9a-f]{64}", container_ids[0]) is None:
+        raise ConformanceError("openbao_container_identity_invalid")
+    # CRITICAL: attach only the checkout-owned OpenBao container to the
+    # label-verified local-stack network; never broaden the PostgreSQL host bind.
+    _docker("network", "connect", network, container_ids[0])
 
 
 def _path_is_reparse(path: Path) -> bool:
@@ -270,16 +319,6 @@ def _runtime_values() -> dict[str, str]:
     )
 
 
-def _postgres_runtime_port(values: dict[str, str]) -> int:
-    try:
-        port = int(values.get("REDAGENT_POSTGRES_PORT", ""))
-    except (TypeError, ValueError) as exc:
-        raise ConformanceError("openbao_postgres_port_invalid") from exc
-    if not 1024 <= port <= 65535:
-        raise ConformanceError("openbao_postgres_port_invalid")
-    return port
-
-
 def _token_is_valid(token: str) -> bool:
     try:
         response = httpx.get(
@@ -323,15 +362,14 @@ def provision() -> dict[str, Any]:
     database_password = values.get("REDAGENT_POSTGRES_PASSWORD", "")
     if not database_password:
         raise ConformanceError("postgres_fixture_password_missing")
-    database_port = _postgres_runtime_port(values)
+    _attach_to_local_stack_network(values)
     _request(
         "POST", "/database/config/redagent-r098", token=root,
         payload={
             "plugin_name": "postgresql-database-plugin",
             "allowed_roles": ["redagent-r098"],
             "connection_url": (
-                "postgresql://{{username}}:{{password}}@host.docker.internal:"
-                f"{database_port}/redagent?sslmode=disable"
+                "postgresql://{{username}}:{{password}}@postgres:5432/redagent?sslmode=disable"
             ),
             "username": "redagent", "password": database_password,
             "verify_connection": True,

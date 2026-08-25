@@ -3014,7 +3014,7 @@
       "count": 1,
       "path": "redagent_platform/gate_lease.py",
       "reason": "compatibility contract identifier",
-      "sha256": "ca4749e75bf65e432a11ad5ba410402f59ed8c388558800853d15fcfe514f149",
+      "sha256": "3ab52a629f9a2f12a5fc5bff6225e3091ff6668637ff6eb8713815d272773812",
       "token": "r118"
     },
     {
@@ -3987,7 +3987,7 @@
       "count": 3,
       "path": "redagent_platform/validation/stages.py",
       "reason": "compatibility contract identifier",
-      "sha256": "4b0ac46dbb06fbceed626e870d8a494dddb433dbc5cbbe1a27e0f9f99dcfa8e7",
+      "sha256": "eaf2490ae9a042338e9201cf34df9d845e663b1976629f28a16bf365dc27363c",
       "token": "r118"
     },
     {
@@ -4806,7 +4806,7 @@
       "count": 8,
       "path": "scripts/openbao_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "439b3a1c94de44758e5c76f768f03ea14d852ccf0453b7075c72483e26330438",
+      "sha256": "3a3704ad5d6729d406b4276ab16b35db2e32656e0a61af1a92e6196e98ad535b",
       "token": "r098"
     },
     {
@@ -4883,7 +4883,7 @@
       "count": 1,
       "path": "scripts/run_validation_gate.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d2f4534583ab6d160edc87308ad20ba0ce238f37b6e4a5261c1c3429c654ad5c",
+      "sha256": "45dbbcc7a7c0c439bce3ceeee855cf68a479e8fe7c475f1fb837413b9f9214b6",
       "token": "R118"
     },
     {
@@ -6031,7 +6031,7 @@
       "count": 4,
       "path": "tests/unit/test_compat_098_openbao_topology.py",
       "reason": "compatibility contract identifier",
-      "sha256": "25af2028d62bd2d6b7da3f3d2e161876c8e694774098d25d490d9f518993001a",
+      "sha256": "02a8ea75cfdb1989d6e17154033a4a19ac0733ea913e0261800d2a5cdf7d7668",
       "token": "r098"
     },
     {
@@ -7571,7 +7571,7 @@
       "count": 5,
       "path": "tests/unit/test_compat_118_validation_workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7366a2c80818ec1b1151ddd0f814326e7f0a9507326aea5b1e88074ea7e507e0",
+      "sha256": "4a7f2fe4d42811909fdc6bffa4df8a2b949ae0ebc7499368c3a08382bbc0f9e5",
       "token": "r118"
     },
     {
@@ -8215,14 +8215,14 @@
       "count": 1,
       "path": "tests/unit/test_local_stack.py",
       "reason": "compatibility contract identifier",
-      "sha256": "5533dac592ec5e1f2bb40f37d582e6f4bdec30b774a1391cc2046289509cc23d",
+      "sha256": "d0676fe2d5c4f1a1ce80bbdd4d4069c627d252697f75df35bb27cd2dae42cacf",
       "token": "r096"
     },
     {
       "count": 3,
       "path": "tests/unit/test_local_stack.py",
       "reason": "compatibility contract identifier",
-      "sha256": "5533dac592ec5e1f2bb40f37d582e6f4bdec30b774a1391cc2046289509cc23d",
+      "sha256": "d0676fe2d5c4f1a1ce80bbdd4d4069c627d252697f75df35bb27cd2dae42cacf",
       "token": "r118"
     },
     {

@@ -30,6 +30,31 @@ def test_direct_git_queries_trust_only_the_exact_authoritative_root() -> None:
     )
     assert safe_values == (f"safe.directory={ROOT.absolute()}",)
     assert "safe.directory=*" not in command
+    normalization_values = tuple(
+        value for value in _config_values(command) if value.startswith("core.autocrlf=")
+    )
+    assert normalization_values == (("core.autocrlf=true",) if os.name == "nt" else ())
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows checkout normalization semantics required")
+def test_windows_isolated_git_query_preserves_the_checkout_normalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkout = tmp_path / "crlf-checkout"
+    cloned = subprocess.run(
+        ("git", "-c", "core.autocrlf=true", "clone", "--no-hardlinks", "--quiet", str(ROOT), str(checkout)),
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+        shell=False,
+    )
+    assert cloned.returncode == 0, cloned.stderr.decode("utf-8", errors="replace")
+    monkeypatch.setattr(run_validation_gate, "ROOT", checkout)
+
+    state = run_validation_gate._worktree_state()
+
+    assert state.kind == "clean"
 
 
 def test_nested_stage_git_environment_replaces_ambient_config_injection() -> None:
@@ -50,11 +75,15 @@ def test_nested_stage_git_environment_replaces_ambient_config_injection() -> Non
         fixed_environment=StageRunner._FIXED_ENVIRONMENT_VALUES,
     )
 
-    assert runner._environment["GIT_CONFIG_COUNT"] == "1"
+    assert runner._environment["GIT_CONFIG_COUNT"] == ("2" if os.name == "nt" else "1")
     assert runner._environment["GIT_CONFIG_KEY_0"] == "safe.directory"
     assert runner._environment["GIT_CONFIG_VALUE_0"] == str(ROOT.resolve())
-    assert "GIT_CONFIG_KEY_1" not in runner._environment
-    assert "GIT_CONFIG_VALUE_1" not in runner._environment
+    if os.name == "nt":
+        assert runner._environment["GIT_CONFIG_KEY_1"] == "core.autocrlf"
+        assert runner._environment["GIT_CONFIG_VALUE_1"] == "true"
+    else:
+        assert "GIT_CONFIG_KEY_1" not in runner._environment
+        assert "GIT_CONFIG_VALUE_1" not in runner._environment
     different_owner = dict(runner._environment)
     different_owner["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1"
     completed = subprocess.run(
@@ -86,6 +115,10 @@ def test_lease_ignore_query_uses_only_the_exact_workspace_trust(
     command = observed["command"]
     assert isinstance(command, tuple)
     assert f"safe.directory={tmp_path.absolute()}" in _config_values(command)
+    normalization_values = tuple(
+        value for value in _config_values(command) if value.startswith("core.autocrlf=")
+    )
+    assert normalization_values == (("core.autocrlf=true",) if os.name == "nt" else ())
     environment = observed["environment"]
     assert isinstance(environment, dict)
     assert environment["GIT_CONFIG_GLOBAL"] == os.devnull

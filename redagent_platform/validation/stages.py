@@ -191,13 +191,22 @@ class StageRunner:
             # CRITICAL: fixed controls are code-owned values only; do not widen
             # the inherited-environment allowlist to arbitrary GIT_* settings.
             self._environment.update(fixed_values)
-            self._environment.update(
-                {
-                    "GIT_CONFIG_COUNT": "1",
-                    "GIT_CONFIG_KEY_0": "safe.directory",
-                    "GIT_CONFIG_VALUE_0": str(self._repository_root),
-                }
-            )
+            protected_git_config = {
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "safe.directory",
+                "GIT_CONFIG_VALUE_0": str(self._repository_root),
+            }
+            if os.name == "nt":
+                # IMPORTANT: nested Windows Git processes must interpret the
+                # checkout with the same fixed CRLF normalization as the gate.
+                protected_git_config.update(
+                    {
+                        "GIT_CONFIG_COUNT": "2",
+                        "GIT_CONFIG_KEY_1": "core.autocrlf",
+                        "GIT_CONFIG_VALUE_1": "true",
+                    }
+                )
+            self._environment.update(protected_git_config)
 
     def execution_contract(self, stage: Stage, *, source_oid: str) -> dict[str, object]:
         """Digest the exact argv/environment used by one same-source stage run."""

@@ -92,17 +92,24 @@ def validated_authoritative_validation_lease_path(root: Path) -> Path:
     }
     environment.update(_LEASE_GIT_ENVIRONMENT)
     try:
+        command = [
+            "git",
+            "--no-replace-objects",
+            "-c",
+            f"safe.directory={workspace}",
+        ]
+        if os.name == "nt":
+            # IMPORTANT: keep the lease query aligned with the Windows checkout
+            # normalization while system/global Git config remains disabled.
+            command.extend(("-c", "core.autocrlf=true"))
+        command.extend((
+            "check-ignore",
+            "--quiet",
+            "--",
+            str(target.relative_to(workspace)),
+        ))
         completed = subprocess.run(
-            (
-                "git",
-                "--no-replace-objects",
-                "-c",
-                f"safe.directory={workspace}",
-                "check-ignore",
-                "--quiet",
-                "--",
-                str(target.relative_to(workspace)),
-            ),
+            tuple(command),
             cwd=workspace,
             check=False,
             stdin=subprocess.DEVNULL,

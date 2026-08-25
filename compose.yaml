@@ -28,6 +28,7 @@ services:
     cpus: 1.0
     networks:
       - redagent_internal
+      - redagent_openbao_db
 
   keycloak:
     image: ${REDAGENT_KEYCLOAK_IMAGE:?digest-pinned keycloak image is required}
@@ -122,6 +123,9 @@ services:
 networks:
   redagent_internal:
     driver: bridge
+  redagent_openbao_db:
+    driver: bridge
+    internal: true
 
 volumes:
   redagent_postgres_data:

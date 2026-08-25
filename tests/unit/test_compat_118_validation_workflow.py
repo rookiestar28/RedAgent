@@ -1642,12 +1642,16 @@ def test_validation_gate_git_queries_disable_helper_dispatch(
     monkeypatch.setattr(run_validation_gate, "run_bounded_stdout", completed)
 
     assert run_validation_gate._git("diff", "--name-only") is not None
-    assert observed["command"] == (
+    expected_command = [
         "git",
         "--no-pager",
         "--no-replace-objects",
         "-c",
         f"safe.directory={ROOT.absolute()}",
+    ]
+    if os.name == "nt":
+        expected_command.extend(("-c", "core.autocrlf=true"))
+    expected_command.extend((
         "-c",
         "core.hooksPath=/dev/null",
         "-c",
@@ -1664,7 +1668,8 @@ def test_validation_gate_git_queries_disable_helper_dispatch(
         "--no-ext-diff",
         "--no-textconv",
         "--name-only",
-    )
+    ))
+    assert observed["command"] == tuple(expected_command)
 
 
 def test_node_preflight_is_bounded_and_fails_closed_on_timeout(

@@ -109,6 +109,10 @@ def _isolated_git_command(arguments: Sequence[str]) -> tuple[str, ...]:
     # CRITICAL: hosted runners may own the checkout through a service identity.
     # Trust only this code-owned authoritative root; global config remains disabled.
     command.extend(("-c", f"safe.directory={ROOT.absolute()}"))
+    if os.name == "nt":
+        # IMPORTANT: Actions materializes Windows checkouts with CRLF normalization
+        # from global config; preserve that exact semantic after global config denial.
+        command.extend(("-c", "core.autocrlf=true"))
     for setting in _GIT_COMMAND_CONFIG_OVERRIDES:
         command.extend(("-c", setting))
     command.append(arguments[0])

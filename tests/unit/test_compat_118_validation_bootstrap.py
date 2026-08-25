@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from types import SimpleNamespace
 from pathlib import Path
@@ -29,14 +30,16 @@ def test_canonical_lease_path_refuses_ignore_policy_drift_without_creating_runti
         gate_lease.validated_authoritative_validation_lease_path(tmp_path)
 
     assert not (tmp_path / ".tmp").exists()
-    assert observed["args"][0][:6] == (
+    expected_prefix = [
         "git",
         "--no-replace-objects",
         "-c",
         f"safe.directory={tmp_path.absolute()}",
-        "check-ignore",
-        "--quiet",
-    )
+    ]
+    if os.name == "nt":
+        expected_prefix.extend(("-c", "core.autocrlf=true"))
+    expected_prefix.extend(("check-ignore", "--quiet"))
+    assert observed["args"][0][: len(expected_prefix)] == tuple(expected_prefix)
 
 
 def test_unsupported_host_python_fails_before_venv_lease_or_platform_binding(
