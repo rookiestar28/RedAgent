@@ -1,0 +1,134 @@
+name: redagent-local
+
+services:
+  postgres:
+    image: ${REDAGENT_POSTGRES_IMAGE:?digest-pinned postgres image is required}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${REDAGENT_POSTGRES_USER:?postgres user is required}
+      POSTGRES_DB: ${REDAGENT_POSTGRES_DB:?postgres database is required}
+      POSTGRES_PASSWORD: ${REDAGENT_POSTGRES_PASSWORD:?generated postgres password is required}
+      PGDATA: /var/lib/postgresql/18/docker
+    ports:
+      - "${REDAGENT_BIND_HOST:?loopback bind is required}:${REDAGENT_POSTGRES_PORT:?postgres port is required}:5432"
+    volumes:
+      - redagent_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    mem_limit: 1g
+    cpus: 1.0
+    networks:
+      - redagent_internal
+
+  keycloak:
+    image: ${REDAGENT_KEYCLOAK_IMAGE:?digest-pinned keycloak image is required}
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm", "--health-enabled=true", "--http-management-port=9000"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?generated admin username is required}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?generated admin password is required}
+      KC_HTTP_HOST: 0.0.0.0
+    ports:
+      - "${REDAGENT_BIND_HOST:?loopback bind is required}:${REDAGENT_KEYCLOAK_PORT:?keycloak port is required}:8080"
+    volumes:
+      - redagent_keycloak_data:/opt/keycloak/data
+      - ./config/keycloak/redagent-local-realm.json:/opt/keycloak/data/import/redagent-local-realm.json:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+    cpus: 1.0
+    networks:
+      - redagent_internal
+
+  temporal:
+    image: ${REDAGENT_TEMPORAL_IMAGE:?digest-pinned temporal image is required}
+    restart: unless-stopped
+    user: "1000:1000"
+    # IMPORTANT: mount at the image-owned UID 1000 home; a fresh /var/lib volume is root-owned and SQLite cannot initialize.
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--port", "7233", "--metrics-port", "9090", "--headless", "--namespace", "redagent-local", "--db-filename", "/home/temporal/temporal.db"]
+    ports:
+      - "${REDAGENT_BIND_HOST:?loopback bind is required}:${REDAGENT_TEMPORAL_PORT:?temporal port is required}:7233"
+    volumes:
+      - redagent_temporal_data:/home/temporal
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "127.0.0.1:7233"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    mem_limit: 768m
+    cpus: 1.0
+    networks:
+      - redagent_internal
+
+  rustfs:
+    image: ${REDAGENT_RUSTFS_IMAGE:?REDAGENT_RUSTFS_IMAGE is required}
+    restart: unless-stopped
+    user: "10001:10001"
+    environment:
+      RUSTFS_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}
+      RUSTFS_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_OBS_LOG_DIRECTORY: /tmp/rustfs-logs
+      RUSTFS_OBS_LOGGER_LEVEL: warn
+    ports:
+      - "${REDAGENT_BIND_HOST:-127.0.0.1}:${REDAGENT_RUSTFS_PORT:-59000}:9000"
+    volumes:
+      - redagent_rustfs_data:/data
+    healthcheck:
+      # RustFS alpha.99 protects the documented MinIO-compatible health path; an unauthenticated S3 root 403 proves the API is ready without placing credentials in the health command.
+      test: ["CMD-SHELL", "test \"$$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:9000/)\" = 403"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    mem_limit: 1g
+    cpus: 1.0
+    networks:
+      - redagent_internal
+
+networks:
+  redagent_internal:
+    driver: bridge
+
+volumes:
+  redagent_postgres_data:
+    name: "${REDAGENT_COMPOSE_PROJECT_NAME:-redagent-local}-postgres-data"
+  redagent_keycloak_data:
+    name: "${REDAGENT_COMPOSE_PROJECT_NAME:-redagent-local}-keycloak-data"
+  redagent_temporal_data:
+    name: "${REDAGENT_COMPOSE_PROJECT_NAME:-redagent-local}-temporal-data"
+  redagent_rustfs_data:
+    name: "${REDAGENT_COMPOSE_PROJECT_NAME:-redagent-local}-rustfs-data"

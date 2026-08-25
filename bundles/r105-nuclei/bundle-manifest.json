@@ -1,0 +1,53 @@
+{
+  "schema": "redagent.r105-template-bundle/v1",
+  "bundle_id": "r105-http-header-bundle",
+  "bundle_revision": 1,
+  "source_commit": "ba4818d",
+  "engine": {
+    "version": "3.8.0",
+    "image_digest": "sha256:4e95c15953fe894bda1a8a16ecde958497e335a7a0b1f6fdb17b06af38630871"
+  },
+  "signer": {
+    "certificate_path": "config/trust/r105-nuclei-user.crt",
+    "certificate_sha256": "04c820859f6253abf27eafc340b8f8b375bb7f40cbc5ad36c23672dcf21ec481",
+    "certificate_fingerprint_sha256": "9e10dbdfe4bd2897e6bea2a1f86585ae1437804a722fca56e51f5180cbb732fd",
+    "nuclei_signature_verified": true
+  },
+  "files": [
+    {
+      "path": "templates/redagent-r105-missing-header.yaml",
+      "sha256": "7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",
+      "size_bytes": 700,
+      "kind": "nuclei-template"
+    }
+  ],
+  "template": {
+    "id": "redagent-r105-missing-header",
+    "protocol": "http",
+    "methods": ["GET"],
+    "paths": ["/nuclei/missing-header"],
+    "tags": ["redagent", "synthetic"],
+    "risk_class": "low",
+    "scope_predicate": "owned-r105-gateway-exact-path",
+    "expected_evidence": ["missing-security-header"],
+    "payload_files": [],
+    "elevated_features": []
+  },
+  "review": {
+    "author": "redagent-r105-author",
+    "reviewer": "redagent-r105-independent-review",
+    "separation_of_duties": true,
+    "result": "approved-local-lab-only"
+  },
+  "qualification": {
+    "owned_fixture_finding_count": 1,
+    "external_target_contacts": 0,
+    "direct_target_route": false,
+    "cleanup_residual_resource_count": 0,
+    "false_positive_regression_passed": true
+  },
+  "promoted_at": "2026-07-11T00:00:00+00:00",
+  "expires_at": "2026-08-10T00:00:00+00:00",
+  "deprecated": false,
+  "production_qualified": false
+}

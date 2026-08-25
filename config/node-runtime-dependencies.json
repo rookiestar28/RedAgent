@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "review_date": "2026-07-17",
+  "source": "https://registry.npmjs.org/<package>/<version>",
+  "review_policy": "Every direct dependency must be exactly pinned, present in package-lock.json, license-reviewed, and have zero npm-audit advisories at review time.",
+  "packages": [
+    {"name": "@axe-core/playwright", "version": "4.12.1", "license": "MPL-2.0", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@eslint/js", "version": "9.39.4", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@playwright/test", "version": "1.61.1", "license": "Apache-2.0", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@testing-library/dom", "version": "10.4.1", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@testing-library/jest-dom", "version": "6.9.1", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@testing-library/react", "version": "16.3.2", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@testing-library/user-event", "version": "14.6.1", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@types/node", "version": "18.19.130", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@types/react", "version": "19.2.17", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@types/react-dom", "version": "19.2.3", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "@vitejs/plugin-react", "version": "4.7.0", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "esbuild", "version": "0.25.12", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "eslint", "version": "9.39.4", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "eslint-plugin-react-hooks", "version": "7.1.1", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "eslint-plugin-react-refresh", "version": "0.5.3", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "globals", "version": "17.7.0", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "jsdom", "version": "26.1.0", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "openapi-fetch", "version": "0.17.0", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "openapi-typescript", "version": "7.13.0", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "react", "version": "19.2.7", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "react-dom", "version": "19.2.7", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "typescript", "version": "5.9.3", "license": "Apache-2.0", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "typescript-eslint", "version": "8.63.0", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "vite", "version": "6.4.3", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
+    {"name": "vitest", "version": "3.2.7", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"}
+  ]
+}

@@ -1,0 +1,81 @@
+name: R118 selected gate
+
+"on":
+  workflow_call:
+    inputs:
+      gate:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: Check out classified source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.13"
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Explicitly provision selected-gate Python dependencies
+        if: ${{ inputs.gate == 'G0' || inputs.gate == 'G1' }}
+        run: bash scripts/run_full_tests_linux.sh --provision-dependencies
+      - name: Run the selected shared validation gate
+        env:
+          BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_REVISION: ${{ github.sha }}
+          SELECTED_GATE: ${{ inputs.gate }}
+        run: >-
+          bash scripts/run_full_tests_linux.sh
+          --gate "$SELECTED_GATE"
+          --base "$BASE_REVISION"
+          --head "$HEAD_REVISION"
+          --receipt .tmp/validation/verification.json
+      - name: Verify externally bound validation evidence
+        env:
+          BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_REVISION: ${{ github.sha }}
+          SELECTED_GATE: ${{ inputs.gate }}
+        run: >-
+          python scripts/run_validation_gate.py verify
+          --receipt .tmp/validation/verification.json
+          --source-revision "$HEAD_REVISION"
+          --base-revision "${BASE_REVISION:-none}"
+          --expected-gate "$SELECTED_GATE"
+          --expected-force-full false
+          --expected-ci-context "$GITHUB_EVENT_NAME"
+          --expected-mode risk_proportional
+      - name: Retain bounded verification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r118-receipt-${{ inputs.gate }}-${{ github.sha }}
+          path: .tmp/validation/verification.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain receipt-bound G2 products
+        if: ${{ always() && inputs.gate == 'G2' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r118-products-G2-${{ github.sha }}
+          path: |
+            .tmp/sbom/redagent-sbom.json
+            frontend/dist/index.html
+            frontend/cli-dist/cli/redagent.js
+            frontend/openapi.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,52 @@
+{
+  "realm": "redagent-local",
+  "enabled": true,
+  "displayName": "RedAgent Local Synthetic Identity",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "roles": {
+    "realm": [
+      {"name": "redagent-operator", "description": "Synthetic local operator role"},
+      {"name": "redagent-reviewer", "description": "Synthetic local reviewer role"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "redagent-local-bff",
+      "name": "RedAgent Local BFF",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["https://127.0.0.1:58000/auth/callback"],
+      "webOrigins": ["https://127.0.0.1:58000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://127.0.0.1:58000/auth/logged-out",
+        "backchannel.logout.url": "https://127.0.0.1:58000/auth/backchannel-logout/local-tenant",
+        "backchannel.logout.session.required": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "redagent-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "redagent_tenant",
+            "claim.value": "local-tenant",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": []
+}

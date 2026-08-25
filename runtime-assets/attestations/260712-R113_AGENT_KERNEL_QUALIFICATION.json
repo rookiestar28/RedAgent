@@ -1,0 +1,18 @@
+{
+  "adversarial_case_count": 13,
+  "background_enabled": false,
+  "denied_case_count": 13,
+  "direct_dispatch_count": 0,
+  "external_contact_count": 0,
+  "parallel_tool_calls_enabled": false,
+  "projected_capability_count": 9,
+  "provider_id": "deterministic-fake",
+  "provider_settings_sha256": "af2d6d39267d18a43ffa234f002d8996cb19b0c5d936894899adaf35b4d18fa4",
+  "provider_storage_enabled": false,
+  "qualified_at": "2026-07-12T04:00:00+00:00",
+  "receipt_sha256": "63391067511d6b4d35c10b67586d7adc0e968754d934a566b8795966e957d5f2",
+  "registry_sha256": "3c2224e4d6b1505434944189f806c83a69f86ed570b325a8fe511eb2b1bc9377",
+  "schema": "redagent.r113-qualification/v1",
+  "sensitive_retention_count": 0,
+  "status": "passed"
+}

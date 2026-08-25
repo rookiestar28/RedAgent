@@ -1,0 +1,18 @@
+{
+  "author": "redagent-r110-author",
+  "critical_vulnerability_count": 0,
+  "enabled_profiles": [
+    "r110-mobile-static-v1",
+    "r110-packaged-artifact-v1",
+    "r110-repository-snapshot-v1"
+  ],
+  "expires_at": "2026-08-10T12:01:18Z",
+  "external_adapter_execution": false,
+  "production_qualified": false,
+  "promoted_at": "2026-07-11T12:01:18Z",
+  "qualification_receipt_sha256": "38cdc6bb830369b99336a1bc30c043e98529a8909b0fbbcddc102a08437f5426",
+  "reviewer": "redagent-r110-reviewer",
+  "runtime_lock_sha256": "c11688ebf9a81acf89a128e0dca6894e440b99a9ff677eef7b144110337a7c10",
+  "schema": "redagent.r110-promotion/v1",
+  "source_sha256": "91e7ddb562dee2a5fcb81b27776ef9cab3805344ee7c1a025ab20f8c2a3b981b"
+}

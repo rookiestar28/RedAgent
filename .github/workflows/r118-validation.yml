@@ -1,0 +1,100 @@
+name: R118 validation
+
+"on":
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r118-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      gate: ${{ steps.classify.outputs.gate }}
+      decision_digest: ${{ steps.classify.outputs.decision_digest }}
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.13"
+      - name: Classify the bounded change set
+        id: classify
+        env:
+          BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_REVISION: ${{ github.sha }}
+        run: >-
+          python scripts/run_validation_gate.py classify
+          --base "$BASE_REVISION"
+          --head "$HEAD_REVISION"
+          --github-output "$GITHUB_OUTPUT"
+          --receipt .tmp/validation/decision.json
+      - name: Retain bounded classifier evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r118-classification-${{ github.sha }}
+          path: .tmp/validation/decision.json
+          if-no-files-found: error
+          retention-days: 14
+
+  g0:
+    if: needs.classify.outputs.gate == 'G0'
+    needs: classify
+    uses: ./.github/workflows/r118-validation-gate.yml
+    with:
+      gate: G0
+
+  g1:
+    if: needs.classify.outputs.gate == 'G1'
+    needs: classify
+    uses: ./.github/workflows/r118-validation-gate.yml
+    with:
+      gate: G1
+
+  g2:
+    if: needs.classify.outputs.gate == 'G2'
+    needs: classify
+    uses: ./.github/workflows/r118-validation-gate.yml
+    with:
+      gate: G2
+
+  aggregate:
+    if: ${{ always() }}
+    needs: [classify, g0, g1, g2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out aggregate verifier
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Require the selected gate to terminate successfully
+        env:
+          SELECTED_GATE: ${{ needs.classify.outputs.gate }}
+          CLASSIFY_RESULT: ${{ needs.classify.result }}
+          G0_RESULT: ${{ needs.g0.result }}
+          G1_RESULT: ${{ needs.g1.result }}
+          G2_RESULT: ${{ needs.g2.result }}
+        run: >-
+          python scripts/run_validation_gate.py aggregate
+          --selected "$SELECTED_GATE"
+          --classify-result "$CLASSIFY_RESULT"
+          --g0-result "$G0_RESULT"
+          --g1-result "$G1_RESULT"
+          --g2-result "$G2_RESULT"

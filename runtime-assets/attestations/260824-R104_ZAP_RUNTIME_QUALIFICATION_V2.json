@@ -1,0 +1,36 @@
+{
+  "schema": "redagent.r104-runtime-qualification/v2",
+  "qualified_at": "2026-08-24T17:03:04+08:00",
+  "environment": "Docker Desktop linux/amd64 on Windows",
+  "runtime_lock_sha256": "d39d31c1b61a84e60f61802849dda02c462f9ab657fb3a715e66a649fc53c59a",
+  "engine_image_id": "sha256:3cd55809bfea0393bc67862eec614091faa873cfb219d28465122f04ae8d266b",
+  "profiles": [
+    {
+      "profile_id": "zap-passive-v1",
+      "receipt_sha256": "32d58b85a411f8ccbdaa437468bc35d0145626b654b4e94ac5e7cb591d1bb7cb",
+      "normalized_alert_count": 1
+    },
+    {
+      "profile_id": "zap-auth-crawl-v1",
+      "receipt_sha256": "2bbe71389641435d0929da42d0490c91f141d2c82f8ce16db6ab6bb4151cf3a1",
+      "normalized_alert_count": 1
+    },
+    {
+      "profile_id": "zap-client-spider-v1",
+      "receipt_sha256": "7930dabe1a691d430c1285d169240e2662c4ee7d211166e9b2d86268fd0d1c07",
+      "normalized_alert_count": 1
+    },
+    {
+      "profile_id": "zap-active-xss-lab-v1",
+      "receipt_sha256": "a3c4f3fcdc4fdd463220fe57cbbfafd236abca6e3fbf40cd033e81c24f05afba",
+      "normalized_alert_count": 1
+    }
+  ],
+  "all_profiles_passed": true,
+  "addon_inventory_sha256": "50293fde751b211ed6432b0b5039e8bf3fec7676a738c635a9c1e6844c511e43",
+  "direct_target_route": false,
+  "external_target_contacts": 0,
+  "cleanup_receipt_sha256": "37657817461720122b4abee7a142918f8e1534ffa696eb38d50a8c04956be674",
+  "cleanup_residual_resource_count": 0,
+  "production_qualified": false
+}

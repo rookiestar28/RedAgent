@@ -1,0 +1,72 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "RedAgent R106 Fixture", "version": "1.0.0"},
+  "servers": [{"url": "http://redagent-r106-gateway:8080"}],
+  "components": {
+    "securitySchemes": {"fixtureBearer": {"type": "http", "scheme": "bearer"}},
+    "schemas": {
+      "Document": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "owner_id", "title"],
+        "properties": {
+          "id": {"type": "string", "maxLength": 64},
+          "owner_id": {"type": "string", "maxLength": 64},
+          "title": {"type": "string", "maxLength": 100}
+        }
+      }
+    }
+  },
+  "security": [{"fixtureBearer": []}],
+  "paths": {
+    "/documents": {
+      "post": {
+        "operationId": "createDocument",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object", "additionalProperties": false, "required": ["title"],
+          "properties": {"title": {"type": "string", "minLength": 1, "maxLength": 100}}
+        }}}},
+        "responses": {"201": {"description": "created"}, "400": {"description": "invalid"}}
+      }
+    },
+    "/documents/{documentId}": {
+      "get": {
+        "operationId": "getDocument",
+        "parameters": [{"name": "documentId", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "responses": {
+          "200": {"description": "document", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Document"}}}},
+          "403": {"description": "forbidden"}, "404": {"description": "not found"}
+        }
+      },
+      "delete": {
+        "operationId": "deleteDocument",
+        "parameters": [{"name": "documentId", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "responses": {"204": {"description": "deleted"}, "403": {"description": "forbidden"}, "404": {"description": "not found"}}
+      }
+    },
+    "/documents/{documentId}/transfer": {
+      "post": {
+        "operationId": "transferDocument",
+        "parameters": [{"name": "documentId", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {
+          "type": "object", "additionalProperties": false, "required": ["new_owner_id"],
+          "properties": {"new_owner_id": {"type": "string", "maxLength": 64}}
+        }}}},
+        "responses": {"200": {"description": "transferred"}, "403": {"description": "forbidden"}, "404": {"description": "not found"}}
+      }
+    },
+    "/profiles/{profileId}": {
+      "get": {
+        "operationId": "getProfile",
+        "parameters": [{"name": "profileId", "in": "path", "required": true, "schema": {"type": "string", "maxLength": 64}}],
+        "responses": {"200": {"description": "profile"}, "403": {"description": "forbidden"}, "404": {"description": "not found"}}
+      }
+    },
+    "/admin/audit": {
+      "get": {
+        "operationId": "getAudit",
+        "responses": {"200": {"description": "audit"}, "403": {"description": "forbidden"}}
+      }
+    }
+  }
+}

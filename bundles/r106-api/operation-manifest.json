@@ -1,0 +1,18 @@
+{
+  "schema": "redagent.r106-operation-manifest/v1",
+  "spec_id": "r106-owned-api",
+  "server": "http://redagent-r106-gateway:8080",
+  "operations": [
+    {"operation_id": "createDocument", "method": "POST", "path": "/documents", "risk": "create_owned", "media_types": ["application/json"], "state_change": true, "cleanup": "deleteDocument"},
+    {"operation_id": "deleteDocument", "method": "DELETE", "path": "/documents/{documentId}", "risk": "delete_owned", "media_types": [], "state_change": true, "cleanup": "none_terminal"},
+    {"operation_id": "getAudit", "method": "GET", "path": "/admin/audit", "risk": "admin_read", "media_types": [], "state_change": false, "protected_properties": []},
+    {"operation_id": "getDocument", "method": "GET", "path": "/documents/{documentId}", "risk": "read", "media_types": [], "state_change": false, "protected_properties": ["owner_id", "title"]},
+    {"operation_id": "getProfile", "method": "GET", "path": "/profiles/{profileId}", "risk": "read", "media_types": [], "state_change": false, "protected_properties": ["internal_note"]},
+    {"operation_id": "transferDocument", "method": "POST", "path": "/documents/{documentId}/transfer", "risk": "update_owned", "media_types": ["application/json"], "state_change": true, "cleanup": "transferDocumentToOriginalOwner"}
+  ],
+  "callbacks": false,
+  "webhooks": false,
+  "external_references": false,
+  "unexpected_methods": false,
+  "production_qualified": false
+}

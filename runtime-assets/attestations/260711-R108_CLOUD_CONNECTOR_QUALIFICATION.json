@@ -1,0 +1,137 @@
+{
+  "cancellation": {
+    "cooperative_stop_acknowledged": true,
+    "final_state": "cancelled",
+    "forced_termination": false,
+    "lease_revoked": true,
+    "new_requests_blocked": true,
+    "occurred_at": "2026-07-11T10:58:58+00:00",
+    "residual_resource_count": 0,
+    "run_id": "run-r108-qualification"
+  },
+  "external_adapters": [
+    {
+      "adapter_id": "checkov",
+      "execution_enabled": false,
+      "production_qualified": false
+    },
+    {
+      "adapter_id": "kube-bench",
+      "execution_enabled": false,
+      "production_qualified": false
+    },
+    {
+      "adapter_id": "prowler",
+      "execution_enabled": false,
+      "production_qualified": false
+    },
+    {
+      "adapter_id": "trivy",
+      "execution_enabled": false,
+      "production_qualified": false
+    }
+  ],
+  "negative": {
+    "mutation_denied": true,
+    "overgrant_denied": true,
+    "redirect_denied": true,
+    "wrong_identity_denied": true
+  },
+  "offline": [
+    {
+      "input_sha256": "5dc8b5b40e6583d8256ba9cf015277f327495671af9414beaf2fc9496978458a",
+      "kind": "iac",
+      "network_allowed": false,
+      "result_count": 1,
+      "result_sha256": "593fcf927a50254fca3e1e9a1502f17632382109134c907adffb8a68a888285f",
+      "subprocess_allowed": false
+    },
+    {
+      "input_sha256": "7526cc1ddc4a6f33f77fac2023ed350a940202545f171d12640089cd37633527",
+      "kind": "image",
+      "network_allowed": false,
+      "result_count": 1,
+      "result_sha256": "6a9fd86b58156667748f9185b35e827843b44b76919f4626a44771fb88f6ac8f",
+      "subprocess_allowed": false
+    },
+    {
+      "input_sha256": "86fe0afe088420c89d7f75219cbc6680d931a048658a01f2a13773459d1571b5",
+      "kind": "filesystem",
+      "network_allowed": false,
+      "result_count": 1,
+      "result_sha256": "c440dffc93b2d00da54a32bb7f1919214c23e7a50d5b553f0996eefae05f0f73",
+      "subprocess_allowed": false
+    }
+  ],
+  "providers": [
+    {
+      "complete": true,
+      "evidence_sha256": "c6e23bfac2a68a5b610750c1e76a83b82735de87400f8bc10cb6c2e7e8eda2ac",
+      "external_contact_count": 0,
+      "identity": "aws:123456789012",
+      "mutation_attempt_count": 1,
+      "page_count": 1,
+      "plan_sha256": "fdf2697b8c5180e1db8677085d3bf097f7d60a132e6de6e5de463d30111ffb52",
+      "provider": "aws",
+      "request_count": 2,
+      "resource_count": 1,
+      "result_count": 1,
+      "snapshot_sha256": "4ac967aeab9f011ed684748d98eba101f4b59afbf6312d76753dc0994a935138"
+    },
+    {
+      "complete": true,
+      "evidence_sha256": "d28463a81697daee6a4c3c9cc044b022a52646dd4b256bb33281a7b67dc0e297",
+      "external_contact_count": 0,
+      "identity": "azure:subscription-r108",
+      "mutation_attempt_count": 1,
+      "page_count": 1,
+      "plan_sha256": "ab2d216994ec0c41fb80c2440e92d3060d1b4ebfd72af8129b2048dbb52808f0",
+      "provider": "azure",
+      "request_count": 2,
+      "resource_count": 1,
+      "result_count": 1,
+      "snapshot_sha256": "05f7a4d05ab7fcc40aeb951197bffb2d3f926df4f8883b8e5b6b17b2cd12568c"
+    },
+    {
+      "complete": true,
+      "evidence_sha256": "1079cbbb0799f06d039155fcae81bb79b488eb14d2b2fa5fda74a1479756954b",
+      "external_contact_count": 0,
+      "identity": "gcp:project-r108",
+      "mutation_attempt_count": 1,
+      "page_count": 1,
+      "plan_sha256": "084722234b3249d7b528da42a38871689bfbe9bd2fb36250acc792ae6e71efbd",
+      "provider": "gcp",
+      "request_count": 2,
+      "resource_count": 1,
+      "result_count": 1,
+      "snapshot_sha256": "a1589667aa0ac195e7f1496acfd2f9a340dc4f165a387150856a1d8be341059e"
+    },
+    {
+      "complete": true,
+      "evidence_sha256": "52c94d435ad5225d39a2c271f436ba9f90c553d2021b5c7f168ca4b91c53409a",
+      "external_contact_count": 0,
+      "identity": "kubernetes:cluster-r108",
+      "mutation_attempt_count": 1,
+      "page_count": 1,
+      "plan_sha256": "c361f4abe283e2e6091c2bdc49971f485f95e127ddb29d1e5e48b4cbf703168b",
+      "provider": "kubernetes",
+      "request_count": 2,
+      "resource_count": 1,
+      "result_count": 1,
+      "snapshot_sha256": "d8c4c2edb3760e0d80de68d1eb57dc6bf049b8e8ca8c9a333b05b66b430395d3"
+    }
+  ],
+  "qualified_at": "2026-07-11T10:58:58+00:00",
+  "receipt_sha256": "d2276a89272cd5cdb56f66c5c089a431000940ec821b7e463976380c3a133e2c",
+  "safety": {
+    "external_contact_count": 0,
+    "external_reference_execution_count": 0,
+    "production_qualified": false,
+    "real_cloud_contact_count": 0,
+    "real_cluster_contact_count": 0
+  },
+  "schema": "redagent.r108-qualification/v1",
+  "scope": "repo-owned-loopback-emulators-and-offline-fixtures-only",
+  "source_sha256": "8ac7df4d62d2f096d6180569dc968790ff58774c1a03a1fe77fbc87e37c93f16",
+  "status": "passed"
+}

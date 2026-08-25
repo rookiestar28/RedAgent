@@ -1,0 +1,19 @@
+{
+  "schema_version": "1",
+  "classifier_revision": "r118-classifier-v1",
+  "max_changed_paths": 500,
+  "rules": [
+    {"plane": "workflow", "prefixes": [".github/workflows/", "config/validation/", "redagent_platform/orchestration/", "redagent_platform/agent_kernel/", "redagent_platform/workbench/"]},
+    {"plane": "validator_test", "prefixes": ["redagent_platform/validation/", "tests/"], "exact_paths": ["pyproject.toml", "package.json", "package-lock.json", ".pre-commit-config.yaml", "scripts/run_full_tests_windows.ps1", "scripts/run_full_tests_linux.sh", "scripts/run_validation_gate.py", "redagent_platform/gate_lease.py", "docs/TESTING.md", "docs/E2E_TESTING.md"]},
+    {"plane": "documentation", "prefixes": ["docs/", "docs/resources/", ".local/validation/"], "exact_paths": ["public_release.md", "contributing.md", "readme.md"]},
+    {"plane": "database", "prefixes": ["alembic/", "migrations/", "redagent_platform/persistence/"]},
+    {"plane": "frontend", "prefixes": ["frontend/"]},
+    {"plane": "infrastructure_release", "prefixes": ["deploy/", "infra/", "infrastructure/", "redagent_platform/deployment_release/"], "name_prefixes": ["dockerfile"]},
+    {"plane": "public_api", "prefixes": ["redagent_platform/api/"], "contains": ["redagent_platform/api_", "_api.py"]},
+    {"plane": "identity_policy_security", "prefixes": ["redagent_platform/identity/", "redagent_platform/identity_saas/", "redagent_platform/policy_service/", "redagent_platform/secret_service/", "redagent_platform/mcp_broker/"], "exact_paths": ["redagent_platform/active_policy.py", "redagent_platform/credentials.py", "redagent_platform/kill_switch.py", "redagent_platform/runner_isolation.py"], "contains": ["auth", "rbac"]},
+    {"plane": "runner_execution", "prefixes": ["redagent_platform/runner/", "redagent_platform/runner_service/", "redagent_platform/containment_service/", "redagent_platform/lab_service/", "redagent_platform/nuclei_service/", "redagent_platform/zap_service/", "redagent_platform/network_service/", "redagent_platform/purple_runtime/", "redagent_platform/human_simulation/", "redagent_platform/api_differential_service/", "redagent_platform/cloud_connectors/"], "contains": ["execution", "atomic_runner"]},
+    {"plane": "evidence_reporting", "prefixes": ["redagent_platform/evidence/", "redagent_platform/reporting/"], "contains": ["evidence", "report"]},
+    {"plane": "connector_integration", "prefixes": ["redagent_platform/connectors/"], "contains": ["_service/", "gateway"]},
+    {"plane": "backend", "prefixes": ["redagent_platform/"]}
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0",
+  "platform": "linux/amd64",
+  "updated_at": "2026-07-10",
+  "update_policy": "Re-query the upstream tag with docker buildx imagetools inspect, review license/security/provenance, update both digests, run static/live smoke and the full gate.",
+  "images": [
+    {
+      "service": "postgres",
+      "registry": "docker.io/library/postgres",
+      "tag": "18.3",
+      "index_digest": "sha256:7e32e9833a6fb1c92c32552794cb6ed569d51b445a54907d35fc112ef39684db",
+      "platform_digest": "sha256:a145910d7079e9fbf73e6df19d5fcca0ce59d747cf7d97ac772bff28c3759c32",
+      "platform": "linux/amd64",
+      "reference": "docker.io/library/postgres:18.3@sha256:7e32e9833a6fb1c92c32552794cb6ed569d51b445a54907d35fc112ef39684db",
+      "license_security_status": "PostgreSQL License; Docker Official Image manifest inspected 2026-07-10; vulnerability review remains required on every update.",
+      "signature_policy": "No upstream Sigstore identity policy asserted; digest verification is mandatory and signature status must be reported as not-configured."
+    },
+    {
+      "service": "keycloak",
+      "registry": "quay.io/keycloak/keycloak",
+      "tag": "26.6.4",
+      "index_digest": "sha256:0aae0de7fca85525f727d3354df17896092de8bb26ae4c12d89c77e5df8cbce4",
+      "platform_digest": "sha256:22c8cf9e79af88d320499c93994bb2c319ca255092d8ae7c7a45dd46d68192e2",
+      "platform": "linux/amd64",
+      "reference": "quay.io/keycloak/keycloak:26.6.4@sha256:0aae0de7fca85525f727d3354df17896092de8bb26ae4c12d89c77e5df8cbce4",
+      "license_security_status": "Apache-2.0; official Keycloak tag and registry manifest inspected 2026-07-10; vulnerability review remains required on every update.",
+      "signature_policy": "No upstream Sigstore identity policy asserted; digest verification is mandatory and signature status must be reported as not-configured."
+    },
+    {
+      "service": "temporal",
+      "registry": "docker.io/temporalio/temporal",
+      "tag": "1.7.3",
+      "index_digest": "sha256:906f9765cde508333ef191aab908bc724657b5f736cb5ead13921d9a45b33622",
+      "platform_digest": "sha256:1683f097876c2af71ba833bd9418910601be12d4a25422f2c4ebec45113e1bc2",
+      "platform": "linux/amd64",
+      "reference": "docker.io/temporalio/temporal:1.7.3@sha256:906f9765cde508333ef191aab908bc724657b5f736cb5ead13921d9a45b33622",
+      "license_security_status": "MIT; official Temporal CLI image manifest inspected 2026-07-10; CLI 1.7.3 embeds Temporal Server 1.31.2 security release; vulnerability review remains required on every update.",
+      "signature_policy": "OCI attestation manifests were present, but no verified upstream Sigstore identity policy is asserted; digest verification is mandatory and signature status remains not-configured."
+    },
+    {
+      "service": "rustfs",
+      "registry": "docker.io/rustfs/rustfs",
+      "tag": "1.0.0-alpha.99",
+      "index_digest": "sha256:103dd40b84d5aa3d5ab02f3a693797eb1d14cb842554b222dfbb589f364aa47f",
+      "platform_digest": "sha256:a92846f09d9f1ccc41aeb9a9f1e8049093cc23b055d2b5a144e77525c1de1b41",
+      "platform": "linux/amd64",
+      "reference": "docker.io/rustfs/rustfs:1.0.0-alpha.99@sha256:103dd40b84d5aa3d5ab02f3a693797eb1d14cb842554b222dfbb589f364aa47f",
+      "license_security_status": "Apache-2.0; official pre-release image manifest inspected 2026-07-10; local S3 conformance only and never production-qualified by R097.",
+      "signature_policy": "No verified upstream Sigstore identity policy asserted; exact index/platform digest verification is mandatory.",
+      "purpose": "local-conformance-only",
+      "production_qualified": false
+    }
+  ]
+}

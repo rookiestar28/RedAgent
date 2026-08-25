@@ -1,0 +1,32 @@
+services:
+  openbao:
+    image: ${REDAGENT_OPENBAO_IMAGE:?digest-pinned OpenBao image is required}
+    command: ["server"]
+    ports:
+      - "127.0.0.1:58200:8200"
+    volumes:
+      - redagent_openbao_data:/openbao/file
+      - redagent_openbao_audit:/openbao/logs
+      - ./config/openbao/openbao-local.hcl:/openbao/config/openbao-local.hcl:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      # The official entrypoint chowns new named volumes and drops to uid 100/gid 1000.
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    mem_limit: 512m
+    mem_swappiness: 0
+    pids_limit: 128
+    cpus: 0.5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  redagent_openbao_data:
+  redagent_openbao_audit:

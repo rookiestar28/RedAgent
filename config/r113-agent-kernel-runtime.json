@@ -1,0 +1,19 @@
+{
+  "background_mode": false,
+  "direct_runner_dispatch": false,
+  "enabled_providers": [
+    "deterministic-fake"
+  ],
+  "external_model_calls": false,
+  "hosted_tools": false,
+  "mcp": false,
+  "openai_adapter_state": "disabled-until-separately-qualified",
+  "parallel_tool_calls": false,
+  "projected_capability_count": 9,
+  "provider_storage": false,
+  "qualification_assertion_sha256": "63391067511d6b4d35c10b67586d7adc0e968754d934a566b8795966e957d5f2",
+  "qualification_receipt_sha256": "6ca041eb8a893428520b0491d982993fbfb6a52e4745baddc13c7d0e8b39ad53",
+  "registry_sha256": "3c2224e4d6b1505434944189f806c83a69f86ed570b325a8fe511eb2b1bc9377",
+  "schema": "redagent.r113-runtime-lock/v1",
+  "sensitive_trace_capture": false
+}

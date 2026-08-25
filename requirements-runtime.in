@@ -1,0 +1,14 @@
+alembic==1.18.5
+asyncpg==0.31.0
+boto3==1.43.45
+fastapi==0.139.0
+joserfc==1.7.3
+httpx==0.28.1
+opentelemetry-api==1.42.1
+opentelemetry-exporter-otlp-proto-grpc==1.42.1
+opentelemetry-sdk==1.42.1
+pydantic==2.13.4
+SQLAlchemy==2.0.51
+schemathesis==4.22.4
+temporalio==1.30.0
+uvicorn==0.51.0

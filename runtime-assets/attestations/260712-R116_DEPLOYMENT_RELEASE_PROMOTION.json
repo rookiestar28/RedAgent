@@ -1,0 +1,18 @@
+{
+  "author": "release-engineer",
+  "automatic_apply_enabled": false,
+  "destructive_downgrade_enabled": false,
+  "destructive_restore_enabled": false,
+  "expires_at": "2027-07-12T00:00:00+00:00",
+  "external_execution_enabled": false,
+  "network_enabled": false,
+  "production_qualified": false,
+  "promoted_at": "2026-07-12T00:00:00+00:00",
+  "qualification_receipt_sha256": "4d29a95315b043a0d19f6b51226d79d955dd234d883face775afe4adeaa59363",
+  "real_environment_qualified": false,
+  "registry_fallback_enabled": false,
+  "reviewer": "security-reviewer",
+  "runtime_lock_sha256": "8ca1115349227ec16d518dcb045ddbc9742b3436cea0e3a51cb07831126e74fc",
+  "schema": "redagent.r116-promotion/v1",
+  "source_tree_sha256": "8679714014184e0075b3beb8bc42739b1842fafafff5c6bf14bd27ba353d7550"
+}

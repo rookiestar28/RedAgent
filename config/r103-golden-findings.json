@@ -1,0 +1,28 @@
+{
+  "schema": "redagent.r103-golden-findings/v1",
+  "database_version": "r103-golden-v1",
+  "tool": "redagent-r103-synthetic",
+  "tool_version": "1.0.0",
+  "expectations": [
+    {
+      "expectation_id": "r103-header-training-marker",
+      "rule_id": "R103-TRAINING-HEADER",
+      "title": "Synthetic training header marker",
+      "severity": "low",
+      "confidence": "confirmed",
+      "affected_resource": "synthetic-web-root",
+      "location": "GET /health/ready#x-redagent-training",
+      "expected_fingerprint": "62f4dd055b8aa4443c6be9b1ba04dc3b8d6a1af2ac19d04e9dfc333893111188"
+    },
+    {
+      "expectation_id": "r103-api-training-marker",
+      "rule_id": "R103-TRAINING-PROFILE",
+      "title": "Synthetic profile training marker",
+      "severity": "informational",
+      "confidence": "confirmed",
+      "affected_resource": "synthetic-api-profile",
+      "location": "GET /api/v1/profile#training_marker",
+      "expected_fingerprint": "a94347aaf673e92c022d99c42adb1c175420c12cc722407eec760cfbc5c3c0db"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "redagent.r106-identity-matrix/v1",
+  "matrix_id": "r106-identity-matrix-v1",
+  "states": ["anonymous", "owner", "peer", "tenant_admin", "other_tenant", "expired", "revoked", "ownership_transferred"],
+  "cases": [
+    {"operation_id": "getDocument", "relation": "cross_owner", "privileged": "owner", "lower": "peer", "allowed_lower_outcomes": ["403", "404", "200_filtered"]},
+    {"operation_id": "getDocument", "relation": "cross_tenant", "privileged": "owner", "lower": "other_tenant", "allowed_lower_outcomes": ["403", "404"]},
+    {"operation_id": "getAudit", "relation": "lower_role", "privileged": "tenant_admin", "lower": "peer", "allowed_lower_outcomes": ["403"]},
+    {"operation_id": "getProfile", "relation": "property_restricted", "privileged": "owner", "lower": "peer", "allowed_lower_outcomes": ["200_filtered", "403", "404"]},
+    {"operation_id": "transferDocument", "relation": "cross_owner", "privileged": "owner", "lower": "peer", "allowed_lower_outcomes": ["403", "404"]},
+    {"operation_id": "deleteDocument", "relation": "cross_owner", "privileged": "owner", "lower": "peer", "allowed_lower_outcomes": ["403", "404"]},
+    {"operation_id": "getDocument", "relation": "expired_session", "privileged": "owner", "lower": "expired", "allowed_lower_outcomes": ["401"]},
+    {"operation_id": "getDocument", "relation": "revoked_session", "privileged": "owner", "lower": "revoked", "allowed_lower_outcomes": ["401"]}
+  ],
+  "credentials_in_generator": false,
+  "credentials_in_replay": false,
+  "production_qualified": false
+}

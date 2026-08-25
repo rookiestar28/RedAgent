@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "rootDir": ".",
+    "outDir": "cli-dist",
+    "declaration": false
+  },
+  "include": ["cli/redagent.ts", "src/lib/apiClient.ts", "src/generated/api.d.ts"],
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+}

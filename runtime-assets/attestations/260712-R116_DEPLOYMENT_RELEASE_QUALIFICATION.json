@@ -1,0 +1,20 @@
+{
+  "adversarial_case_count": 32,
+  "cloud_contact_count": 0,
+  "denied_case_count": 32,
+  "drill_case_count": 6,
+  "external_execution_count": 0,
+  "failed_cases": [],
+  "network_contact_count": 0,
+  "ok": true,
+  "outcome_sha256": "a8a4d2962e40aaa876f4499a1b1cca5aa21cae5686070d5226f1ee12b42b4712",
+  "passed_drill_count": 6,
+  "production_qualified": false,
+  "qualification_case_count": 38,
+  "real_cluster_contact_count": 0,
+  "receipt_sha256": "bfbccd9c19dba9370a3f43be588c7f4553fe3febdb4702d78cfa28e314432d7b",
+  "registry_contact_count": 0,
+  "scenario_sha256": "6d12e1228577bd375461bde8b48f1e78a6600c63ac559eefb7e5ebad1dd1005b",
+  "schema": "redagent.r116-qualification/v1",
+  "status": "passed"
+}

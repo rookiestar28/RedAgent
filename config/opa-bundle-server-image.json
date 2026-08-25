@@ -1,0 +1,12 @@
+{
+  "index_digest": "sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0",
+  "license_security_status": "PSF-2.0 for CPython; Docker Official Image manifest inspected 2026-07-14; vulnerability review remains required on every update.",
+  "platform": "linux/amd64",
+  "platform_digest": "sha256:c25cd44f45df1279a2cba589e67dfcd9db04647ea483b117a7de8b1a99bdfb23",
+  "production_qualified": false,
+  "purpose": "local-conformance-only",
+  "reference": "docker.io/library/python:3.13-alpine@sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0",
+  "registry": "docker.io/library/python",
+  "source": "https://hub.docker.com/_/python",
+  "tag": "3.13-alpine"
+}

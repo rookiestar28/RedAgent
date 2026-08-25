@@ -1,0 +1,25 @@
+{
+  "version": "2026-08-25.r126.2",
+  "performance": {
+    "lcpP75Milliseconds": 2500,
+    "inpP75Milliseconds": 200,
+    "clsP75": 0.1,
+    "localShellReadyP95Milliseconds": 1000,
+    "localFeedbackP95Milliseconds": 100,
+    "longTaskMaximumMilliseconds": 50,
+    "initialJavaScriptGzipBytes": 122880,
+    "initialCssGzipBytes": 12288,
+    "initialCombinedGzipBytes": 138240,
+    "largeData": {
+      "totalRecords": 1000,
+      "renderedPageSize": 100,
+      "readyP95Milliseconds": 250,
+      "maximumWorkspaceDomElements": 1500
+    },
+    "commandSearch": {
+      "optionCount": 1000,
+      "resultLimit": 50,
+      "readyP95Milliseconds": 100
+    }
+  }
+}

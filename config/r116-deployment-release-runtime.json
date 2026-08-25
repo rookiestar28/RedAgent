@@ -1,0 +1,85 @@
+{
+  "automatic_apply_enabled": false,
+  "bundled_images": [
+    {
+      "components": [
+        "api",
+        "worker"
+      ],
+      "cyclonedx_sbom_path": ".planning/260712-R116_APP_IMAGE_SBOM.cdx.json.gz",
+      "cyclonedx_sbom_sha256": "6cb557bac0d38dc2178b1235b184433fd0e822819f4e0ce5ed2f6f34252b02c5",
+      "reference": "redagent/r116-app@sha256:d8b1f9b8a60e8dc4820553d36799f18f07268d1f8d53e2a02b20c9f722c9ae19",
+      "sbom_path": ".planning/260712-R116_APP_IMAGE_SBOM.spdx.json.gz",
+      "sbom_sha256": "f23287b4c1078b61c15831028ef686a145743947c3a2df915151ad793e71ba35"
+    }
+  ],
+  "destructive_downgrade_enabled": false,
+  "destructive_restore_enabled": false,
+  "enabled_profiles": [
+    "single_node",
+    "kubernetes_enterprise"
+  ],
+  "external_execution_enabled": false,
+  "max_bundle_artifacts": 4096,
+  "max_bundle_bytes": 107374182400,
+  "network_enabled": false,
+  "production_qualified": false,
+  "profile_sha256s": [
+    {
+      "path": "r116-single-node.json",
+      "sha256": "79a20014a7b2a7dd9668e2c3b7245acae60833846fa9808d9e0c08ea7face3fe"
+    },
+    {
+      "path": "r116-kubernetes-enterprise.json",
+      "sha256": "50c881dbd2480435bed671bd5bfa095cc574db8cb9f43027ecabc1c1bb42a1eb"
+    }
+  ],
+  "qualification_assertion_sha256": "bfbccd9c19dba9370a3f43be588c7f4553fe3febdb4702d78cfa28e314432d7b",
+  "qualification_level": "structurally_conformant",
+  "real_environment_qualified": false,
+  "registry_fallback_enabled": false,
+  "schema": "redagent.r116-runtime-lock/v1",
+  "source_sha256s": [
+    {
+      "path": "redagent_platform/deployment_release/__init__.py",
+      "sha256": "a5567a93527505cafbb54a701b98fc73184909efebf8427b4a8c1900dadc059c"
+    },
+    {
+      "path": "redagent_platform/deployment_release/distribution.py",
+      "sha256": "e64f30e0501de5d64dc7cf9b0972a55d09d683134eae89a83f90090aa98c2c27"
+    },
+    {
+      "path": "redagent_platform/deployment_release/kubernetes.py",
+      "sha256": "4ab835f4fd6c494927be166152009672d993bc65fb43c5a70d56d025c13f880c"
+    },
+    {
+      "path": "redagent_platform/deployment_release/promotion.py",
+      "sha256": "d811a8de9dfbef947ed96d2f4be71cc83b5c5b44ee1f2186cdb8b92849d3f079"
+    },
+    {
+      "path": "redagent_platform/deployment_release/qualification.py",
+      "sha256": "64c08f942b9d09a4631527da0b9d00eebf9a84c3f2ec12b858a968bdf366aaed"
+    },
+    {
+      "path": "redagent_platform/deployment_release/recovery.py",
+      "sha256": "f364d270c752f2061ec0247fee8d70d24a4195601d1a9a7a3838ee5297a30b05"
+    },
+    {
+      "path": "redagent_platform/deployment_release/topology.py",
+      "sha256": "b02750bc26884b61c7681f0b5c316ae2ebe360f75c2639e175c01af4ad41877a"
+    },
+    {
+      "path": "redagent_platform/deployment_release/upgrade.py",
+      "sha256": "e8b7eff67c1be8356a069d2373447c83329edf8ca3d6dd0c3f84f56098a1b3b4"
+    },
+    {
+      "path": "scripts/r116_deployment_release.py",
+      "sha256": "1239074ce64ce9a7fd97776d2fef4bdf83be50e1507e8ee50b368f65deae7ec2"
+    },
+    {
+      "path": "scripts/r116_sign_promotion.py",
+      "sha256": "df89fc125d3f0b46dda8875b0aad4b11f300b54db64698aa4882a406e52b29a3"
+    }
+  ],
+  "source_tree_sha256": "8679714014184e0075b3beb8bc42739b1842fafafff5c6bf14bd27ba353d7550"
+}

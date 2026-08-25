@@ -1,0 +1,23 @@
+{
+  "schema": "redagent.r107-runtime-lock/v1",
+  "platform": "linux/amd64",
+  "profile_id": "tcp-connect-discovery-v1",
+  "target_local_tag": "redagent/r107-target:local",
+  "target_image_id": "sha256:63bc76cf7a5cdb22a0e6853fe0af053c809efeed0828f2be118d70c22e789e9f",
+  "target_dockerfile_sha256": "e463fea25cb328d5b94a509d8ca4cb8c74d9b93640f1635fa8696965edd2a6fc",
+  "target_source_sha256": "fbacce031e7457739818252a9788a6634debee45f36110bf8a65f324ac48877e",
+  "gateway_local_tag": "redagent/r107-gateway:local",
+  "gateway_image_id": "sha256:e4177494a0591668b122866105acbfe7583432bc2491690f48c9752ecf3bceb2",
+  "gateway_dockerfile_sha256": "25c9cf5f1fc663d7f55b48370be03adad9a295eb319b12f3007485b44f02991b",
+  "gateway_source_sha256": "a7fbc95ecdd3050aa41a5b86194fa34b61d50ecd0851457d8fabc2c0e0886e60",
+  "worker_local_tag": "redagent/r107-worker:local",
+  "worker_image_id": "sha256:bae98a1c31a0c550038eb617f34f8445e06415e9c120b42665aed46365fadd0d",
+  "worker_dockerfile_sha256": "f32d6f5b41a4fadb43281fe2b2b4b3c5338d297c211ecaafb3232f5dd6268741",
+  "worker_source_sha256": "a8e665df2f06c5170cc1fdde6d7b765827dd37637393a22b15e33f3a3af1fbb3",
+  "critical_vulnerability_count": 0,
+  "external_scanner_present": false,
+  "external_target_allowed": false,
+  "raw_socket_allowed": false,
+  "runtime_update_allowed": false,
+  "production_qualified": false
+}

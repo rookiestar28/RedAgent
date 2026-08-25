@@ -1,0 +1,33 @@
+{
+  "schema": "redagent.r105-artifact-promotion/v1",
+  "artifact": {
+    "engine_id": "nuclei-3.8.0-r105.1",
+    "nuclei_version": "3.8.0",
+    "platform": "linux/amd64",
+    "image_digest": "sha256:4e95c15953fe894bda1a8a16ecde958497e335a7a0b1f6fdb17b06af38630871",
+    "upstream_image_digest": "sha256:b0eb3dd127de6b20836fd6bbc55cacff0ac43c226f4b35ba077d7ea03ec9e740",
+    "dockerfile_sha256": "985f72dafc2bb07b770728e5feec3cc082f1d82641b3d6479f415704ca8d8c8c",
+    "configured_user": "65532:65532"
+  },
+  "sbom": {
+    "format": "spdx-json",
+    "sha256": "8e82e90208ae3fe8cc613a36aaaa69d85c139329ed41b5466612070bc89747b9"
+  },
+  "vulnerability_review": {
+    "scanner": "trivy-0.70.0",
+    "report_sha256": "ebb1ada367bcfd5d5d12759ab80bde3261d6265cda68834eb77a02c3cf7eddb8",
+    "critical_vulnerability_count": 0,
+    "result": "accepted_no_critical",
+    "upstream_direct_execution_rejected": true
+  },
+  "qualification": {
+    "signed_bundle_verified": true,
+    "owned_fixture_finding_count": 1,
+    "external_target_contacts": 0,
+    "direct_target_route": false,
+    "cleanup_residual_resource_count": 0
+  },
+  "created_at": "2026-07-11T00:00:00+00:00",
+  "expires_at": "2026-08-10T00:00:00+00:00",
+  "production_qualified": false
+}

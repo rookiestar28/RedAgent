@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "base_image": "docker.io/library/python:3.13.9-alpine3.22",
+  "base_index_digest": "sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1",
+  "base_linux_amd64_digest": "sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6",
+  "registry": "docker.io/library/python",
+  "tag": "3.13.9-alpine3.22",
+  "index_digest": "sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1",
+  "platform_digest": "sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6",
+  "derived_image_id": "sha256:596e2d88e331382c51e631216c524d51d198a0094f7eefe041b30657857e60d1",
+  "local_tag": "redagent/r103-synthetic-lab:1.0.0",
+  "platform": "linux/amd64",
+  "source": "repository-owned:containers/lab-synthetic",
+  "license_security_status": "PSF-2.0 Python runtime on Alpine; benign deterministic local fixture only.",
+  "purpose": "r103-safe-local-lab-qualification",
+  "production_qualified": false
+}

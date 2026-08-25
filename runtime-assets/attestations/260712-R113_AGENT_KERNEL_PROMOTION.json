@@ -1,0 +1,24 @@
+{
+  "author": "redagent-r113-author",
+  "background_mode": false,
+  "critical_vulnerability_count": 0,
+  "direct_runner_dispatch": false,
+  "enabled_providers": [
+    "deterministic-fake"
+  ],
+  "expires_at": "2026-08-10T16:38:09Z",
+  "external_model_calls": false,
+  "hosted_tools": false,
+  "mcp": false,
+  "parallel_tool_calls": false,
+  "production_qualified": false,
+  "projected_capability_count": 9,
+  "promoted_at": "2026-07-11T16:38:09Z",
+  "provider_storage": false,
+  "qualification_receipt_sha256": "6ca041eb8a893428520b0491d982993fbfb6a52e4745baddc13c7d0e8b39ad53",
+  "reviewer": "redagent-r113-reviewer",
+  "runtime_lock_sha256": "bb93b83f28263815209718f565806c20d33720727b938828cf2cdd57fee04619",
+  "schema": "redagent.r113-promotion/v1",
+  "sensitive_trace_capture": false,
+  "source_sha256": "3c2224e4d6b1505434944189f806c83a69f86ed570b325a8fe511eb2b1bc9377"
+}

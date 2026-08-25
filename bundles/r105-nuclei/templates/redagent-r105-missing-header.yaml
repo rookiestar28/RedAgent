@@ -1,0 +1,26 @@
+id: redagent-r105-missing-header
+
+info:
+  name: R105 Missing Security Header
+  author: redagent
+  severity: low
+  tags: redagent,synthetic
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/nuclei/missing-header"
+    redirects: false
+    max-redirects: 0
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        name: missing-security-header
+        part: header
+        negative: true
+        words:
+          - X-Content-Type-Options
+# digest: 4b0a00483046022100a5e003556d9ca5a499deb2dfdd6b58d8bc422ac243fd09ebf21e24f5a3e249a502210083e723cf21f7713a3eb7caecba652c2d3c25501d0b5e0b4213eebbb13ea36db0:602974d2cc7cf24e81a247e0ab472bc0

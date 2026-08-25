@@ -1,0 +1,56 @@
+{
+  "schema": "redagent.r105-template-bundle/v2",
+  "bundle_id": "r105-http-header-bundle",
+  "bundle_revision": 2,
+  "source_base": "70d75756615aea34f6f897ff766be3c96a56b668",
+  "engine": {
+    "version": "3.11.1",
+    "image_digest": "sha256:92781786bc926d2a809c1239953bdeabb31151492b87fd54a9f834835c8217ad"
+  },
+  "signer": {
+    "certificate_path": "config/trust/r105-nuclei-user.crt",
+    "certificate_sha256": "04c820859f6253abf27eafc340b8f8b375bb7f40cbc5ad36c23672dcf21ec481",
+    "certificate_fingerprint_sha256": "9e10dbdfe4bd2897e6bea2a1f86585ae1437804a722fca56e51f5180cbb732fd",
+    "nuclei_signature_verified": true
+  },
+  "files": [
+    {
+      "path": "templates/redagent-r105-missing-header.yaml",
+      "sha256": "7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",
+      "size_bytes": 700,
+      "kind": "nuclei-template"
+    }
+  ],
+  "template": {
+    "id": "redagent-r105-missing-header",
+    "protocol": "http",
+    "methods": ["GET"],
+    "paths": ["/nuclei/missing-header"],
+    "tags": ["redagent", "synthetic"],
+    "risk_class": "low",
+    "scope_predicate": "owned-r105-gateway-exact-path",
+    "expected_evidence": ["missing-security-header"],
+    "payload_files": [],
+    "elevated_features": []
+  },
+  "review": {
+    "author": "redagent-r105-author",
+    "reviewer": "redagent-r105-independent-review",
+    "separation_of_duties": true,
+    "result": "approved-local-lab-only"
+  },
+  "qualification": {
+    "receipt_path": ".planning/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json",
+    "receipt_sha256": "2ec66c84edb81a4f8b199558ad39777687ff3d30903f677eeab9af47e3813154",
+    "candidate_bundle_sha256": "2e27c89ed82a3b626a7888ef76f6208de0ece0377ccf58fba110142c7ab21624",
+    "owned_fixture_finding_count": 1,
+    "external_target_contacts": 0,
+    "direct_target_route": false,
+    "cleanup_residual_resource_count": 0,
+    "false_positive_regression_passed": true
+  },
+  "promoted_at": "2026-08-24T17:03:42+08:00",
+  "expires_at": "2026-09-23T17:03:42+08:00",
+  "deprecated": false,
+  "production_qualified": false
+}

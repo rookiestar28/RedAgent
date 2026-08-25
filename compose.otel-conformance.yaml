@@ -1,0 +1,30 @@
+name: redagent-otel-conformance
+
+services:
+  otel-collector:
+    image: ${REDAGENT_OTEL_COLLECTOR_IMAGE:?digest-pinned Collector image is required}
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    ports:
+      - "127.0.0.1:58431:4317"
+      - "127.0.0.1:51318:13133"
+    volumes:
+      - ./config/otel-collector/collector-conformance.yaml:/etc/otelcol-contrib/config.yaml:ro
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    mem_swappiness: 0
+    pids_limit: 128
+    cpus: 0.5
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - telemetry-conformance
+
+networks:
+  telemetry-conformance:
+    internal: true

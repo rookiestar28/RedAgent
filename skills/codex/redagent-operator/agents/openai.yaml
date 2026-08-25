@@ -1,0 +1,7 @@
+interface:
+  display_name: "RedAgent Operator"
+  short_description: "Guided, authorized RedAgent workflows"
+  brand_color: "#334155"
+  default_prompt: "Use $redagent-operator to collect scope and run a dry-run RedAgent command-contract check."
+policy:
+  allow_implicit_invocation: false

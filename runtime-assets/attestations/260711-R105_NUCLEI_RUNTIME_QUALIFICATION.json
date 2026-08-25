@@ -1,0 +1,26 @@
+{
+  "artifact_receipt_id": "artifact-r105-nuclei-380-r105-1",
+  "artifact_signature_sha256": "2033efe25e3bd01814600cf3e2d394a1e39e329b8010f1fc9ba6e92e47e8a750",
+  "bundle_sha256": "6c16355c64475bbea0b647f5a0c8571a461a7382ec9acb9a0aff9800108bc768",
+  "cleanup_residual_resource_count": 0,
+  "direct_target_route": false,
+  "external_target_contacts": 0,
+  "forced_termination": false,
+  "finding": {
+    "affected_resource": "/nuclei/missing-header",
+    "fingerprint_sha256": "ea7a73090000839cdd2482aee7e50f62f0767cdb9392f5dfd8605dc1da0b6614",
+    "matcher_name": "missing-security-header",
+    "severity": "low",
+    "template_id": "redagent-r105-missing-header"
+  },
+  "owned_fixture_finding_count": 1,
+  "passed": true,
+  "gateway_quota_denied": true,
+  "native_stop_acknowledged": true,
+  "native_stop_attempted": true,
+  "payload_tamper_denied": true,
+  "plan_sha256": "65145759b32c6b25ed2002a03983581c5e6bb50d9801d50e9524e762dfcd1dd5",
+  "production_qualified": false,
+  "schema": "redagent.r105-qualification/v1",
+  "unsigned_template_denied": true
+}

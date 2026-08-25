@@ -1,0 +1,23 @@
+{
+  "schema": "redagent.r106-engine-artifact/v1",
+  "engine": "schemathesis",
+  "version": "4.22.4",
+  "python": "3.13.9",
+  "pypi_project_url": "https://pypi.org/project/schemathesis/4.22.4/",
+  "release_url": "https://github.com/schemathesis/schemathesis/releases/tag/v4.22.4",
+  "wheel_filename": "schemathesis-4.22.4-py3-none-any.whl",
+  "wheel_sha256": "62ff5d1657e823fc485ac9083e24995f497ae1aba6957b86b310d399317f21cb",
+  "runtime_lock_sha256": "9c49a29253b64acf693acdb232fa88c86271e05fae1c6becafded14b0defceed",
+  "dependency_review_sha256": "8576186baddfd64ad2ad10aaf4e86f3c66ea8df9649084a274243b3b7be1697f",
+  "generated_sbom_sha256": "eb4e3f313f320252eaa6a9982fcd192bbbb9b02d6928f0bb86f0ea96983a90ee",
+  "locked_component_count": 73,
+  "direct_license": "MIT",
+  "pypi_known_vulnerabilities": 0,
+  "yanked": false,
+  "unexpected_methods_enabled": false,
+  "external_references_enabled": false,
+  "callbacks_enabled": false,
+  "restler_included": false,
+  "production_qualified": false,
+  "reviewed_at": "2026-07-11T12:30:00Z"
+}

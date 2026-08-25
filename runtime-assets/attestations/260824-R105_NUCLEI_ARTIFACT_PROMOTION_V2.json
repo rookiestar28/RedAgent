@@ -1,0 +1,64 @@
+{
+  "schema": "redagent.r105-artifact-promotion/v2",
+  "promotion_id": "r105-nuclei-3.11.1-r105.2-local",
+  "created_at": "2026-08-24T17:03:42+08:00",
+  "expires_at": "2026-09-23T17:03:42+08:00",
+  "environment": "Docker Desktop linux/amd64 on Windows",
+  "production_qualified": false,
+  "runtime_lock": {
+    "path": "config/r105-nuclei-runtime-v2.json",
+    "sha256": "7b6694e5eb3e60e6146c84922cfc6404e444665b04efadf2a85898149a795429"
+  },
+  "artifact": {
+    "engine_id": "nuclei-3.11.1-r105.2",
+    "local_tag": "redagent/r105-nuclei:3.11.1-r105.2",
+    "nuclei_version": "3.11.1",
+    "platform": "linux/amd64",
+    "image_digest": "sha256:92781786bc926d2a809c1239953bdeabb31151492b87fd54a9f834835c8217ad",
+    "upstream_image_digest": "sha256:9fd705284ac4b5f721fa1e23bf366f26e985cd4ec65927fe9a53cb3fcb0417a6",
+    "dockerfile_sha256": "cd83a295ea40fb0555da89f6f46961ae23c5cfac017fd957f29abdfc53ca315c",
+    "configured_user": "65532:65532"
+  },
+  "owned_helpers": {
+    "target_local_tag": "redagent/r105-target:1.0.1",
+    "target_image_id": "sha256:c83d8a5ebaa0d46f0d0cf3f3e15b709ced2b904e9d14babe8eea64598a552dc5",
+    "target_source_sha256": "d2012077f8bb7f5e5bef3c1fbd591c9777b2f19e4d45e159692ed182c0bbc6e3",
+    "target_dockerfile_sha256": "9e54a89e3b444d5efa6bb7bd8f2d70197200156bb78d05b8d9ee0fe5ed96df0a",
+    "gateway_local_tag": "redagent/r105-gateway:1.0.1",
+    "gateway_image_id": "sha256:be45182b6bc063b6caf224a86270a9e33dcd3b8de76d49597d0b12351a8cad9c",
+    "gateway_source_sha256": "1554ba860102ce2e94736f52ca740396e989e28b32bd1ccd04794cfee50e8393",
+    "gateway_dockerfile_sha256": "65f8a0acefe1ce3e08954852a60f18d2aed089bc00182902d1242a7da412e451"
+  },
+  "build": {
+    "source_date_epoch": 1787529600,
+    "buildkit_compatibility_version": "20",
+    "rewrite_timestamp": true,
+    "unpack": false,
+    "reproducible_build_count": 2,
+    "runtime_update_allowed": false,
+    "community_templates_allowed": false
+  },
+  "sbom": {
+    "format": "spdx-json",
+    "generator": "trivy-0.74.0",
+    "package_count": 594,
+    "sha256": "9cbc9fc562decdb01d61c71b62efe2060ee97725f10257f4f65c1787d5dd603b"
+  },
+  "vulnerability_review": {
+    "scanner": "trivy-0.74.0",
+    "database_updated_at": "2026-08-24T06:55:32.451220873Z",
+    "report_sha256": "cfb0ccb20acc39cce8ff842bccb0789f2ba8c571f81f93eddc1a438127dad816",
+    "critical_vulnerability_count": 0,
+    "result": "accepted_no_critical",
+    "upstream_direct_execution_rejected": true
+  },
+  "qualification": {
+    "receipt_path": ".planning/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json",
+    "receipt_sha256": "2ec66c84edb81a4f8b199558ad39777687ff3d30903f677eeab9af47e3813154",
+    "signed_bundle_verified": true,
+    "owned_fixture_finding_count": 1,
+    "external_target_contacts": 0,
+    "direct_target_route": false,
+    "cleanup_residual_resource_count": 0
+  }
+}

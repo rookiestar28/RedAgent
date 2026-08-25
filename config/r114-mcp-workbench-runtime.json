@@ -1,0 +1,18 @@
+{
+  "ambient_environment": false,
+  "direct_runner_dispatch": false,
+  "dynamic_discovery": false,
+  "dynamic_registration": false,
+  "enabled_transports": [
+    "in_process"
+  ],
+  "inventory_sha256": "7112852d4e9b66a6ad676278d970eaa57eb4179483f94a6fa365141875a8a78c",
+  "protocol_version": "2025-11-25",
+  "provider_mcp": false,
+  "qualification_assertion_sha256": "3e07e7d9c76f28654ce231a28a4bc7d9ef973036037c49a7e0e4ede170045353",
+  "remote_http": false,
+  "schema": "redagent.r114-runtime-lock/v1",
+  "sensitive_retention": false,
+  "stdio": false,
+  "token_passthrough": false
+}

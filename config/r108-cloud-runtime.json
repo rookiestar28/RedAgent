@@ -1,0 +1,19 @@
+{
+  "control_pack_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "enabled_profiles": [
+    "aws",
+    "azure",
+    "gcp",
+    "kubernetes"
+  ],
+  "external_adapter_execution": false,
+  "network_mode": "loopback-emulator-or-none",
+  "offline_database_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "production_qualified": false,
+  "qualification_assertion_sha256": "d2276a89272cd5cdb56f66c5c089a431000940ec821b7e463976380c3a133e2c",
+  "qualification_receipt_sha256": "30d3d65b88846c29e86259f1fecbd892efcd9f8cb5ce843ffa545eda5d4ab9e6",
+  "real_cloud_allowed": false,
+  "real_cluster_allowed": false,
+  "schema": "redagent.r108-runtime-lock/v1",
+  "source_sha256": "8ac7df4d62d2f096d6180569dc968790ff58774c1a03a1fe77fbc87e37c93f16"
+}

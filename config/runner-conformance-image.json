@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "base_image": "docker.io/library/python:3.13.9-alpine3.22",
+  "base_index_digest": "sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1",
+  "base_linux_amd64_digest": "sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6",
+  "derived_image_id": "sha256:53021de7e52376b1cdf9b3553bfcb8de15dea0ba4cd2afd835594bdfeae017ac",
+  "source_date_epoch": 1760544000,
+  "buildkit_compatibility_version": "20",
+  "local_tag": "redagent/r100-synthetic:1.0.0",
+  "registry": "docker.io/library/python",
+  "tag": "3.13.9-alpine3.22",
+  "index_digest": "sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1",
+  "platform_digest": "sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6",
+  "platform": "linux/amd64",
+  "source": "https://github.com/docker-library/python.git",
+  "source_revision": "3f2d7e4c339ab883455b81a873519f1d0f2cd80a",
+  "license_security_status": "PSF-2.0 Python runtime on Alpine; official image manifest inspected 2026-07-10; benign local synthetic conformance only.",
+  "purpose": "r100-benign-synthetic-runner-base",
+  "production_qualified": false
+}

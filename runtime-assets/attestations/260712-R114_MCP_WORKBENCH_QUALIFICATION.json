@@ -1,0 +1,19 @@
+{
+  "adversarial_case_count": 20,
+  "credential_access_count": 0,
+  "denied_case_count": 20,
+  "direct_dispatch_count": 0,
+  "fixture_inventory_count": 2,
+  "inventory_sha256": "7112852d4e9b66a6ad676278d970eaa57eb4179483f94a6fa365141875a8a78c",
+  "network_contact_count": 0,
+  "process_launch_count": 0,
+  "protocol_version": "2025-11-25",
+  "provider_mcp_enabled": false,
+  "qualified_at": "2026-07-12T08:30:00+00:00",
+  "receipt_sha256": "3e07e7d9c76f28654ce231a28a4bc7d9ef973036037c49a7e0e4ede170045353",
+  "remote_http_enabled": false,
+  "schema": "redagent.r114-qualification/v1",
+  "sensitive_retention_count": 0,
+  "status": "passed",
+  "stdio_enabled": false
+}

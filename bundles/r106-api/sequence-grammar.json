@@ -1,0 +1,14 @@
+{
+  "schema": "redagent.r106-sequence-grammar/v1",
+  "grammar_id": "r106-sequence-grammar-v1",
+  "max_steps": 8,
+  "sequences": [
+    {"id": "create-read-delete", "steps": ["createDocument", "getDocument", "deleteDocument"], "cleanup_order": ["deleteDocument"]},
+    {"id": "create-transfer-read-restore-delete", "steps": ["createDocument", "transferDocument", "getDocument", "transferDocumentToOriginalOwner", "deleteDocument"], "cleanup_order": ["transferDocumentToOriginalOwner", "deleteDocument"]}
+  ],
+  "every_mutation_requires": ["idempotency_key", "ownership_tag", "postcondition", "compensation"],
+  "cleanup_order": "reverse_dependency",
+  "aggressive_resource_grammar": false,
+  "restler_execution": false,
+  "production_qualified": false
+}

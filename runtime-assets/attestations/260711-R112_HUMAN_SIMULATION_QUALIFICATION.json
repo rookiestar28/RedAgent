@@ -1,0 +1,46 @@
+{
+  "campaign_id": "r112-sink-email-canary-v1",
+  "campaign_sha256": "b21260762414ee3fe87fd732ce3b19a7d1d2d00f923f6642989caf1945ff22af",
+  "canary": {
+    "correlation_sha256": "130dc2da52d55611333f5f1923da951d3203fa94dfd335f7db001cac3851b57b",
+    "triggered_in_owned_sink": true
+  },
+  "deletion": {
+    "deleted_message_count": 1,
+    "final_state": "deleted",
+    "residual_message_count": 0,
+    "zero_residual": true
+  },
+  "delivery": {
+    "captured": true,
+    "human_delivered": false,
+    "message_sha256": "7fa8621d1e364f8b047785cffdf2b50025d169abc8b76f7786e894f1bebaa101",
+    "recipient_class": "synthetic-invalid-owned"
+  },
+  "event": {
+    "body_sha256": "b5f85f3a4ab8732d94467e9149502351d0b2f13e02949408b7b95d463b0cc041",
+    "category": "synthetic_accepted",
+    "raw_value_retained": false,
+    "replay_checked": true,
+    "signature_verified": true
+  },
+  "plan_sha256": "585bc2077edf2cd1d9e289800f3ddd0ee15010bd1399d08c9a92332952a1e7e7",
+  "qualified_at": "2026-07-11T15:58:58+00:00",
+  "receipt_sha256": "d2f9c07fe94f29951d1ee5e7a1def143b86c7ea2b4f0bb7552bcadbe4aae7793",
+  "safety": {
+    "external_contact_count": 0,
+    "external_reference_execution_count": 0,
+    "forward_count": 0,
+    "human_delivery_count": 0,
+    "production_contact_count": 0,
+    "provider_credential_count": 0,
+    "raw_submission_retained_count": 0,
+    "real_recipient_count": 0,
+    "relay_count": 0,
+    "tracking_count": 0
+  },
+  "schema": "redagent.r112-qualification/v1",
+  "scope": "owned-synthetic-invalid-recipient-in-process-sink",
+  "source_sha256": "e06d986c3462a563b8981daa20d145b470204084861604e078e5ff967cb87ccd",
+  "status": "passed"
+}

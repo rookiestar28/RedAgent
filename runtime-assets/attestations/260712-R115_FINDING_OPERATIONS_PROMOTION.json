@@ -1,0 +1,20 @@
+{
+  "ai_approval": false,
+  "arbitrary_destination": false,
+  "arbitrary_payload": false,
+  "author": "engineer-r115",
+  "expires_at": "2026-08-10T18:22:39+00:00",
+  "external_connectors": false,
+  "fixture_connector_count": 1,
+  "generator_publication": false,
+  "network_enabled": false,
+  "production_qualified": false,
+  "promoted_at": "2026-07-11T18:22:39+00:00",
+  "qualification_receipt_sha256": "dfcb3c1becdc7e8871c60d138c53a509d774422e0aec6e6420d04aac90ef2373",
+  "reviewer": "reviewer-r115",
+  "runtime_lock_sha256": "d06b056950c9b1545617ff44c61f219ca182895fc6fab13e2ab11d048416a149",
+  "scenario_sha256": "86eec380ca1d9068493c36dc690afaccc64c2b31cf76d057c477fdcc6974623f",
+  "schema": "redagent.r115-promotion/v1",
+  "unredacted_publication": false,
+  "unreviewed_publication": false
+}

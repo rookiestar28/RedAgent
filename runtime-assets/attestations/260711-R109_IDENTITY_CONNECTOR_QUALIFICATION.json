@@ -1,0 +1,101 @@
+{
+  "cancellation": {
+    "cooperative_stop_acknowledged": true,
+    "final_state": "cancelled",
+    "forced_termination": false,
+    "lease_revoked": true,
+    "new_requests_blocked": true,
+    "occurred_at": "2026-07-11T11:26:15+00:00",
+    "residual_resource_count": 0,
+    "run_id": "run-r109-qualification"
+  },
+  "external_adapters": [
+    {
+      "adapter_id": "scubagear",
+      "execution_enabled": false,
+      "production_qualified": false
+    },
+    {
+      "adapter_id": "scubagoggles",
+      "execution_enabled": false,
+      "production_qualified": false
+    },
+    {
+      "adapter_id": "prowler",
+      "execution_enabled": false,
+      "production_qualified": false
+    }
+  ],
+  "negative": {
+    "mutation_denied": true,
+    "overgrant_denied": true,
+    "redirect_denied": true,
+    "wrong_binding_denied": true
+  },
+  "providers": [
+    {
+      "audience": "graph-microsoft-r109",
+      "complete": true,
+      "evaluation_sha256": "9c315ac9ef71a27ee3d3662cfb537a18f13c4866f5ace90cbf83bc540a4f7f9b",
+      "external_contact_count": 0,
+      "page_count": 1,
+      "plan_sha256": "11078f32763cab8a9f2ad4e9abee8b3e88a885a22aa45714c36bb48be6878bc7",
+      "provider": "microsoft_365",
+      "resource_count": 1,
+      "selected_fields": [
+        "id",
+        "displayName",
+        "tenantType"
+      ],
+      "snapshot_sha256": "353f881e63882a6dea86ca620607a3888e66c96492abe32d3c12269d7eb5749d",
+      "tenant_id": "tenant-r109-m365"
+    },
+    {
+      "audience": "admin-google-r109",
+      "complete": true,
+      "evaluation_sha256": "0be5e254c19791605da5b7b4631f343b2d9ca7a7a7b339a3404c5bd0ad99a689",
+      "external_contact_count": 0,
+      "page_count": 1,
+      "plan_sha256": "51c74fff755b689efd33dea752534cac6af20f3b67bd0adf26be45991dc0c950",
+      "provider": "google_workspace",
+      "resource_count": 1,
+      "selected_fields": [
+        "id",
+        "name",
+        "directMembersCount"
+      ],
+      "snapshot_sha256": "c7657e377044e8524db63ddb1c97f530af75e853493e42ff113430d9e92f6767",
+      "tenant_id": "customer-r109-google"
+    },
+    {
+      "audience": "okta-api-r109",
+      "complete": true,
+      "evaluation_sha256": "587cb16ff423f61c6311ed55cd926e667d0e163db63715ee7eb702ae37019426",
+      "external_contact_count": 0,
+      "page_count": 1,
+      "plan_sha256": "66253eae507fc66b980dd2d39a216601e62b32796e3a05a74e29ad05bad12b69",
+      "provider": "okta",
+      "resource_count": 1,
+      "selected_fields": [
+        "id",
+        "type",
+        "created"
+      ],
+      "snapshot_sha256": "83a00e60cafc7c2715968990423359b3ae11fdbbb1c5a173aa6a5026d266138d",
+      "tenant_id": "org-r109-okta"
+    }
+  ],
+  "qualified_at": "2026-07-11T11:26:15+00:00",
+  "receipt_sha256": "419a26bdbd96756a315a1b71bac49df023c6b8c419fea3b49c1c49d844051923",
+  "safety": {
+    "credential_material_persisted_count": 0,
+    "external_contact_count": 0,
+    "external_reference_execution_count": 0,
+    "production_qualified": false,
+    "real_tenant_contact_count": 0
+  },
+  "schema": "redagent.r109-qualification/v1",
+  "scope": "repo-owned-loopback-identity-emulators-only",
+  "source_sha256": "5a0237e31ee6903b502b2fe9650e3272e6942e94f355e0994c075ce717304dc9",
+  "status": "passed"
+}

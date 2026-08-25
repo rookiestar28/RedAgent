@@ -1,0 +1,38 @@
+env:
+  contexts:
+    - name: redagent-r123-passive
+      urls:
+        - http://redagent-r104-gateway:8080/passive/missing-header
+      includePaths:
+        - '\Qhttp://redagent-r104-gateway:8080/passive/missing-header\E'
+      excludePaths:
+        - '^(?!http://redagent\-r104\-gateway:8080/passive/missing\-header$).*$'
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: false
+jobs:
+  - type: spider
+    parameters:
+      context: redagent-r123-passive
+      url: http://redagent-r104-gateway:8080/passive/missing-header
+      maxDuration: 2
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 2
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /work
+      reportFile: zap-report.json
+parameters:
+  requestLimit: 20
+  requestRatePerSecond: 2
+  concurrency: 1
+  timeoutSeconds: 60
+  responseBytesLimit: 1048576
+redagent:
+  schema: redagent.r123-zap-passive-plan/v1
+  profileId: zap-passive-v1
+  allowedPaths:
+    - /passive/missing-header

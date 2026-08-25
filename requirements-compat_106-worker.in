@@ -1,0 +1,3 @@
+# Compatibility worker for the isolated API-differential fixture only.
+# Keep this surface minimal: orchestration and database clients belong to the control plane.
+schemathesis==4.22.4

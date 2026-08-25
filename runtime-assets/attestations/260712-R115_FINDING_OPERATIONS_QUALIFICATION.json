@@ -1,0 +1,23 @@
+{
+  "adversarial_case_count": 28,
+  "ai_approval_count": 0,
+  "arbitrary_destination_enabled": false,
+  "arbitrary_payload_enabled": false,
+  "credential_access_count": 0,
+  "cyclonedx_version": "1.6",
+  "denied_case_count": 28,
+  "external_connectors_enabled": false,
+  "external_delivery_count": 0,
+  "fingerprint_recipe": "redagent-fingerprint-v1",
+  "fixture_connector_count": 1,
+  "generator_publication_count": 0,
+  "network_contact_count": 0,
+  "ocsf_version": "1.8.0",
+  "production_qualified": false,
+  "receipt_sha256": "28d02d976bc0aaf8ef0a745feed76f0b48338e22d9e84b8b1bf5edf994221e36",
+  "sarif_version": "2.1.0",
+  "scenario_sha256": "86eec380ca1d9068493c36dc690afaccc64c2b31cf76d057c477fdcc6974623f",
+  "schema": "redagent.r115-qualification/v1",
+  "sensitive_retention_count": 0,
+  "status": "passed"
+}

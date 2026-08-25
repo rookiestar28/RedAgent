@@ -1,0 +1,67 @@
+{
+  "schema": "redagent.r104-artifact-promotion/v2",
+  "promotion_id": "r104-zap-2.17.0-r104.2-local",
+  "created_at": "2026-08-24T17:03:42+08:00",
+  "expires_at": "2026-09-23T17:03:42+08:00",
+  "environment": "Docker Desktop linux/amd64 on Windows",
+  "production_qualified": false,
+  "runtime_lock": {
+    "path": "config/r104-zap-runtime-v2.json",
+    "sha256": "d39d31c1b61a84e60f61802849dda02c462f9ab657fb3a715e66a649fc53c59a"
+  },
+  "artifact": {
+    "local_tag": "redagent/r104-zap:2.17.0-r104.2",
+    "image_digest": "sha256:3cd55809bfea0393bc67862eec614091faa873cfb219d28465122f04ae8d266b",
+    "upstream_image_digest": "sha256:627781353231d056d5a6305ec1f2092f54735cc654915f533d2e8d5d9d41bcb2",
+    "dockerfile_sha256": "36d37e6f7458caaac9a57669c51f9554fc62bfc8b6565a576fc2f39bbd5c738e",
+    "zap_version": "2.17.0",
+    "configured_user": "zap",
+    "addon_inventory_count": 48,
+    "addon_inventory_sha256": "50293fde751b211ed6432b0b5039e8bf3fec7676a738c635a9c1e6844c511e43"
+  },
+  "owned_helpers": {
+    "target_local_tag": "redagent/r104-target:1.0.1",
+    "target_image_id": "sha256:a9196612dd4d48af9f60be06024ac15bd64b39d2fb617b54f2fc66921dda1642",
+    "target_source_sha256": "eadf76b79ea4b64f956cac5f6dc5e004990405f4f4504997fe43002768b7e493",
+    "target_dockerfile_sha256": "92c7b1a54d423789f82585d70eb59ccacb5cda8cd04c4a1f538b9316a35d1eb3",
+    "gateway_local_tag": "redagent/r104-gateway:1.0.1",
+    "gateway_image_id": "sha256:a571a9ff40677e8aac9af21fc8c08c4cbbcbf489d9708d82b3ef73df84d55cd2",
+    "gateway_source_sha256": "09a956ad273eb2161b866cbee87d185da35f6bdb62113670a50c276cb1aa2668",
+    "gateway_dockerfile_sha256": "3d94dc192c711e2031a28c6be2e2f940cbeccd71373eede6832641d6c3726416"
+  },
+  "build": {
+    "source_date_epoch": 1787529600,
+    "buildkit_compatibility_version": "20",
+    "rewrite_timestamp": true,
+    "unpack": false,
+    "reproducible_build_count": 2,
+    "runtime_update_allowed": false
+  },
+  "sbom": {
+    "format": "spdx-json",
+    "generator": "trivy-0.74.0",
+    "package_count": 277,
+    "sha256": "d049db94f2c81e2885a27f028660eb1e527623b0b0406438042fa89860450574"
+  },
+  "vulnerability_review": {
+    "scanner": "trivy-0.74.0",
+    "database_updated_at": "2026-08-24T06:55:32.451220873Z",
+    "report_sha256": "431f3676ea80af5139890a6be8806d4040583d0d13f9b364c309bf8adc163856",
+    "critical_vulnerability_count": 0,
+    "result": "accepted_no_critical"
+  },
+  "qualification": {
+    "receipt_path": ".planning/260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json",
+    "receipt_sha256": "44e446b213e622548027d08a27e0a94c37863a0b1422231cefb6b839e5a59622",
+    "profiles": [
+      "zap-passive-v1",
+      "zap-auth-crawl-v1",
+      "zap-client-spider-v1",
+      "zap-active-xss-lab-v1"
+    ],
+    "all_profiles_passed": true,
+    "external_target_contacts": 0,
+    "direct_target_route": false,
+    "cleanup_residual_resource_count": 0
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "author": "redagent-r109-author",
+  "critical_vulnerability_count": 0,
+  "enabled_profiles": [
+    "google_workspace",
+    "microsoft_365",
+    "okta"
+  ],
+  "expires_at": "2026-08-10T11:26:41Z",
+  "external_adapter_execution": false,
+  "production_qualified": false,
+  "promoted_at": "2026-07-11T11:26:41Z",
+  "qualification_receipt_sha256": "c3d018144951be6668c34c5e6cf48d725bf46936a41b6819b9a9620beb4ae719",
+  "reviewer": "redagent-r109-reviewer",
+  "runtime_lock_sha256": "6962541b8708115c8767012fba484effc8fb852426cf39b1a00c2aa62a6c1b65",
+  "schema": "redagent.r109-promotion/v1",
+  "source_sha256": "5a0237e31ee6903b502b2fe9650e3272e6942e94f355e0994c075ce717304dc9"
+}

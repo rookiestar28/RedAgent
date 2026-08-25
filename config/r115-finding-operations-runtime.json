@@ -1,0 +1,19 @@
+{
+  "ai_approval": false,
+  "arbitrary_destination": false,
+  "arbitrary_payload": false,
+  "cyclonedx_version": "1.6",
+  "enabled_connectors": [
+    "fixture-ticket"
+  ],
+  "external_connectors": false,
+  "fingerprint_recipe": "redagent-fingerprint-v1",
+  "generator_publication": false,
+  "network_enabled": false,
+  "ocsf_version": "1.8.0",
+  "qualification_assertion_sha256": "28d02d976bc0aaf8ef0a745feed76f0b48338e22d9e84b8b1bf5edf994221e36",
+  "sarif_version": "2.1.0",
+  "schema": "redagent.r115-runtime-lock/v1",
+  "unredacted_publication": false,
+  "unreviewed_publication": false
+}

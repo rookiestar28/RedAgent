@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "providers": [
+    {
+      "provider_id": "local-keycloak",
+      "issuer": "http://127.0.0.1:58080/realms/redagent-local",
+      "discovery_url": "http://127.0.0.1:58080/realms/redagent-local/.well-known/openid-configuration",
+      "client_id": "redagent-local-bff",
+      "audience": "redagent-local-bff",
+      "redirect_uri": "https://127.0.0.1:58000/auth/callback",
+      "post_logout_redirect_uri": "https://127.0.0.1:58000/auth/logged-out",
+      "allowed_algorithms": ["RS256"],
+      "scopes": ["openid", "profile", "email"],
+      "tenant_claim": "redagent_tenant",
+      "roles_claim_path": ["realm_access", "roles"],
+      "token_endpoint_auth_method": "none",
+      "clock_skew_seconds": 30,
+      "http_timeout_seconds": 5
+    }
+  ]
+}

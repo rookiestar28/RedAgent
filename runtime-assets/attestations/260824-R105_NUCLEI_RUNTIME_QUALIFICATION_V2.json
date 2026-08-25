@@ -1,0 +1,30 @@
+{
+  "schema": "redagent.r105-runtime-qualification/v2",
+  "qualified_at": "2026-08-24T17:03:04+08:00",
+  "environment": "Docker Desktop linux/amd64 on Windows",
+  "runtime_lock_sha256": "7b6694e5eb3e60e6146c84922cfc6404e444665b04efadf2a85898149a795429",
+  "engine_image_id": "sha256:92781786bc926d2a809c1239953bdeabb31151492b87fd54a9f834835c8217ad",
+  "candidate_bundle_sha256": "2e27c89ed82a3b626a7888ef76f6208de0ece0377ccf58fba110142c7ab21624",
+  "local_receipt_sha256": "7de914b4727e8afbf8da68ff059e178dace7c377a0d83648f233fbe441c0ad24",
+  "plan_sha256": "87a53e18ab1f3f686edcf8e8e5a066dbb8f08b170b7fa07ca90c159136f32991",
+  "signed_bundle_verified": true,
+  "owned_fixture_finding_count": 1,
+  "finding": {
+    "template_id": "redagent-r105-missing-header",
+    "matcher_name": "missing-security-header",
+    "severity": "low",
+    "affected_resource": "/nuclei/missing-header",
+    "fingerprint_sha256": "ea7a73090000839cdd2482aee7e50f62f0767cdb9392f5dfd8605dc1da0b6614"
+  },
+  "unsigned_template_denied": true,
+  "payload_tamper_denied": true,
+  "gateway_quota_denied": true,
+  "direct_target_route": false,
+  "external_target_contacts": 0,
+  "native_stop_attempted": true,
+  "native_stop_acknowledged": true,
+  "forced_termination": false,
+  "cleanup_receipt_sha256": "8f925b6487cf2dfb7d352a05f717a3472f518f6e420a4f35f25b27d323cee892",
+  "cleanup_residual_resource_count": 0,
+  "production_qualified": false
+}

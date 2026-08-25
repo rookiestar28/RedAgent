@@ -1,0 +1,16 @@
+{
+  "author": "redagent-r107-author",
+  "critical_vulnerability_count": 0,
+  "expires_at": "2026-08-10T10:16:58Z",
+  "external_scanner_present": false,
+  "external_target_allowed": false,
+  "gateway_image_digest": "sha256:e4177494a0591668b122866105acbfe7583432bc2491690f48c9752ecf3bceb2",
+  "production_qualified": false,
+  "profile_id": "tcp-connect-discovery-v1",
+  "promoted_at": "2026-07-11T10:16:58Z",
+  "reviewer": "redagent-r107-reviewer",
+  "runtime_lock_sha256": "cb7f9a74fc6946003f2c4b6da2bc265d0bac6f89df67c610b66140e799d02ee5",
+  "schema": "redagent.r107-promotion/v1",
+  "target_image_digest": "sha256:63bc76cf7a5cdb22a0e6853fe0af053c809efeed0828f2be118d70c22e789e9f",
+  "worker_image_digest": "sha256:bae98a1c31a0c550038eb617f34f8445e06415e9c120b42665aed46365fadd0d"
+}

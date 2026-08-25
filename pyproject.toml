@@ -1,0 +1,10 @@
+[project]
+name = "redagent"
+version = "0.1.0"
+description = "Enterprise RedAgent platform bootstrap harness."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+pythonpath = ["."]
+addopts = "-q --strict-config --strict-markers"

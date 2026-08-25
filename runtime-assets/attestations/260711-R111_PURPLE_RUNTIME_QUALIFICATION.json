@@ -1,0 +1,37 @@
+{
+  "ability_id": "r111-file-stage-marker-v1",
+  "ability_sha256": "a98c1e8eb7afa850c5e7e02c90b112bd8342e5bbbe348cbf7cdd48a8dab83a03",
+  "adapter_sha256": "e8d737578f4c8330abfcab69dbb4a890d973da9a9bb633e3e9da93b5d3d2f5aa",
+  "attack_technique_id": "T1074.001",
+  "detection": {
+    "analytic_id": "AN-r111-owned-marker",
+    "collector_id": "collector-r111-owned",
+    "event_schema": "redagent.r111-owned-file-event-v1",
+    "event_sha256": "4556652c1d94d1cbf567ee2c1df070522b82b442e293ab96107e5e8e3cecaf09",
+    "observed": true,
+    "strategy_id": "DET-r111-file-create"
+  },
+  "lifecycle": {
+    "before_entry_count": 0,
+    "final_state": "succeeded",
+    "marker_sha256": "8fff5af8f7db6cd226c710e6299d0b8bad1b0544175996a806b0057110937392",
+    "residual_resource_count": 0,
+    "teardown_verified": true
+  },
+  "plan_sha256": "97924e7004e9c4ec92ccd0031ecd0ad569e4693426f1963f48a7811a2e5b3d34",
+  "qualified_at": "2026-07-11T15:23:14+00:00",
+  "receipt_sha256": "8cff67d66a62dc6133e699855c6be305fc8fe230b4a2efc476affac6c0a8a829",
+  "safety": {
+    "external_reference_execution_count": 0,
+    "network_contact_count": 0,
+    "persistent_agent_count": 0,
+    "privilege_use_count": 0,
+    "production_contact_count": 0,
+    "subprocess_count": 0,
+    "third_party_contact_count": 0
+  },
+  "schema": "redagent.r111-qualification/v1",
+  "scope": "repo-owned-disposable-filesystem-lab",
+  "source_sha256": "68a9896f154214f73cc1aee5793118283ddbca0351af16202b796d3893b86139",
+  "status": "passed"
+}

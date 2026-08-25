@@ -1,0 +1,51 @@
+services:
+  bundle-server:
+    image: ${REDAGENT_OPA_BUNDLE_SERVER_IMAGE:?REDAGENT_OPA_BUNDLE_SERVER_IMAGE is required}
+    platform: linux/amd64
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 64m
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    volumes:
+      - ./.local/redagent/opa/server/redagent.tar.gz:/bundles/redagent.tar.gz:ro
+    command:
+      - python
+      - -m
+      - http.server
+      - "8080"
+      - --bind
+      - 0.0.0.0
+      - --directory
+      - /bundles
+  opa:
+    image: ${REDAGENT_OPA_IMAGE:?REDAGENT_OPA_IMAGE is required}
+    platform: linux/amd64
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - bundle-server
+    ports:
+      - "127.0.0.1:${REDAGENT_OPA_HOST_PORT:-58181}:8181"
+    volumes:
+      - ./.local/redagent/opa/config.yaml:/config/opa.yaml:ro
+      - ./.local/redagent/opa/persist:/bundles
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    command:
+      - run
+      - --server
+      - --config-file=/config/opa.yaml
+      - --authentication=token
+      - --authorization=basic
+      - --addr=0.0.0.0:8181
+      - --skip-version-check

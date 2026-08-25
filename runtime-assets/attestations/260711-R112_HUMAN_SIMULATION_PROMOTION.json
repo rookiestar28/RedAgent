@@ -1,0 +1,20 @@
+{
+  "author": "redagent-r112-author",
+  "critical_vulnerability_count": 0,
+  "deletion_required": true,
+  "enabled_campaigns": [
+    "r112-sink-email-canary-v1"
+  ],
+  "expires_at": "2026-08-10T15:58:58Z",
+  "external_delivery": false,
+  "human_delivery": false,
+  "production_qualified": false,
+  "promoted_at": "2026-07-11T15:58:58Z",
+  "qualification_receipt_sha256": "77894d50e72a2a7689fa46688c760798701ae1f2878f5fe1cf9f745826b28646",
+  "raw_submission_retention": false,
+  "reviewer": "redagent-r112-reviewer",
+  "runtime_lock_sha256": "3152c875488086e3b3ea5d6916a8e893eab5e154d412a483f9040aa45795f60e",
+  "schema": "redagent.r112-promotion/v1",
+  "sink_only": true,
+  "source_sha256": "e06d986c3462a563b8981daa20d145b470204084861604e078e5ff967cb87ccd"
+}

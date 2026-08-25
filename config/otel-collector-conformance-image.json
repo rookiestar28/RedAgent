@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "name": "otel/opentelemetry-collector-contrib",
+  "version": "0.153.0",
+  "registry": "docker.io/otel/opentelemetry-collector-contrib",
+  "tag": "0.153.0",
+  "platform": "linux/amd64",
+  "index_digest": "sha256:93aad750175cbf1a973ae1c5886c3371f4d800f61be25cdd26870b8441ffe9fa",
+  "linux_amd64_digest": "sha256:388054389612c69d0387ecac256338e4086f6cf072fc8feafb6ce7968dc6946c",
+  "platform_digest": "sha256:388054389612c69d0387ecac256338e4086f6cf072fc8feafb6ce7968dc6946c",
+  "reference": "docker.io/otel/opentelemetry-collector-contrib:0.153.0@sha256:93aad750175cbf1a973ae1c5886c3371f4d800f61be25cdd26870b8441ffe9fa",
+  "license": "Apache-2.0",
+  "license_security_status": "reviewed",
+  "purpose": "local-conformance-only",
+  "production_qualified": false
+}

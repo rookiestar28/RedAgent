@@ -1,0 +1,21 @@
+{
+  "campaign_sha256": "b21260762414ee3fe87fd732ce3b19a7d1d2d00f923f6642989caf1945ff22af",
+  "credential_allowed": false,
+  "deletion_required": true,
+  "enabled_campaigns": [
+    "r112-sink-email-canary-v1"
+  ],
+  "external_delivery": false,
+  "forward_allowed": false,
+  "human_delivery": false,
+  "network_allowed": false,
+  "production_qualified": false,
+  "qualification_assertion_sha256": "d2f9c07fe94f29951d1ee5e7a1def143b86c7ea2b4f0bb7552bcadbe4aae7793",
+  "qualification_receipt_sha256": "77894d50e72a2a7689fa46688c760798701ae1f2878f5fe1cf9f745826b28646",
+  "raw_submission_retention": false,
+  "relay_allowed": false,
+  "schema": "redagent.r112-runtime-lock/v1",
+  "sink_only": true,
+  "source_sha256": "e06d986c3462a563b8981daa20d145b470204084861604e078e5ff967cb87ccd",
+  "tracking_allowed": false
+}

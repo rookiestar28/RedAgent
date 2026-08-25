@@ -1,0 +1,27 @@
+{
+  "schema_version": "1",
+  "registry_revision": "r118-stages-v1",
+  "stages": [
+    {"id": "local-stack", "argv": ["python", "scripts/redagent_local_stack.py", "start"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "database-upgrade", "argv": ["python", "-m", "alembic", "upgrade", "head"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "openbao-conformance", "argv": ["python", "scripts/openbao_conformance.py", "provision"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "opa-validate", "argv": ["python", "scripts/opa_conformance.py", "validate"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "opa-build", "argv": ["python", "scripts/opa_conformance.py", "build"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "opa-build-rollback", "argv": ["python", "scripts/opa_conformance.py", "build-rollback"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "opa-provision", "argv": ["python", "scripts/opa_conformance.py", "provision"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "secure-sdlc", "argv": ["python", "scripts/validate_secure_sdlc.py"], "gates": ["G1", "G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "agent-skills", "argv": ["python", "scripts/validate_agent_skills.py", "--json"], "gates": ["G1", "G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "changed-file-hooks", "argv": ["python", "-m", "pre_commit", "run", "--files"], "gates": ["G0", "G1"], "timeout_seconds": 600, "planes": []},
+    {"id": "pre-commit-all-files", "argv": ["python", "-m", "pre_commit", "run", "--all-files", "--show-diff-on-failure"], "gates": ["G2"], "timeout_seconds": 1200, "planes": []},
+    {"id": "backend-tests", "argv": ["python", "-m", "pytest", "tests"], "gates": ["G1", "G2"], "timeout_seconds": 2400, "planes": ["backend", "evidence_reporting", "connector_integration", "governance"]},
+    {"id": "frontend-install", "argv": ["npm", "ci", "--audit=false"], "gates": ["G1", "G2"], "timeout_seconds": 900, "planes": ["frontend"]},
+    {"id": "frontend-audit", "argv": ["npm", "audit", "--audit-level=moderate"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "frontend-api-check", "argv": ["npm", "run", "check:api"], "gates": ["G2"], "timeout_seconds": 300, "planes": []},
+    {"id": "frontend-typecheck", "argv": ["npm", "run", "typecheck"], "gates": ["G1", "G2"], "timeout_seconds": 300, "planes": ["frontend"]},
+    {"id": "frontend-lint", "argv": ["npm", "run", "lint"], "gates": ["G1", "G2"], "timeout_seconds": 300, "planes": ["frontend"]},
+    {"id": "frontend-unit", "argv": ["npm", "run", "test:unit"], "gates": ["G1", "G2"], "timeout_seconds": 600, "planes": ["frontend"]},
+    {"id": "frontend-build", "argv": ["npm", "run", "build"], "gates": ["G1", "G2"], "timeout_seconds": 600, "planes": ["frontend"]},
+    {"id": "playwright-install", "argv": ["npx", "playwright", "install", "chromium"], "gates": ["G2"], "timeout_seconds": 900, "planes": []},
+    {"id": "frontend-e2e", "argv": ["npm", "test"], "gates": ["G2"], "timeout_seconds": 1200, "planes": []}
+  ]
+}

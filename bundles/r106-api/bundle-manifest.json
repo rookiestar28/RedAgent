@@ -1,0 +1,36 @@
+{
+  "schema": "redagent.r106-bundle-manifest/v1",
+  "bundle_id": "r106-owned-api-differential",
+  "revision": 1,
+  "engine": {
+    "name": "schemathesis",
+    "version": "4.22.4",
+    "wheel_sha256": "62ff5d1657e823fc485ac9083e24995f497ae1aba6957b86b310d399317f21cb"
+  },
+  "files": [
+    {"path": "identity-matrix.json", "sha256": "059ef46cd887c4a702e6f70214b7c31b1abfdd80d1a391ccd18d19ca6411fa0c", "size_bytes": 1557},
+    {"path": "openapi.json", "sha256": "20f47d472a86dc7fb249c18caeab52dee21729917894b2805638dd466ece7e42", "size_bytes": 3117},
+    {"path": "operation-manifest.json", "sha256": "fa32aee23816bbeb27d956d344875e3948596c34f3091ce34209f00f4e4c8a12", "size_bytes": 1456},
+    {"path": "sequence-grammar.json", "sha256": "d33b5530e5efe4edb0e95fd2efca5e69c08f97a1f6b32d0c0cb9328fd24bab05", "size_bytes": 752}
+  ],
+  "canonical_spec_sha256": "69a30b280d770131897297711a326aaa36c7c23ade95685ee558ab9519f9a74b",
+  "author_user_id": "redagent-r106-author",
+  "reviewer_user_id": "redagent-r106-reviewer",
+  "review": {
+    "state": "approved-local-lab",
+    "callbacks": false,
+    "webhooks": false,
+    "external_references": false,
+    "unexpected_methods": false,
+    "arbitrary_credentials": false,
+    "restler_execution": false,
+    "cleanup_required": true
+  },
+  "qualification": {
+    "owned_fixture_only": true,
+    "external_target_contacts": 0,
+    "production_qualified": false
+  },
+  "promoted_at": "2026-07-11T08:55:00Z",
+  "expires_at": "2026-08-10T08:55:00Z"
+}

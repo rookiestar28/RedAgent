@@ -1,0 +1,82 @@
+{
+  "schema": "redagent.r104-qualification-matrix/v1",
+  "date": "2026-07-11",
+  "environment": "Windows PowerShell; Docker Desktop linux/amd64; project-local .venv",
+  "scope": "repo-owned disposable R104 fixture only",
+  "runtime": {
+    "zap_version": "2.17.0",
+    "zap_runtime_image_digest": "sha256:ccd16df57aed6724abdafe71b1077099c2b992d0945359d32d84f0939186b0c3",
+    "zap_upstream_bare_digest": "sha256:627781353231d056d5a6305ec1f2092f54735cc654915f533d2e8d5d9d41bcb2",
+    "chromium_version": "149.0.7827.53-r0",
+    "addon_inventory_sha256": "50293fde751b211ed6432b0b5039e8bf3fec7676a738c635a9c1e6844c511e43",
+    "target_image_id": "sha256:db8bf25081f45eb2496cc423a5ff15c4b66813ae9420bc8682cbaead1ce803e0",
+    "gateway_image_id": "sha256:c5f84374fa9155c6215f1f21fa86c6449f568b4329478d4f72b3d50e23437bd6",
+    "gateway_source_sha256": "09a956ad273eb2161b866cbee87d185da35f6bdb62113670a50c276cb1aa2668",
+    "target_source_sha256": "eadf76b79ea4b64f956cac5f6dc5e004990405f4f4504997fe43002768b7e493",
+    "controller_sha256": "e6aa69570c1bb9ce2314141e9783bd406b4a7444d4fefaf5e9dec76392529836"
+  },
+  "profiles": [
+    {
+      "profile_id": "zap-passive-v1",
+      "result": "passed",
+      "normalized_alert_count": 1,
+      "discarded_uncertified_alert_count": 1,
+      "external_target_contacts": 0,
+      "cleanup_residual_resource_count": 0
+    },
+    {
+      "profile_id": "zap-auth-crawl-v1",
+      "result": "passed",
+      "normalized_alert_count": 1,
+      "discarded_uncertified_alert_count": 1,
+      "external_target_contacts": 0,
+      "cleanup_residual_resource_count": 0
+    },
+    {
+      "profile_id": "zap-client-spider-v1",
+      "result": "passed",
+      "normalized_alert_count": 1,
+      "discarded_uncertified_alert_count": 4,
+      "external_target_contacts": 0,
+      "cleanup_residual_resource_count": 0
+    },
+    {
+      "profile_id": "zap-active-xss-lab-v1",
+      "result": "passed",
+      "normalized_alert_count": 1,
+      "discarded_uncertified_alert_count": 4,
+      "external_target_contacts": 0,
+      "cleanup_residual_resource_count": 0
+    }
+  ],
+  "topology": {
+    "internal_network_count": 2,
+    "published_ports": 0,
+    "gateway_is_only_dual_homed_component": true,
+    "zap_can_resolve_target_directly": false
+  },
+  "cancellation": {
+    "native_stop_acknowledged": true,
+    "cleanup_residual_resource_count": 0
+  },
+  "sensitive_cleanup": {
+    "sensitive_files_remaining": 0
+  },
+  "supply_chain": {
+    "sbom_format": "SPDX JSON",
+    "sbom_package_count": 422,
+    "sbom_sha256": "a2eea2a285f6bd4c4c0c1816fb8d15fa9bf28798fa071c49c32a4257dbe04cde",
+    "upstream_github_attestation": "not_found",
+    "upstream_slsa_provenance": "not_found",
+    "upstream_cosign_signature": "not_found",
+    "rejected_full_image_critical_count": 22,
+    "critical_vulnerability_review": "accepted_no_critical",
+    "critical_vulnerability_report_sha256": "d9d33e83f93b9670677beeb113fdcb328229f9336dd7818c3ec1d07a7d2f4310",
+    "promotion_sha256": "ab13748873833cb6aebfc97e56b62dffed7e61bfec4a53bccefece91eca27b8b",
+    "promotion_signature_bundle_sha256": "2c344cb4bf35e06536b5a6ba64695e1484fe45ebd2297388ffe317553eb61327",
+    "promotion_public_key_sha256": "7476c78bfef45906affd2ae7070ee5f498a573689870437493b7bad43825e506",
+    "promotion_signature_verified": true,
+    "r100_capability_promotion": "verified_and_persistence_tested"
+  },
+  "acceptance_status": "accepted"
+}

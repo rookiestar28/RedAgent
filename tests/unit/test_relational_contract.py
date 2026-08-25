@@ -1,0 +1,346 @@
+from __future__ import annotations
+
+import pytest
+from sqlalchemy import UniqueConstraint
+
+from redagent_platform.persistence.models import (
+    TENANT_TABLE_NAMES,
+    JobStatus,
+    assert_job_transition,
+    compute_issue_fingerprint,
+    metadata,
+)
+
+
+EXPECTED_TABLES = {
+    "tenants",
+    "users",
+    "engagements",
+    "targets",
+    "roe_versions",
+    "approvals",
+    "policy_references",
+    "campaigns",
+    "campaign_strategy_revisions",
+    "campaign_effects",
+    "jobs",
+    "workflow_commands",
+    "evidence_operations",
+    "evidence_artifacts",
+    "evidence_derivatives",
+    "evidence_custody_events",
+    "evidence_verifications",
+    "secret_references",
+    "secret_workload_clients",
+    "secret_lease_operations",
+    "secret_leases",
+    "secret_lease_events",
+    "audit_events",
+    "outbox_events",
+    "idempotency_records",
+    "issue_definitions",
+    "finding_instances",
+    "identity_providers",
+    "tenant_memberships",
+    "role_assignments",
+    "login_transactions",
+    "browser_sessions",
+    "identity_replay_records",
+    "jit_grants",
+    "break_glass_reviews",
+    "service_identities",
+    "policy_bundle_revisions",
+    "policy_bundle_promotions",
+    "policy_agent_status",
+    "policy_decisions",
+    "policy_boundary_receipts",
+    "policy_log_receipts",
+    "runner_classes",
+    "runner_registrations",
+    "runner_identities",
+    "execution_capability_manifests",
+    "artifact_verification_receipts",
+    "runner_job_manifests",
+    "runner_pull_leases",
+    "runner_lifecycle_events",
+    "runner_execution_receipts",
+    "containment_controls",
+    "containment_approvals",
+    "containment_job_actions",
+    "containment_phase_receipts",
+    "containment_residual_risks",
+    "containment_incidents",
+    "quota_policies",
+    "quota_usage",
+    "quota_reservations",
+    "quota_operations",
+    "telemetry_export_operations",
+    "telemetry_delivery_attempts",
+    "telemetry_dead_letters",
+    "security_incidents",
+    "incident_timeline_events",
+    "incident_actions",
+    "slo_definitions",
+    "slo_windows",
+    "slo_evaluations",
+    "alert_instances",
+    "alert_notifications",
+    "lab_bundles",
+    "lab_target_attestations",
+    "lab_target_leases",
+    "golden_scenario_runs",
+    "golden_scenario_steps",
+    "golden_finding_expectations",
+    "qualification_measurements",
+    "lab_backup_restore_receipts",
+    "lab_teardown_receipts",
+    "zap_profile_revisions",
+    "zap_target_attestations",
+    "zap_compiled_plans",
+    "zap_runs",
+    "zap_run_steps",
+    "zap_gateway_decisions",
+    "zap_normalized_alerts",
+    "zap_cancellation_receipts",
+    "zap_cleanup_receipts",
+    "nuclei_engine_artifacts",
+    "nuclei_target_attestations",
+    "nuclei_bundle_revisions",
+    "nuclei_bundle_files",
+    "nuclei_template_revisions",
+    "nuclei_bundle_reviews",
+    "nuclei_bundle_promotions",
+    "nuclei_profile_revisions",
+    "nuclei_compiled_plans",
+    "nuclei_runs",
+    "nuclei_gateway_decisions",
+    "nuclei_normalized_results",
+    "nuclei_result_rejections",
+    "nuclei_cancellation_receipts",
+    "nuclei_cleanup_receipts",
+    "api_diff_engine_artifacts",
+    "api_diff_spec_revisions",
+    "api_diff_operation_manifests",
+    "api_diff_identity_matrices",
+    "api_diff_sequence_grammars",
+    "api_diff_reviews",
+    "api_diff_promotions",
+    "api_diff_profiles",
+    "api_diff_target_attestations",
+    "api_diff_plans",
+    "api_diff_cases",
+    "api_diff_runs",
+    "api_diff_resource_ledger",
+    "api_diff_gateway_decisions",
+    "api_diff_observations",
+    "api_diff_replay_artifacts",
+    "api_diff_cancellation_receipts",
+    "api_diff_cleanup_receipts",
+    "network_engine_artifacts",
+    "network_adapter_declarations",
+    "network_profiles",
+    "network_topology_attestations",
+    "network_target_sets",
+    "network_plans",
+    "network_plan_tuples",
+    "network_runs",
+    "network_gateway_decisions",
+    "network_observations",
+    "network_cancellation_receipts",
+    "network_cleanup_receipts",
+    "cloud_adapter_artifacts",
+    "cloud_provider_profiles",
+    "cloud_operation_manifests",
+    "cloud_identity_bindings",
+    "cloud_control_packs",
+    "cloud_offline_artifacts",
+    "cloud_collection_plans",
+    "cloud_collection_runs",
+    "cloud_snapshot_pages",
+    "cloud_snapshot_resources",
+    "cloud_check_results",
+    "cloud_cleanup_receipts",
+    "identity_adapter_artifacts",
+    "identity_provider_profiles",
+    "identity_operation_manifests",
+    "identity_tenant_bindings",
+    "identity_baseline_artifacts",
+    "identity_collection_plans",
+    "identity_collection_runs",
+    "identity_snapshot_pages",
+    "identity_snapshot_resources",
+    "identity_baseline_evaluations",
+    "identity_exception_annotations",
+    "identity_exception_approvals",
+    "identity_graph_approvals",
+    "identity_graph_nodes",
+    "identity_graph_edges",
+    "identity_cleanup_receipts",
+    "artifact_adapter_artifacts",
+    "artifact_pipeline_profiles",
+    "artifact_rule_bundles",
+    "artifact_database_snapshots",
+    "artifact_bindings",
+    "artifact_analysis_plans",
+    "artifact_analysis_runs",
+    "artifact_manifest_entries",
+    "artifact_components",
+    "artifact_license_observations",
+    "artifact_vulnerability_observations",
+    "artifact_vex_annotations",
+    "artifact_credential_findings",
+    "artifact_static_findings",
+    "artifact_mobile_observations",
+    "artifact_cleanup_receipts",
+    "purple_adapter_artifacts",
+    "purple_abilities",
+    "purple_ability_phases",
+    "purple_detection_expectations",
+    "purple_lab_bindings",
+    "purple_approvals",
+    "purple_execution_plans",
+    "purple_runs",
+    "purple_snapshots",
+    "purple_action_receipts",
+    "purple_telemetry_events",
+    "purple_cleanup_receipts",
+    "purple_teardown_receipts",
+    "purple_rehearsal_receipts",
+    "human_adapter_artifacts",
+    "human_campaign_manifests",
+    "human_consent_rosters",
+    "human_suppression_lists",
+    "human_privacy_reviews",
+    "human_message_templates",
+    "human_campaign_approvals",
+    "human_campaign_plans",
+    "human_campaign_runs",
+    "human_delivery_receipts",
+    "human_minimized_events",
+    "human_canary_correlations",
+    "human_stop_receipts",
+    "human_deletion_receipts",
+    "human_rehearsal_receipts",
+    "human_evidence_records",
+    "agent_provider_profiles",
+    "agent_projected_tools",
+    "agent_runs",
+    "agent_steps",
+    "agent_proposals",
+    "agent_approvals",
+    "agent_budget_ledgers",
+    "agent_working_memory",
+    "agent_reviewed_facts",
+    "agent_trace_envelopes",
+    "agent_qualification_receipts",
+    "mcp_server_registrations",
+    "mcp_transport_attestations",
+    "mcp_inventory_revisions",
+    "mcp_inventory_items",
+    "mcp_freeze_events",
+    "workbench_campaign_drafts",
+    "workbench_trust_items",
+    "workbench_disclosures",
+    "workbench_reviewer_decisions",
+    "workbench_conclusions",
+    "workbench_lifecycle_events",
+    "mcp_qualification_receipts",
+    "finding_import_sessions",
+    "finding_import_records",
+    "managed_issues",
+    "finding_occurrences",
+    "finding_evidence_links",
+    "finding_operations",
+    "finding_comments",
+    "finding_risk_acceptances",
+    "finding_retests",
+    "finding_report_snapshots",
+    "finding_report_claims",
+    "finding_publications",
+    "finding_connector_profiles",
+    "finding_connector_deliveries",
+    "finding_connector_attempts",
+    "finding_connector_callbacks",
+    "finding_connector_reconciliations",
+}
+
+
+def test_initial_relational_schema_inventory_is_complete() -> None:
+    assert EXPECTED_TABLES == set(metadata.tables)
+
+
+def test_every_tenant_table_has_tenant_version_and_timestamps() -> None:
+    for name in TENANT_TABLE_NAMES:
+        columns = metadata.tables[name].columns
+        assert "tenant_id" in columns, name
+        assert "version" in columns, name
+        assert "created_at" in columns, name
+        assert "updated_at" in columns, name
+
+
+def test_idempotency_and_finding_dedup_have_database_uniqueness() -> None:
+    idempotency = metadata.tables["idempotency_records"]
+    definitions = metadata.tables["issue_definitions"]
+    instances = metadata.tables["finding_instances"]
+
+    assert _has_unique(idempotency, {"tenant_id", "operation", "idempotency_key"})
+    assert _has_unique(definitions, {"tenant_id", "fingerprint"})
+    assert _has_unique(instances, {"tenant_id", "issue_definition_id", "affected_resource", "location"})
+
+
+def test_issue_fingerprint_is_stable_and_version_sensitive() -> None:
+    first = compute_issue_fingerprint(
+        tool="nuclei",
+        rule_id="CVE-EXAMPLE",
+        database_version="2026.07",
+        title="Synthetic issue",
+    )
+    repeated = compute_issue_fingerprint(
+        tool="NUCLEI",
+        rule_id="CVE-EXAMPLE",
+        database_version="2026.07",
+        title=" Synthetic issue ",
+    )
+    changed = compute_issue_fingerprint(
+        tool="nuclei",
+        rule_id="CVE-EXAMPLE",
+        database_version="2026.08",
+        title="Synthetic issue",
+    )
+
+    assert first == repeated
+    assert first != changed
+    assert len(first) == 64
+
+
+@pytest.mark.parametrize(
+    ("current", "next_status"),
+    [
+        (JobStatus.PENDING, JobStatus.RUNNING),
+        (JobStatus.RUNNING, JobStatus.SUCCEEDED),
+        (JobStatus.RUNNING, JobStatus.FAILED),
+        (JobStatus.RUNNING, JobStatus.CANCELLED),
+    ],
+)
+def test_allowed_job_transitions(current: JobStatus, next_status: JobStatus) -> None:
+    assert_job_transition(current, next_status)
+
+
+@pytest.mark.parametrize(
+    ("current", "next_status"),
+    [
+        (JobStatus.PENDING, JobStatus.SUCCEEDED),
+        (JobStatus.SUCCEEDED, JobStatus.RUNNING),
+        (JobStatus.CANCELLED, JobStatus.RUNNING),
+    ],
+)
+def test_invalid_job_transitions_fail_closed(current: JobStatus, next_status: JobStatus) -> None:
+    with pytest.raises(ValueError, match="invalid_job_transition"):
+        assert_job_transition(current, next_status)
+
+
+def _has_unique(table, columns: set[str]) -> bool:
+    return any(
+        isinstance(constraint, UniqueConstraint) and {column.name for column in constraint.columns} == columns
+        for constraint in table.constraints
+    )

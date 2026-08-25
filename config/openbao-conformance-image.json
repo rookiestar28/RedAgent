@@ -1,0 +1,11 @@
+{
+  "registry": "ghcr.io/openbao/openbao",
+  "tag": "2.5.5",
+  "index_digest": "sha256:6150c4a6b62067db6141c8da7a6a6b5763f4f47c315343d0c848b40fecdfd452",
+  "platform_digest": "sha256:e59b4c73cfce6875363d25548222819433c6ce0af9c6d3ec9ede220e905723f9",
+  "platform": "linux/amd64",
+  "reference": "ghcr.io/openbao/openbao:2.5.5@sha256:6150c4a6b62067db6141c8da7a6a6b5763f4f47c315343d0c848b40fecdfd452",
+  "license_security_status": "MPL-2.0; official OpenBao GHCR manifest inspected 2026-07-10; local conformance only.",
+  "purpose": "local-conformance-only",
+  "production_qualified": false
+}

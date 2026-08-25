@@ -1,0 +1,23 @@
+{
+  "ambient_environment": false,
+  "author": "engineer-r114",
+  "critical_vulnerability_count": 0,
+  "direct_runner_dispatch": false,
+  "dynamic_discovery": false,
+  "dynamic_registration": false,
+  "expires_at": "2026-08-10T17:18:49+00:00",
+  "fixture_inventory_count": 2,
+  "production_qualified": false,
+  "promoted_at": "2026-07-11T17:18:49+00:00",
+  "protocol_version": "2025-11-25",
+  "provider_mcp": false,
+  "qualification_receipt_sha256": "075b2c57dab49acbbd47755ee2357786aef80fc140f214345fe94b1269da01bd",
+  "remote_http": false,
+  "reviewer": "reviewer-r114",
+  "runtime_lock_sha256": "043371f82c0a02bc583d9b518c4822ea75b8ba09719a4d4e866e0dbc77e7d597",
+  "schema": "redagent.r114-promotion/v1",
+  "sensitive_retention": false,
+  "source_sha256": "7112852d4e9b66a6ad676278d970eaa57eb4179483f94a6fa365141875a8a78c",
+  "stdio": false,
+  "token_passthrough": false
+}

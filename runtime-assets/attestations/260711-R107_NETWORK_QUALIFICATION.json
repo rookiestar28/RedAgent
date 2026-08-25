@@ -1,0 +1,32 @@
+{
+  "schema": "redagent.r107-qualification/v1",
+  "date": "2026-07-11",
+  "environment": "Windows 11 Docker Desktop 29.5.3, Linux amd64 containers",
+  "profile_id": "tcp-connect-discovery-v1",
+  "passed": true,
+  "plan_sha256": "2df1d219143dafd38143ff308d09216a97806c927e3753c0d3ee6841244f587c",
+  "topology_sha256": "e8f005ec5d28bac4b1f28c60fa8af542a2e3186b26b2058737d36a94c6f1f9b9",
+  "route_sha256": "e92066899fcdebc82a73ec4ec9612911aba483c1d3fa7a7beff111b8e4e301e0",
+  "literal_tuple_count": 2,
+  "completed_count": 2,
+  "denied_count": 0,
+  "service_classes": [
+    "http",
+    "ssh"
+  ],
+  "dual_internal_networks": true,
+  "published_ports": 0,
+  "direct_target_route": false,
+  "external_target_contacts": 0,
+  "external_scanner_present": false,
+  "forbidden_tuple_denied": true,
+  "gateway_attempt_quota_denied": true,
+  "gateway_blocked_before_worker_stop": true,
+  "cooperative_stop_acknowledged": true,
+  "forced_termination": false,
+  "raw_banner_persisted": false,
+  "residual_container_count": 0,
+  "residual_network_count": 0,
+  "production_qualified": false,
+  "safety_statement": "Only the repo-owned target at 10.107.0.10 ports 8080 and 8443 was contacted through the repo-owned independent gateway. Both networks were Docker-internal; no host target port or public route existed. No external repository content or scanner executed."
+}

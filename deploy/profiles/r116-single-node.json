@@ -1,0 +1,780 @@
+{
+  "admission_namespaces": [],
+  "availability_claim": "local_private_non_ha",
+  "components": [
+    {
+      "arguments": [
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8443",
+        "--private-cluster-bind",
+        "--tls-cert-file",
+        "/var/run/redagent/tls/tls.crt",
+        "--tls-key-file",
+        "/var/run/redagent/tls/tls.key"
+      ],
+      "command": [
+        "python",
+        "scripts/redagent_control_plane_api.py"
+      ],
+      "deployment_mode": "bundled",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": "redagent/r116-app@sha256:d8b1f9b8a60e8dc4820553d36799f18f07268d1f8d53e2a02b20c9f722c9ae19",
+      "name": "api",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": null,
+      "owner": "platform-control",
+      "persistent_volumes": [],
+      "ports": [
+        8443
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/live",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-api",
+      "tls_bundle_name": "redagent-api-tls"
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "identity",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": "OIDC provider with TLS, issuer pinning, and administrative access controls",
+      "owner": "platform-data",
+      "persistent_volumes": [
+        "identity-data"
+      ],
+      "ports": [
+        8080
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-identity",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "object-store",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": "S3-compatible versioned object store with TLS and immutable retention",
+      "owner": "platform-data",
+      "persistent_volumes": [
+        "object-store-data"
+      ],
+      "ports": [
+        9000
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-object-store",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "opa",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": "OPA bundle consumer with TLS-authenticated policy distribution and decision logging",
+      "owner": "platform-control",
+      "persistent_volumes": [],
+      "ports": [
+        8181
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-opa",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "openbao",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": "OpenBao integrated-storage HA cluster with TLS, auto-unseal, and audit devices",
+      "owner": "platform-data",
+      "persistent_volumes": [
+        "openbao-data"
+      ],
+      "ports": [
+        8200,
+        8201
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-openbao",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "postgresql",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": "CloudNativePG-compatible HA cluster with TLS, WAL archive, and PITR",
+      "owner": "platform-data",
+      "persistent_volumes": [
+        "postgresql-data"
+      ],
+      "ports": [
+        5432
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-postgresql",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "runner",
+      "network_class": "runner-target-gated",
+      "node_class": "isolated-runner",
+      "operator_contract": "policy-approved isolated runner pool with authenticated TLS control endpoint",
+      "owner": "execution-security",
+      "persistent_volumes": [],
+      "ports": [
+        9443
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-runner",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "telemetry",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": "OpenTelemetry collector with authenticated TLS ingestion and durable export",
+      "owner": "platform-control",
+      "persistent_volumes": [],
+      "ports": [
+        4317,
+        4318
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-telemetry",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [],
+      "deployment_mode": "operator_managed",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": null,
+      "name": "temporal",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": "supported Temporal cluster with TLS and persistence configured",
+      "owner": "platform-data",
+      "persistent_volumes": [
+        "temporal-data"
+      ],
+      "ports": [
+        7233
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-temporal",
+      "tls_bundle_name": null
+    },
+    {
+      "arguments": [],
+      "command": [
+        "python",
+        "scripts/redagent_workflow_worker.py"
+      ],
+      "deployment_mode": "bundled",
+      "failure_domains": [
+        "single-host"
+      ],
+      "image": "redagent/r116-app@sha256:d8b1f9b8a60e8dc4820553d36799f18f07268d1f8d53e2a02b20c9f722c9ae19",
+      "name": "worker",
+      "network_class": "private-service",
+      "node_class": "control-data",
+      "operator_contract": null,
+      "owner": "platform-control",
+      "persistent_volumes": [],
+      "ports": [
+        9090
+      ],
+      "probes": {
+        "liveness": {
+          "initial_delay_seconds": 30,
+          "path": "/health/live",
+          "timeout_seconds": 2
+        },
+        "readiness": {
+          "initial_delay_seconds": 1,
+          "path": "/health/ready",
+          "timeout_seconds": 2
+        },
+        "startup": {
+          "initial_delay_seconds": 5,
+          "path": "/health/startup",
+          "timeout_seconds": 3
+        }
+      },
+      "replicas": 1,
+      "resources": {
+        "limits": {
+          "cpu": "2",
+          "memory": "2Gi"
+        },
+        "requests": {
+          "cpu": "250m",
+          "memory": "256Mi"
+        }
+      },
+      "security_context": {
+        "allow_privilege_escalation": false,
+        "capabilities_drop": [
+          "ALL"
+        ],
+        "host_docker_socket": false,
+        "privileged": false,
+        "read_only_root_filesystem": true,
+        "run_as_non_root": true,
+        "seccomp_profile": "RuntimeDefault"
+      },
+      "service_account": "redagent-worker",
+      "tls_bundle_name": null
+    }
+  ],
+  "edge": {
+    "health_private": true,
+    "management_private": true,
+    "metrics_private": true,
+    "tls": true,
+    "trusted_proxy_forwarded_headers_only": true
+  },
+  "exceptions": [],
+  "kind": "single_node",
+  "network_flows": [
+    {
+      "destination": "api",
+      "ports": [
+        8443
+      ],
+      "purpose": "trusted ingress to the control-plane API",
+      "source": "trusted-edge"
+    },
+    {
+      "destination": "identity",
+      "ports": [
+        8080
+      ],
+      "purpose": "OIDC discovery and token validation",
+      "source": "api"
+    },
+    {
+      "destination": "opa",
+      "ports": [
+        8181
+      ],
+      "purpose": "authorization decisions",
+      "source": "api"
+    },
+    {
+      "destination": "postgresql",
+      "ports": [
+        5432
+      ],
+      "purpose": "control-plane persistence",
+      "source": "api"
+    },
+    {
+      "destination": "temporal",
+      "ports": [
+        7233
+      ],
+      "purpose": "workflow submission and status",
+      "source": "api"
+    },
+    {
+      "destination": "openbao",
+      "ports": [
+        8200
+      ],
+      "purpose": "bounded secret references",
+      "source": "api"
+    },
+    {
+      "destination": "object-store",
+      "ports": [
+        9000
+      ],
+      "purpose": "evidence object access",
+      "source": "api"
+    },
+    {
+      "destination": "postgresql",
+      "ports": [
+        5432
+      ],
+      "purpose": "workflow state persistence",
+      "source": "worker"
+    },
+    {
+      "destination": "temporal",
+      "ports": [
+        7233
+      ],
+      "purpose": "workflow task polling",
+      "source": "worker"
+    },
+    {
+      "destination": "openbao",
+      "ports": [
+        8200
+      ],
+      "purpose": "bounded secret references",
+      "source": "worker"
+    },
+    {
+      "destination": "opa",
+      "ports": [
+        8181
+      ],
+      "purpose": "execution policy decisions",
+      "source": "worker"
+    },
+    {
+      "destination": "runner",
+      "ports": [
+        9443
+      ],
+      "purpose": "authorized runner dispatch",
+      "source": "worker"
+    },
+    {
+      "destination": "telemetry",
+      "ports": [
+        4317,
+        4318
+      ],
+      "purpose": "API telemetry export",
+      "source": "api"
+    },
+    {
+      "destination": "telemetry",
+      "ports": [
+        4317,
+        4318
+      ],
+      "purpose": "worker telemetry export",
+      "source": "worker"
+    },
+    {
+      "destination": "telemetry",
+      "ports": [
+        4317,
+        4318
+      ],
+      "purpose": "runner telemetry export",
+      "source": "runner"
+    }
+  ],
+  "network_policies": [
+    {
+      "allowed_peers": [
+        "explicit-service-and-target-peers"
+      ],
+      "default_deny": true,
+      "direction": "egress"
+    },
+    {
+      "allowed_peers": [
+        "explicit-service-peers"
+      ],
+      "default_deny": true,
+      "direction": "ingress"
+    }
+  ],
+  "ok": true,
+  "production_qualified": false,
+  "profile_id": "r116-single_node-v1",
+  "profile_sha256": "345173cedbbb9122e5444c7df86ed40df09b9031abd749dc3dd87b824df54acf",
+  "qualification_level": "structurally_conformant",
+  "schema": "redagent.deployment-profile/v1"
+}

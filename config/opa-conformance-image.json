@@ -1,0 +1,12 @@
+{
+  "index_digest": "sha256:57f7d06808fff6de3ea1d698e6430990973ca1370be0e54975f0083d615521da",
+  "license_security_status": "Apache-2.0; official OPA 1.18.2 release reviewed 2026-07-10",
+  "platform": "linux/amd64",
+  "platform_digest": "sha256:3ece20d3a58eb4051db71c0b84fc962bca2a6f9aa74ee8ea3d027d693fdc2d1a",
+  "production_qualified": false,
+  "purpose": "local-conformance-only",
+  "reference": "docker.io/openpolicyagent/opa:1.18.2-static@sha256:57f7d06808fff6de3ea1d698e6430990973ca1370be0e54975f0083d615521da",
+  "registry": "docker.io/openpolicyagent/opa",
+  "source": "https://github.com/open-policy-agent/opa/releases/tag/v1.18.2",
+  "tag": "1.18.2-static"
+}

@@ -1,0 +1,77 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  redaction:
+    allow_all_keys: false
+    allowed_keys:
+      - deployment.environment.name
+      - redagent.correlation.id
+      - redagent.duration_ms
+      - redagent.event.id
+      - redagent.measurement.name
+      - redagent.measurement.value
+      - redagent.operation
+      - redagent.outcome
+      - redagent.parent_span.id
+      - redagent.reason_code
+      - redagent.resource.id
+      - redagent.resource.type
+      - redagent.sampled
+      - redagent.schema
+      - redagent.span.id
+      - redagent.tenant.id
+      - redagent.trace.id
+      - service.instance.id
+      - service.name
+      - service.namespace
+      - service.version
+    blocked_key_patterns:
+      - '(?i)(authorization|cookie|credential|password|secret|token|prompt|tool|db\.statement|http\.url)'
+    blocked_values:
+      - '(?i)(bearer\s+|password=|secret=|token=)'
+    summary: silent
+  batch:
+    timeout: 1s
+    send_batch_size: 128
+    send_batch_max_size: 256
+
+exporters:
+  otlphttp/fixed_siem:
+    endpoint: http://host.docker.internal:58432
+    timeout: 3s
+    sending_queue:
+      enabled: true
+      num_consumers: 1
+      queue_size: 512
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 5s
+      max_elapsed_time: 30s
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, redaction, batch]
+      exporters: [otlphttp/fixed_siem]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, redaction, batch]
+      exporters: [otlphttp/fixed_siem]

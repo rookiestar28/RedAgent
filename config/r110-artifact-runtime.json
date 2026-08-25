@@ -1,0 +1,19 @@
+{
+  "database_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "enabled_profiles": [
+    "r110-mobile-static-v1",
+    "r110-packaged-artifact-v1",
+    "r110-repository-snapshot-v1"
+  ],
+  "external_adapter_execution": false,
+  "mobile_dynamic_allowed": false,
+  "network_allowed": false,
+  "package_lifecycle_allowed": false,
+  "production_qualified": false,
+  "qualification_assertion_sha256": "6ad129918a8d8cd8e8d65025a6b74d3a9c78feae70ebc1fdd6617f9f89a46c94",
+  "qualification_receipt_sha256": "38cdc6bb830369b99336a1bc30c043e98529a8909b0fbbcddc102a08437f5426",
+  "rule_bundle_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "schema": "redagent.r110-runtime-lock/v1",
+  "source_sha256": "91e7ddb562dee2a5fcb81b27776ef9cab3805344ee7c1a025ab20f8c2a3b981b",
+  "subprocess_allowed": false
+}

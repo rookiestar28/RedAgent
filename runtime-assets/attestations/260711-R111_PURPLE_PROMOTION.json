@@ -1,0 +1,18 @@
+{
+  "author": "redagent-r111-author",
+  "cleanup_required": true,
+  "critical_vulnerability_count": 0,
+  "enabled_abilities": [
+    "r111-file-stage-marker-v1"
+  ],
+  "expires_at": "2026-08-10T15:23:14Z",
+  "external_adapter_execution": false,
+  "production_qualified": false,
+  "promoted_at": "2026-07-11T15:23:14Z",
+  "qualification_receipt_sha256": "1f4bbf03fd2554e12abbe2ccf902c9743a61b144506a0dca30f96e988f720b8d",
+  "reviewer": "redagent-r111-reviewer",
+  "runtime_lock_sha256": "8a0790861e3cc09d85e222d2fcba3564284e432bd0711f890f017d60a24e11ec",
+  "schema": "redagent.r111-promotion/v1",
+  "source_sha256": "68a9896f154214f73cc1aee5793118283ddbca0351af16202b796d3893b86139",
+  "telemetry_required": true
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "redagent.public-source-relocation/v1",
+  "relocations": {
+    "redagent_platform/deployment_release/promotion.py": {
+      "signed_sha256": "d811a8de9dfbef947ed96d2f4be71cc83b5c5b44ee1f2186cdb8b92849d3f079",
+      "public_path": "redagent_platform/deployment_release/promotion.py",
+      "public_sha256": "a2d1e34a2073dabc4807e892e576488f475050e55caeff809dd3ecd04ddbc6c3"
+    }
+  }
+}
