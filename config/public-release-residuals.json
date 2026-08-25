@@ -3014,7 +3014,7 @@
       "count": 1,
       "path": "redagent_platform/gate_lease.py",
       "reason": "compatibility contract identifier",
-      "sha256": "ed81653a824939842a64c1959b84b7f6a567eca0106362974d992fcfdbf7ae59",
+      "sha256": "ca4749e75bf65e432a11ad5ba410402f59ed8c388558800853d15fcfe514f149",
       "token": "r118"
     },
     {
@@ -3987,7 +3987,7 @@
       "count": 3,
       "path": "redagent_platform/validation/stages.py",
       "reason": "compatibility contract identifier",
-      "sha256": "31012cb2d49fe96cda3190bda9ffd9692473e0bd5c58563b0bee7dc553f7eee9",
+      "sha256": "4b0ac46dbb06fbceed626e870d8a494dddb433dbc5cbbe1a27e0f9f99dcfa8e7",
       "token": "r118"
     },
     {
@@ -4883,7 +4883,7 @@
       "count": 1,
       "path": "scripts/run_validation_gate.py",
       "reason": "compatibility contract identifier",
-      "sha256": "fd530d1f193069f27d7ac7457e47173d554b4c5990ec8724507d06bcba604589",
+      "sha256": "d2f4534583ab6d160edc87308ad20ba0ce238f37b6e4a5261c1c3429c654ad5c",
       "token": "R118"
     },
     {
@@ -7571,7 +7571,7 @@
       "count": 5,
       "path": "tests/unit/test_compat_118_validation_workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "b08f1a1d43a12a4afa06b32936942afaae78ed7c01b822a2f950b862e2fb9cec",
+      "sha256": "7366a2c80818ec1b1151ddd0f814326e7f0a9507326aea5b1e88074ea7e507e0",
       "token": "r118"
     },
     {

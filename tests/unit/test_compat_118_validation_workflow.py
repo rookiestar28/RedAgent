@@ -1647,6 +1647,8 @@ def test_validation_gate_git_queries_disable_helper_dispatch(
         "--no-pager",
         "--no-replace-objects",
         "-c",
+        f"safe.directory={ROOT.absolute()}",
+        "-c",
         "core.hooksPath=/dev/null",
         "-c",
         "core.fsmonitor=false",

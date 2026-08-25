@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
@@ -66,6 +66,8 @@ _MAX_ARTIFACT_TOTAL_BYTES = 32 * 1024 * 1024
 _GIT_TIMEOUT_SECONDS = 30
 _TOOL_PREFLIGHT_TIMEOUT_SECONDS = 30
 _MAX_GIT_OUTPUT_BYTES = 2 * 1024 * 1024
+_MAX_WORKTREE_DIAGNOSTIC_BYTES = 4096
+_MAX_WORKTREE_DIAGNOSTIC_ENTRIES = 20
 DEFAULT_VERIFY_EXECUTION_SECONDS = 600
 _MIN_VERIFY_EXECUTION_SECONDS = 60
 _MAX_VERIFY_EXECUTION_SECONDS = 7_200
@@ -104,6 +106,9 @@ def _isolated_git_command(arguments: Sequence[str]) -> tuple[str, ...]:
     if not arguments:
         raise RuntimeError("Git source query requires a subcommand")
     command: list[str] = ["git", "--no-pager", "--no-replace-objects"]
+    # CRITICAL: hosted runners may own the checkout through a service identity.
+    # Trust only this code-owned authoritative root; global config remains disabled.
+    command.extend(("-c", f"safe.directory={ROOT.absolute()}"))
     for setting in _GIT_COMMAND_CONFIG_OVERRIDES:
         command.extend(("-c", setting))
     command.append(arguments[0])
@@ -232,9 +237,44 @@ def _changed_paths(base: str | None, head: str, *, deadline: float | None = None
     return tuple(paths)
 
 
-def _worktree_is_clean(*, deadline: float | None = None) -> bool:
+@dataclass(frozen=True, slots=True)
+class WorktreeState:
+    kind: str
+    entries: tuple[str, ...] = ()
+
+
+def _worktree_state(*, deadline: float | None = None) -> WorktreeState:
     completed = _git("status", "--porcelain=v1", "-z", "--untracked-files=normal", deadline=deadline)
-    return completed is not None and completed.returncode == 0 and completed.stdout == b""
+    if completed is None or completed.returncode != 0:
+        return WorktreeState(kind="query_failed")
+    if completed.stdout == b"":
+        return WorktreeState(kind="clean")
+    entries = tuple(
+        raw.decode("utf-8", errors="backslashreplace")
+        for raw in completed.stdout.split(b"\0")
+        if raw
+    )
+    return WorktreeState(kind="dirty", entries=entries)
+
+
+def _worktree_failure_summary(state: WorktreeState) -> str:
+    if state.kind == "query_failed":
+        return "git_source_state_query_failed"
+    if state.kind == "clean":
+        return "worktree_clean"
+    prefix = f"worktree_dirty total={len(state.entries)} entries="
+    encoded_entries: list[str] = []
+    for entry in state.entries[:_MAX_WORKTREE_DIAGNOSTIC_ENTRIES]:
+        candidate = json.dumps(entry, ensure_ascii=True)
+        proposed = prefix + "[" + ",".join((*encoded_entries, candidate)) + "]"
+        if len(proposed.encode("utf-8")) > _MAX_WORKTREE_DIAGNOSTIC_BYTES:
+            break
+        encoded_entries.append(candidate)
+    return prefix + "[" + ",".join(encoded_entries) + "]"
+
+
+def _worktree_is_clean(*, deadline: float | None = None) -> bool:
+    return _worktree_state(deadline=deadline).kind == "clean"
 
 
 def _request(
@@ -754,7 +794,11 @@ def _run_command_locked(
 def run_command(args: argparse.Namespace) -> int:
     _assert_reference_docs_only()
     if not _worktree_is_clean():
-        raise RuntimeError("authoritative validation requires a clean worktree, including non-ignored untracked files")
+        detail = _worktree_failure_summary(_worktree_state())
+        raise RuntimeError(
+            "authoritative validation requires a clean worktree, including non-ignored "
+            f"untracked files; {detail}"
+        )
     with ValidationLease(_validation_lease_path()) as lease:
         # CRITICAL: another writer can finish after the first preflight; never plan stages on that changed source.
         capability = lease.capability()
@@ -766,7 +810,11 @@ def run_command(args: argparse.Namespace) -> int:
         _attest_active_project_venv()
         bind_authoritative_validation_platform(ROOT, capability)
         if not _worktree_is_clean(deadline=deadline):
-            raise RuntimeError("authoritative validation requires a clean worktree, including non-ignored untracked files")
+            detail = _worktree_failure_summary(_worktree_state(deadline=deadline))
+            raise RuntimeError(
+                "authoritative validation requires a clean worktree, including non-ignored "
+                f"untracked files; {detail}"
+            )
         request, decision, selected_gate = _authoritative_selection(args, deadline=deadline)
         deadline = min(deadline, gate_started + budget_seconds(selected_gate))
         _assert_deadline_remaining(deadline, "after source selection")

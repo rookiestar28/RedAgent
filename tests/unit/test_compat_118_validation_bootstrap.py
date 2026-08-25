@@ -29,9 +29,11 @@ def test_canonical_lease_path_refuses_ignore_policy_drift_without_creating_runti
         gate_lease.validated_authoritative_validation_lease_path(tmp_path)
 
     assert not (tmp_path / ".tmp").exists()
-    assert observed["args"][0][:4] == (
+    assert observed["args"][0][:6] == (
         "git",
         "--no-replace-objects",
+        "-c",
+        f"safe.directory={tmp_path.absolute()}",
         "check-ignore",
         "--quiet",
     )

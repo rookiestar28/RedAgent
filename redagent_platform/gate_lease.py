@@ -69,6 +69,12 @@ def validated_authoritative_validation_lease_path(root: Path) -> Path:
     """Require the canonical writer coordinate to remain a regular ignored file path."""
 
     workspace = Path(root).absolute()
+    try:
+        workspace_metadata = workspace.lstat()
+    except OSError as exc:
+        raise ValidationLeaseError("authoritative validation workspace cannot be inspected") from exc
+    if _is_linklike(workspace, workspace_metadata) or not stat.S_ISDIR(workspace_metadata.st_mode):
+        raise ValidationLeaseError("authoritative validation workspace is not a real directory")
     target = authoritative_validation_lease_path(workspace).absolute()
     if target.parent != workspace.joinpath(*_LEASE_DIRECTORY).absolute():
         raise ValidationLeaseError("authoritative validation lease escaped the workspace")
@@ -90,6 +96,8 @@ def validated_authoritative_validation_lease_path(root: Path) -> Path:
             (
                 "git",
                 "--no-replace-objects",
+                "-c",
+                f"safe.directory={workspace}",
                 "check-ignore",
                 "--quiet",
                 "--",

@@ -29,6 +29,24 @@ assert_contained_real_path() {
   done
 }
 
+assert_exact_lib64_compatibility_link() {
+  local link="$venv/lib64"
+  local target="$venv/lib"
+  if [[ ! -L "$link" || "$(readlink -- "$link")" != "lib" ]]; then
+    echo "POSIX venv lib64 compatibility link must target the sibling lib directory." >&2
+    exit 1
+  fi
+  if [[ ! -d "$target" || -L "$target" ]]; then
+    echo "POSIX venv lib64 compatibility target must be a real directory." >&2
+    exit 1
+  fi
+  assert_contained_real_path "$target"
+  if [[ "$(readlink -f -- "$link")" != "$(readlink -f -- "$target")" ]]; then
+    echo "POSIX venv lib64 compatibility link escaped its exact target." >&2
+    exit 1
+  fi
+}
+
 assert_contained_real_path "$venv"
 venv_config="$venv/pyvenv.cfg"
 assert_contained_real_path "$venv_config"
@@ -42,11 +60,18 @@ if [[ "$system_site_count" -ne 1 || "$false_site_count" -ne 1 ]]; then
   echo "POSIX venv must set include-system-site-packages = false exactly once." >&2
   exit 1
 fi
-for base in "$venv/lib" "$venv/lib64" "$venv/local" "$venv/local/lib" "$venv/local/lib64"; do
+for base in "$venv/lib" "$venv/local" "$venv/local/lib" "$venv/local/lib64"; do
   if [[ -e "$base" || -L "$base" ]]; then
     assert_contained_real_path "$base"
   fi
 done
+lib64_is_compatibility_link=false
+if [[ -L "$venv/lib64" ]]; then
+  assert_exact_lib64_compatibility_link
+  lib64_is_compatibility_link=true
+elif [[ -e "$venv/lib64" ]]; then
+  assert_contained_real_path "$venv/lib64"
+fi
 
 # CRITICAL: Debian/Ubuntu site.py also scans dist-packages under local/lib and
 # version-short paths; lib64 is valid on other CPython platforms. Validate all
@@ -55,21 +80,31 @@ shopt -s nullglob
 startup_sites=(
   "$venv"/lib/python*/site-packages
   "$venv"/lib/python*/dist-packages
-  "$venv"/lib64/python*/site-packages
-  "$venv"/lib64/python*/dist-packages
   "$venv"/local/lib/python*/site-packages
   "$venv"/local/lib/python*/dist-packages
   "$venv"/local/lib64/python*/site-packages
   "$venv"/local/lib64/python*/dist-packages
 )
+if [[ "$lib64_is_compatibility_link" == false ]]; then
+  startup_sites+=(
+    "$venv"/lib64/python*/site-packages
+    "$venv"/lib64/python*/dist-packages
+  )
+fi
 shopt -u nullglob
 for versionless in \
-  "$venv/lib/site-packages" "$venv/lib/dist-packages" \
-  "$venv/lib64/site-packages" "$venv/lib64/dist-packages"; do
+  "$venv/lib/site-packages" "$venv/lib/dist-packages"; do
   if [[ -e "$versionless" || -L "$versionless" ]]; then
     startup_sites+=("$versionless")
   fi
 done
+if [[ "$lib64_is_compatibility_link" == false ]]; then
+  for versionless in "$venv/lib64/site-packages" "$venv/lib64/dist-packages"; do
+    if [[ -e "$versionless" || -L "$versionless" ]]; then
+      startup_sites+=("$versionless")
+    fi
+  done
+fi
 
 if [[ "${#startup_sites[@]}" -eq 0 ]]; then
   echo "POSIX venv has no bounded site-packages or dist-packages directory." >&2
@@ -82,5 +117,9 @@ for site_dir in "${startup_sites[@]}"; do
   fi
   assert_contained_real_path "$site_dir"
 done
+if [[ "$lib64_is_compatibility_link" == true ]]; then
+  # CRITICAL: revalidate the one allowed link immediately before venv execution.
+  assert_exact_lib64_compatibility_link
+fi
 
 echo "posix_venv_layout_ok=true"
