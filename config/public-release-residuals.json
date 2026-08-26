@@ -8215,28 +8215,28 @@
       "count": 1,
       "path": "tests/unit/test_local_stack.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d0676fe2d5c4f1a1ce80bbdd4d4069c627d252697f75df35bb27cd2dae42cacf",
+      "sha256": "4aa307b5262adc7ef12a0a90045b6ba8d4490b860d10b5da7a5dbe403cd3a027",
       "token": "r096"
     },
     {
       "count": 3,
       "path": "tests/unit/test_local_stack.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d0676fe2d5c4f1a1ce80bbdd4d4069c627d252697f75df35bb27cd2dae42cacf",
+      "sha256": "4aa307b5262adc7ef12a0a90045b6ba8d4490b860d10b5da7a5dbe403cd3a027",
       "token": "r118"
     },
     {
       "count": 1,
       "path": "tests/unit/test_local_stack_config.py",
       "reason": "compatibility contract identifier",
-      "sha256": "f9d4cd00036a787170ece26a6fadf8b08c0335c39fd3b284af9cfc94b53a7248",
+      "sha256": "dc4671942af9bece372beefede02b4ccd71bbe2d8800d9ef3efe4da1cca63a30",
       "token": "r092"
     },
     {
       "count": 4,
       "path": "tests/unit/test_local_stack_config.py",
       "reason": "compatibility contract identifier",
-      "sha256": "f9d4cd00036a787170ece26a6fadf8b08c0335c39fd3b284af9cfc94b53a7248",
+      "sha256": "dc4671942af9bece372beefede02b4ccd71bbe2d8800d9ef3efe4da1cca63a30",
       "token": "r118"
     },
     {

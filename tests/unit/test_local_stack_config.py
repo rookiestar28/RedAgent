@@ -72,9 +72,12 @@ def test_local_config_rejects_duplicate_or_privileged_ports() -> None:
         load_local_stack_config(ROOT, env={"REDAGENT_POSTGRES_PORT": "543"})
 
 
-def test_local_config_rejects_state_path_outside_workspace(tmp_path: Path) -> None:
+def test_local_config_rejects_state_path_outside_workspace() -> None:
+    outside_state_dir = ROOT.parent / f".{ROOT.name}-outside-workspace-state"
+    assert not outside_state_dir.is_relative_to(ROOT)
+
     with pytest.raises(ConfigError, match="state_dir_outside_workspace"):
-        load_local_stack_config(ROOT, env={"REDAGENT_STATE_DIR": str(tmp_path)})
+        load_local_stack_config(ROOT, env={"REDAGENT_STATE_DIR": str(outside_state_dir)})
 
 
 @pytest.mark.parametrize("state_dir", [".local/r118-runtime-guard"])

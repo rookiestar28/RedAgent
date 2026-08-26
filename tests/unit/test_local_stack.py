@@ -384,8 +384,10 @@ def test_runtime_oidc_config_tracks_the_effective_keycloak_port(tmp_path: Path) 
         shutil.rmtree(state_dir, ignore_errors=True)
 
 
-def test_runtime_oidc_config_rejects_a_state_directory_outside_workspace(tmp_path: Path) -> None:
-    config = replace(load_local_stack_config(ROOT, env={}), state_dir=tmp_path)
+def test_runtime_oidc_config_rejects_a_state_directory_outside_workspace() -> None:
+    outside_state_dir = ROOT.parent / f".{ROOT.name}-outside-workspace-state"
+    assert not outside_state_dir.is_relative_to(ROOT)
+    config = replace(load_local_stack_config(ROOT, env={}), state_dir=outside_state_dir)
 
     with pytest.raises(LocalStackError, match="runtime_oidc_config_outside_workspace"):
         local_stack_module.create_runtime_oidc_provider_config(config)
