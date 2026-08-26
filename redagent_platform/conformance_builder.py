@@ -20,6 +20,7 @@ from typing import Callable, Iterator, Mapping
 _LOCK_NAME = "conformance-buildkit.json"
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 _PURPOSE = re.compile(r"[a-z0-9-]{1,16}")
+_RUNTIME_PREFIX = re.compile(r"[a-z0-9-]{1,32}")
 _TOKEN = re.compile(r"[0-9a-f]{16}")
 _IMAGE = re.compile(r"[a-z0-9][a-z0-9._/-]{0,127}:[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 _CONFIG_MEMBER = re.compile(r"(?:blobs/sha256/)?([0-9a-f]{64})(?:\.json)?")
@@ -76,6 +77,28 @@ def isolated_docker_environment(
                 pass
             environment["DOCKER_CONFIG"] = str(config_root)
             yield environment
+
+
+@contextmanager
+def isolated_runtime_directory(
+    repo_root: str | Path,
+    *,
+    prefix: str,
+) -> Iterator[Path]:
+    """Yield one identity-pinned temporary directory below the contained runtime root."""
+
+    if not _RUNTIME_PREFIX.fullmatch(prefix):
+        raise ConformanceBuilderError("conformance_builder_runtime_prefix_invalid")
+    root = Path(os.path.abspath(repo_root))
+    with _contained_runtime_root(root) as runtime_root:
+        with tempfile.TemporaryDirectory(prefix=prefix, dir=runtime_root) as directory:
+            runtime = Path(directory)
+            _assert_real_directory(runtime)
+            if os.name == "posix":
+                # IMPORTANT: the pinned non-root container may create files but cannot list them.
+                runtime.chmod(0o733)
+            with _pinned_directory(runtime):
+                yield runtime
 
 
 @contextmanager

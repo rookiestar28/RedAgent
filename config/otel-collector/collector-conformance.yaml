@@ -44,18 +44,9 @@ processors:
     send_batch_max_size: 256
 
 exporters:
-  otlphttp/fixed_siem:
-    endpoint: http://host.docker.internal:58432
-    timeout: 3s
-    sending_queue:
-      enabled: true
-      num_consumers: 1
-      queue_size: 512
-    retry_on_failure:
-      enabled: true
-      initial_interval: 1s
-      max_interval: 5s
-      max_elapsed_time: 30s
+  file/fixed_siem:
+    path: /receipt/redagent-otel-receipt.json
+    flush_interval: 100ms
 
 extensions:
   health_check:
@@ -70,8 +61,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, redaction, batch]
-      exporters: [otlphttp/fixed_siem]
+      exporters: [file/fixed_siem]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, redaction, batch]
-      exporters: [otlphttp/fixed_siem]
+      exporters: [file/fixed_siem]

@@ -9,6 +9,9 @@ services:
       - "127.0.0.1:51318:13133"
     volumes:
       - ./config/otel-collector/collector-conformance.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - type: bind
+        source: ${REDAGENT_OTEL_RECEIPT_DIR:?conformance-owned receipt directory required}
+        target: /receipt
     read_only: true
     cap_drop:
       - ALL
@@ -20,8 +23,6 @@ services:
     mem_swappiness: 0
     pids_limit: 128
     cpus: 0.5
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - telemetry-conformance
 

@@ -423,34 +423,44 @@ class EvidenceRepository:
         if not verification.ok:
             raise EvidenceRecordConflict("unverified_evidence_cannot_finalize")
         operations = metadata.tables["evidence_operations"]
-        if not operation_prevalidated:
-            await self._tenant_context()
+        await self._tenant_context()
+        # IMPORTANT: the prevalidated path must acquire the same lock before state
+        # inspection; otherwise two exact replays can both observe `reserved` and race
+        # the one-write finalization CTE.
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:scope, 0))"),
+            {"scope": f"evidence-finalize:{self.tenant_id}:{request.artifact_id}"},
+        )
+        expected_state = (
+            OperationState.RESERVED.value if operation_prevalidated else OperationState.UPLOADED.value
+        )
+        expected_version = (
+            operations.c.object_version_id.is_(None)
+            if operation_prevalidated
+            else operations.c.object_version_id == stored.version_id
+        )
+        operation = (
             await self.session.execute(
-                text("SELECT pg_advisory_xact_lock(hashtextextended(:scope, 0))"),
-                {"scope": f"evidence-finalize:{self.tenant_id}:{request.artifact_id}"},
-            )
-            operation = (
-                await self.session.execute(
-                    select(operations).where(
-                        operations.c.tenant_id == self.tenant_id,
-                        operations.c.id == operation_id,
-                        operations.c.artifact_id == request.artifact_id,
-                        operations.c.object_key == stored.object_key,
-                        operations.c.object_version_id == stored.version_id,
-                        operations.c.operation_state == OperationState.UPLOADED.value,
-                    )
+                select(operations).where(
+                    operations.c.tenant_id == self.tenant_id,
+                    operations.c.id == operation_id,
+                    operations.c.artifact_id == request.artifact_id,
+                    operations.c.object_key == stored.object_key,
+                    expected_version,
+                    operations.c.operation_state == expected_state,
                 )
-            ).mappings().one_or_none()
-            if operation is None:
-                existing = await self.get_artifact(request.artifact_id)
-                if (
-                    existing is not None
-                    and existing["object_key"] == stored.object_key
-                    and existing["object_version_id"] == stored.version_id
-                    and existing["content_sha256"] == stored.content_sha256
-                ):
-                    return existing
-                raise EvidenceRecordConflict("evidence_operation_finalize_conflict")
+            )
+        ).mappings().one_or_none()
+        if operation is None:
+            existing = await self.get_artifact(request.artifact_id)
+            if (
+                existing is not None
+                and existing["object_key"] == stored.object_key
+                and existing["object_version_id"] == stored.version_id
+                and existing["content_sha256"] == stored.content_sha256
+            ):
+                return existing
+            raise EvidenceRecordConflict("evidence_operation_finalize_conflict")
         artifacts = metadata.tables["evidence_artifacts"]
         attestation_hash = _attestation_hash(request, stored)
         resource = {

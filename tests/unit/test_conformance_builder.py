@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import tarfile
+import tempfile
 from types import SimpleNamespace
 
 import pytest
@@ -14,6 +15,7 @@ import pytest
 import redagent_platform.conformance_builder as conformance_builder
 from redagent_platform.conformance_builder import (
     attest_docker_image_config,
+    isolated_runtime_directory,
     pinned_conformance_builder,
 )
 
@@ -167,6 +169,41 @@ def test_runtime_detects_parent_identity_change_across_child_creation(
 
     with pytest.raises(RuntimeError, match="runtime_parent_changed"):
         conformance_builder._ensure_real_child(tmp_path, ".tmp")
+
+
+def test_isolated_runtime_directory_is_contained_pinned_and_removed(tmp_path: Path) -> None:
+    with isolated_runtime_directory(tmp_path, prefix="receipt-") as directory:
+        created = directory
+        assert directory.parent == tmp_path / ".tmp" / "conformance-builders"
+        assert directory.name.startswith("receipt-")
+        assert directory.is_dir()
+        assert not directory.is_symlink()
+        if os.name == "posix":
+            assert directory.stat().st_mode & 0o777 == 0o733
+        (directory / "synthetic.json").write_text("{}\n", encoding="utf-8")
+
+    assert not created.exists()
+
+
+def test_isolated_runtime_directory_surfaces_cleanup_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingTemporaryDirectory:
+        def __init__(self, *, prefix: str, dir: Path) -> None:
+            self.path = Path(dir) / f"{prefix}exact"
+
+        def __enter__(self) -> str:
+            self.path.mkdir()
+            return str(self.path)
+
+        def __exit__(self, *_args: object) -> None:
+            raise OSError("synthetic_cleanup_failure")
+
+    monkeypatch.setattr(tempfile, "TemporaryDirectory", FailingTemporaryDirectory)
+    with pytest.raises(OSError, match="synthetic_cleanup_failure"):
+        with isolated_runtime_directory(tmp_path, prefix="receipt-"):
+            pass
 
 
 def test_builder_lock_is_exact_public_dependency_metadata() -> None:

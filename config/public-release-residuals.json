@@ -4813,7 +4813,7 @@
       "count": 6,
       "path": "scripts/otel_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "21caa4200c8b35f5942443f7d46965a3f80378bfa70fe013c60b4b3abcdc2e1b",
+      "sha256": "50848df181eee3801d15d31b82c14b312a7ebe50d86c11f16d4153913bef128d",
       "token": "r102"
     },
     {
@@ -5156,14 +5156,14 @@
       "count": 2,
       "path": "tests/integration/test_compat_097_evidence_persistence.py",
       "reason": "compatibility contract identifier",
-      "sha256": "56f492015ce58e99c252316c3a1b7bfc135926044501f973489ee10bb6c7b0ea",
+      "sha256": "8ef042252f694407c28ee9046c6115919f886694b3d19df439898c1d6c199ee5",
       "token": "r097"
     },
     {
       "count": 2,
       "path": "tests/integration/test_compat_097_evidence_persistence.py",
       "reason": "compatibility contract identifier",
-      "sha256": "56f492015ce58e99c252316c3a1b7bfc135926044501f973489ee10bb6c7b0ea",
+      "sha256": "8ef042252f694407c28ee9046c6115919f886694b3d19df439898c1d6c199ee5",
       "token": "r099"
     },
     {

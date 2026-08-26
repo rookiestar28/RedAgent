@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from redagent_platform.evidence_service.backends import LocalAppendOnlyBackend
@@ -163,7 +163,7 @@ async def _scenario() -> None:
             ).mappings().one()
             assert still_reserved["operation_state"] == "reserved"
             assert still_reserved["quarantine_reason"] is None
-        backend.put(
+        pending_stored = backend.put(
             ObjectPutRequest(
                 object_key=pending_key,
                 content=pending.content,
@@ -176,25 +176,58 @@ async def _scenario() -> None:
                 operation_id=reservation.operation_id,
             )
         )
-        resumed, concurrent_replay = await asyncio.gather(
-            service.ingest(
-                pending,
-                actor_user_id=actor,
-                correlation_id=f"corr-pending-resume-a-{suffix}",
-                occurred_at=NOW + timedelta(milliseconds=1),
-            ),
-            service.ingest(
-                pending,
-                actor_user_id=actor,
-                correlation_id=f"corr-pending-resume-b-{suffix}",
-                occurred_at=NOW + timedelta(milliseconds=1),
-            ),
+        pending_verification = backend.verify_exact(pending_stored)
+
+        async def finalize_pending(correlation_id: str) -> dict[str, object]:
+            async with sessions() as session, session.begin():
+                return await EvidenceRepository(
+                    session,
+                    tenant_id=tenant,
+                    actor_user_id=actor,
+                    correlation_id=correlation_id,
+                ).finalize(
+                    reservation.operation_id,
+                    pending,
+                    pending_stored,
+                    pending_verification,
+                    occurred_at=NOW + timedelta(milliseconds=1),
+                    operation_prevalidated=True,
+                )
+
+        operations = metadata.tables["evidence_operations"]
+        # IMPORTANT: hold the row until both finalizers are queued so this test pins the
+        # prevalidated-finalize race instead of depending on event-loop timing.
+        async with sessions() as blocker, blocker.begin():
+            await blocker.execute(
+                text("SELECT set_config('redagent.tenant_id', :tenant_id, true)"),
+                {"tenant_id": tenant},
+            )
+            await blocker.execute(
+                select(operations.c.id)
+                .where(
+                    operations.c.tenant_id == tenant,
+                    operations.c.id == reservation.operation_id,
+                )
+                .with_for_update()
+            )
+            finalize_tasks = (
+                asyncio.create_task(finalize_pending(f"corr-pending-finalize-a-{suffix}")),
+                asyncio.create_task(finalize_pending(f"corr-pending-finalize-b-{suffix}")),
+            )
+            await asyncio.sleep(0.1)
+        finalized, concurrent_finalized = await asyncio.gather(*finalize_tasks)
+        assert finalized == concurrent_finalized
+        assert finalized["artifact_id"] == pending.artifact_id
+        assert finalized["content_sha256"] == pending.content_hash
+
+        replayed_pending = await service.ingest(
+            pending,
+            actor_user_id=actor,
+            correlation_id=f"corr-pending-replay-{suffix}",
+            occurred_at=NOW + timedelta(milliseconds=1),
         )
-        assert resumed.replayed is True
-        assert concurrent_replay.replayed is True
-        assert resumed.artifact == concurrent_replay.artifact
-        assert resumed.artifact["artifact_id"] == pending.artifact_id
-        assert resumed.artifact["content_sha256"] == pending.content_hash
+        assert replayed_pending.replayed is True
+        assert replayed_pending.artifact == finalized
 
         failed = ArtifactWriteRequest(**{
             **{name: getattr(request, name) for name in request.__slots__ if name != "content_hash"},

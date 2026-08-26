@@ -4,14 +4,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import gzip
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
-import queue
+import stat
 import subprocess
 import sys
-from threading import Thread
 import time
 from urllib.request import urlopen
 from uuid import uuid4
@@ -21,10 +19,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from google.protobuf.json_format import Parse, ParseError
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest, ExportTraceServiceResponse,
-)
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
@@ -32,50 +29,36 @@ from redagent_platform.telemetry_service.contracts import (
     TELEMETRY_SCHEMA, ResourceType, ServiceName, SignalKind, SignalOutcome, TelemetryEnvelope,
 )
 from redagent_platform.telemetry_service.sdk import OpenTelemetrySink
-from redagent_platform.conformance_builder import isolated_docker_environment
+from redagent_platform.conformance_builder import (
+    isolated_docker_environment,
+    isolated_runtime_directory,
+)
 
 
-RECEIPTS: queue.Queue[bytes] = queue.Queue(maxsize=4)
+_RECEIPT_MEMBER = "redagent-otel-receipt.json"
+_MAX_RECEIPT_BYTES = 64 * 1024
 
 
 class ConformanceError(RuntimeError):
     pass
 
 
-class _Receiver(BaseHTTPRequestHandler):
-    def do_POST(self) -> None:  # noqa: N802
-        length = int(self.headers.get("content-length", "0"))
-        if self.path != "/v1/traces" or not 0 < length <= 64 * 1024:
-            self.send_error(400)
-            return
-        body = self.rfile.read(length)
-        if self.headers.get("content-encoding", "").lower() == "gzip":
-            body = gzip.decompress(body)
-        RECEIPTS.put_nowait(body)
-        response = ExportTraceServiceResponse().SerializeToString()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/x-protobuf")
-        self.send_header("Content-Length", str(len(response)))
-        self.end_headers()
-        self.wfile.write(response)
-
-    def log_message(self, _format: str, *args: object) -> None:
-        return
-
-
 def conformance() -> dict[str, object]:
     lock = json.loads((ROOT / "config" / "otel-collector-conformance-image.json").read_text(encoding="utf-8"))
     image = str(lock["reference"])
     name = f"redagent-r102-otel-{uuid4().hex[:10]}"
-    server = ThreadingHTTPServer(("127.0.0.1", 58432), _Receiver)
-    Thread(target=server.serve_forever, daemon=True).start()
-    try:
-        with isolated_docker_environment(ROOT) as environment:
+    with isolated_docker_environment(ROOT) as environment:
+        with isolated_runtime_directory(ROOT, prefix="otel-receipt-") as receipt_directory:
             _ensure_collector_image(lock, environment=environment)
             config = ROOT / "config" / "otel-collector" / "collector-conformance.yaml"
-            return _exercise_collector(lock, image, name, config, environment=environment)
-    finally:
-        server.shutdown()
+            return _exercise_collector(
+                lock,
+                image,
+                name,
+                config,
+                receipt_directory=receipt_directory,
+                environment=environment,
+            )
 
 
 def _exercise_collector(
@@ -84,6 +67,7 @@ def _exercise_collector(
     name: str,
     config: Path,
     *,
+    receipt_directory: Path,
     environment: dict[str, str],
 ) -> dict[str, object]:
     started = False
@@ -93,9 +77,9 @@ def _exercise_collector(
             "run", "--detach", "--name", name, "--read-only", "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges:true", "--memory", "256m",
             "--pids-limit", "128", "--cpus", "0.5", "--tmpfs", "/tmp",
-            "--add-host", "host.docker.internal:host-gateway",
             "--publish", "127.0.0.1:58431:4317", "--publish", "127.0.0.1:51318:13133",
             "--volume", f"{config}:/etc/otelcol-contrib/config.yaml:ro",
+            "--volume", f"{receipt_directory}:/receipt",
             image, "--config=/etc/otelcol-contrib/config.yaml", environment=environment,
         )
         started = True
@@ -115,11 +99,14 @@ def _exercise_collector(
             measurement_name=None, measurement_value=None,
         )
         OpenTelemetrySink(provider=provider).emit(envelope)
-        try:
-            body = RECEIPTS.get(timeout=10)
-        except queue.Empty as exc:
-            raise ConformanceError("collector_receipt_timeout") from exc
-        request = ExportTraceServiceRequest.FromString(body)
+        if not provider.force_flush(timeout_millis=5_000):
+            raise ConformanceError("collector_export_flush_failed")
+        body = _wait_for_collector_receipt(
+            receipt_directory,
+            name=name,
+            environment=environment,
+        )
+        request = _parse_receipt(body)
         attributes = _attributes(request)
         expected = {
             "redagent.schema": TELEMETRY_SCHEMA,
@@ -219,6 +206,130 @@ def _value(value) -> object:
     return getattr(value, field) if field else None
 
 
+def _wait_for_collector_receipt(
+    receipt_directory: Path,
+    *,
+    name: str,
+    environment: dict[str, str],
+) -> bytes:
+    deadline = time.monotonic() + 10
+    last_error = "collector_receipt_missing"
+    while time.monotonic() < deadline:
+        try:
+            return _read_receipt(receipt_directory)
+        except ConformanceError as exc:
+            last_error = str(exc)
+            if last_error not in {"collector_receipt_missing", "collector_receipt_empty"}:
+                raise
+        status = _docker(
+            "inspect", name, "--format", "{{.State.Status}}", check=False, environment=environment
+        )
+        if status.strip() == "exited":
+            logs = _docker_logs(name, environment=environment)
+            raise ConformanceError(f"collector_start_failed:{logs[-1000:]}")
+        time.sleep(0.25)
+    logs = _docker_logs(name, environment=environment)
+    raise ConformanceError(f"collector_receipt_timeout:{last_error}:{logs[-4000:]}")
+
+
+def _read_receipt(receipt_directory: Path) -> bytes:
+    try:
+        entries = tuple(receipt_directory.iterdir())
+    except OSError as exc:
+        raise ConformanceError("collector_receipt_directory_unavailable") from exc
+    if not entries:
+        raise ConformanceError("collector_receipt_missing")
+    if len(entries) != 1 or entries[0].name != _RECEIPT_MEMBER:
+        raise ConformanceError("collector_receipt_entries_invalid")
+    receipt = entries[0]
+    try:
+        before = receipt.lstat()
+    except OSError as exc:
+        raise ConformanceError("collector_receipt_member_invalid") from exc
+    if _is_linklike(receipt, before) or not stat.S_ISREG(before.st_mode):
+        raise ConformanceError("collector_receipt_member_invalid")
+    if before.st_size == 0:
+        raise ConformanceError("collector_receipt_empty")
+    if before.st_size > _MAX_RECEIPT_BYTES:
+        raise ConformanceError("collector_receipt_payload_too_large")
+
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(receipt, flags)
+    except OSError as exc:
+        raise ConformanceError("collector_receipt_member_invalid") from exc
+    try:
+        opened = os.fstat(descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ConformanceError("collector_receipt_member_invalid")
+        if _file_identity(opened) != _file_identity(before) or opened.st_size != before.st_size:
+            raise ConformanceError("collector_receipt_identity_changed")
+        chunks: list[bytes] = []
+        remaining = _MAX_RECEIPT_BYTES + 1
+        while remaining > 0:
+            chunk = os.read(descriptor, remaining)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        payload = b"".join(chunks)
+        after_open = os.fstat(descriptor)
+        if (
+            _file_identity(after_open) != _file_identity(opened)
+            or after_open.st_size != opened.st_size
+            or len(payload) != opened.st_size
+        ):
+            raise ConformanceError("collector_receipt_identity_changed")
+    finally:
+        os.close(descriptor)
+
+    try:
+        after = receipt.lstat()
+        final_entries = tuple(receipt_directory.iterdir())
+    except OSError as exc:
+        raise ConformanceError("collector_receipt_identity_changed") from exc
+    if (
+        _file_identity(after) != _file_identity(before)
+        or after.st_size != before.st_size
+        or len(final_entries) != 1
+        or final_entries[0].name != _RECEIPT_MEMBER
+    ):
+        raise ConformanceError("collector_receipt_identity_changed")
+    if not 0 < len(payload) <= _MAX_RECEIPT_BYTES:
+        raise ConformanceError("collector_receipt_payload_too_large")
+    return payload
+
+
+def _is_linklike(path: Path, metadata: os.stat_result) -> bool:
+    if path.is_symlink():
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction) and is_junction():
+        return True
+    return bool(int(getattr(metadata, "st_file_attributes", 0) or 0) & 0x00000400)
+
+
+def _file_identity(metadata: os.stat_result) -> tuple[int, int, int]:
+    return (
+        int(metadata.st_dev),
+        int(metadata.st_ino),
+        int(getattr(metadata, "st_file_attributes", 0) or 0),
+    )
+
+
+def _parse_receipt(payload: bytes) -> ExportTraceServiceRequest:
+    try:
+        records = tuple(line for line in payload.decode("utf-8").splitlines() if line.strip())
+        if len(records) != 1:
+            raise ValueError("one receipt record required")
+        request = Parse(records[0], ExportTraceServiceRequest())
+    except (ParseError, UnicodeDecodeError, ValueError) as exc:
+        raise ConformanceError("collector_receipt_json_invalid") from exc
+    if not request.resource_spans:
+        raise ConformanceError("collector_receipt_json_invalid")
+    return request
+
+
 def _wait_health(name: str, *, environment: dict[str, str] | None = None) -> None:
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
@@ -232,7 +343,7 @@ def _wait_health(name: str, *, environment: dict[str, str] | None = None) -> Non
             "inspect", name, "--format", "{{.State.Status}}", check=False, environment=environment
         )
         if status.strip() == "exited":
-            logs = _docker("logs", name, check=False, environment=environment)
+            logs = _docker_logs(name, environment=environment)
             raise ConformanceError(f"collector_start_failed:{logs[-1000:]}")
     raise ConformanceError("collector_health_timeout")
 
@@ -251,11 +362,24 @@ def _docker(
     return completed.stdout.strip()
 
 
+def _docker_logs(name: str, *, environment: dict[str, str] | None = None) -> str:
+    completed = subprocess.run(
+        ["docker", "logs", "--tail", "100", name],
+        cwd=ROOT,
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    return f"{completed.stdout}\n{completed.stderr}".strip()[-4000:]
+
+
 if __name__ == "__main__":
     if sys.argv[1:] != ["conformance"]:
         raise SystemExit("usage: otel_conformance.py conformance")
     try:
         print(json.dumps(conformance(), sort_keys=True))
-    except (ConformanceError, OSError, queue.Empty) as exc:
+    except (ConformanceError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1) from exc
