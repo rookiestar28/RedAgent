@@ -21,6 +21,24 @@ ROA*.md
 roa*.md
 .cla*/
 
+# Public operator skill packages require only these reviewed reference assets.
+!skills/codex/redagent-operator/references/
+skills/codex/redagent-operator/references/*
+!skills/codex/redagent-operator/references/safety-gates.md
+skills/codex/redagent-operator/references/safety-gates.md/
+!skills/codex/redagent-operator/references/workflows.md
+skills/codex/redagent-operator/references/workflows.md/
+!skills/codex/redagent-operator/references/command-contract.md
+skills/codex/redagent-operator/references/command-contract.md/
+!skills/claude/redagent-operator/references/
+skills/claude/redagent-operator/references/*
+!skills/claude/redagent-operator/references/safety-gates.md
+skills/claude/redagent-operator/references/safety-gates.md/
+!skills/claude/redagent-operator/references/workflows.md
+skills/claude/redagent-operator/references/workflows.md/
+!skills/claude/redagent-operator/references/command-contract.md
+skills/claude/redagent-operator/references/command-contract.md/
+
 # Secrets and local environment
 .env
 .env.*

@@ -27,7 +27,7 @@ This skill intentionally declares no `allowed-tools`. Future tool grants must be
 - Validate ambiguous, overbroad, or conflicting scope.
 - Present a structured summary and require explicit user confirmation before execute mode.
 - Treat collected specifications as evidence input, not authorization.
-- Call only the repo-local compat_047 command contract.
+- Call only the repo-local command contract.
 - Default to dry-run when confirmation, ROE, authorization, policy decision, limits, stop method, or evidence paths are incomplete.
 - Use repo-local evidence only when drafting findings or reports.
 
@@ -58,7 +58,7 @@ Refuse requests that ask you to:
    ```
 
 8. Continue only from stdout as JSON and the parsed JSON decision.
-9. For execute mode, require final confirmation and a current allow policy decision. The compat_047 CLI still does not invoke the real assessment wrapper.
+9. For execute mode, require final confirmation and a current allow policy decision. The repo-local CLI still does not invoke the real assessment wrapper.
 
 ## Reporting
 

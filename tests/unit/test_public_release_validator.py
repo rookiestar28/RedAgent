@@ -138,3 +138,55 @@ def test_head_blob_inventory_ignores_replacement_commits(
 
     monkeypatch.setattr(VALIDATOR, "ROOT", repo)
     assert VALIDATOR._head_blob_oids() == {"marker.txt": exact_oid}
+
+
+def test_required_operator_skill_references_are_tracked_public_assets() -> None:
+    expected = {
+        f"skills/{platform}/redagent-operator/references/{name}"
+        for platform in ("codex", "claude")
+        for name in ("safety-gates.md", "workflows.md", "command-contract.md")
+    }
+    completed = subprocess.run(
+        ("git", "--no-replace-objects", "ls-files", "-z", "--", "skills"),
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    tracked = {
+        raw.decode("utf-8", errors="strict").replace("\\", "/")
+        for raw in completed.stdout.split(b"\0")
+        if raw
+    }
+
+    tracked_references = {
+        path for path in tracked if "/redagent-operator/references/" in path
+    }
+    assert tracked_references == expected
+
+
+def test_operator_skill_reference_allowlist_rejects_unreviewed_paths() -> None:
+    filenames = ("safety-gates.md", "workflows.md", "command-contract.md")
+    probes = {
+        f"skills/{platform}/redagent-operator/references/not-reviewed.md"
+        for platform in ("codex", "claude")
+    }
+    probes.update(
+        f"skills/{platform}/redagent-operator/references/{filename}/not-reviewed.md"
+        for platform in ("codex", "claude")
+        for filename in filenames
+    )
+    completed = subprocess.run(
+        ("git", "check-ignore", "--no-index", "-z", "--stdin"),
+        cwd=ROOT,
+        check=False,
+        input=b"\0".join(path.encode("utf-8") for path in sorted(probes)) + b"\0",
+        capture_output=True,
+    )
+    ignored = {
+        raw.decode("utf-8", errors="strict").replace("\\", "/")
+        for raw in completed.stdout.split(b"\0")
+        if raw
+    }
+
+    assert completed.returncode == 0
+    assert ignored == probes

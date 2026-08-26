@@ -53,7 +53,7 @@ Refuse requests that ask you to:
    ```
 
 9. Continue only from stdout as JSON and the parsed JSON decision. Do not infer success from stderr text.
-10. For execute mode, require a confirmed specification summary and current allow policy decision in the JSON request. The compat_047 CLI still does not invoke the real assessment wrapper.
+10. For execute mode, require a confirmed specification summary and current allow policy decision in the JSON request. The repo-local CLI still does not invoke the real assessment wrapper.
 
 ## Reporting
 
