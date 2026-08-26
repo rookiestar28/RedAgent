@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "name": "moby/buildkit",
+  "version": "v0.32.2",
+  "index_digest": "sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
+  "linux_amd64_digest": "sha256:040d34121c27906c4ff9ac152a30d52bf2c5d328d3bb748916bb3d2743c02528",
+  "reference": "docker.io/moby/buildkit:v0.32.2@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
+  "platform": "linux/amd64",
+  "purpose": "local-conformance-builder-only",
+  "production_qualified": false
+}

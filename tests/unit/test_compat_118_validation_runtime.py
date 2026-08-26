@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import os
 from pathlib import Path
-import subprocess
 import sys
 import time
 from types import SimpleNamespace
@@ -82,7 +81,7 @@ def test_runtime_uses_a_forward_slash_pre_commit_home_on_windows(
     scripts = venv / "Scripts"
     scripts.mkdir(parents=True)
     monkeypatch.setattr(gate_runtime, "attest_active_project_venv", lambda _root: venv)
-    monkeypatch.setattr(gate_runtime.os, "name", "nt")
+    monkeypatch.setattr(gate_runtime, "_uses_windows_runtime_paths", lambda: True)
     monkeypatch.setenv("PATH", "C:\\safe-bin")
 
     with ValidationLease(authoritative_validation_lease_path(tmp_path)) as lease:
@@ -431,8 +430,8 @@ def test_contained_process_assigns_a_windows_kill_job_before_resuming(
     )
 
     assert containment.windows_job_handle == 99
-    assert observed["creationflags"] & subprocess.CREATE_NEW_PROCESS_GROUP
-    assert observed["creationflags"] & 0x00000004
+    assert observed["creationflags"] & gate_runtime._CREATE_NEW_PROCESS_GROUP
+    assert observed["creationflags"] & gate_runtime._CREATE_SUSPENDED
     assert lifecycle == ["assign:99", "resume"]
 
 

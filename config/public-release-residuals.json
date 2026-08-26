@@ -137,7 +137,7 @@
       "count": 2,
       "path": "config/containment-conformance-image.json",
       "reason": "runtime contract content",
-      "sha256": "308f5e4589166b4bdc62e388cc2dfe160e8beb5e108aad1d49fb4b4bf517aeb9",
+      "sha256": "5e0724024d537532f02012185096bcbb0c86047fd2d2008c92e4c975708847f6",
       "token": "r101"
     },
     {
@@ -347,7 +347,7 @@
       "count": 2,
       "path": "config/runner-conformance-image.json",
       "reason": "runtime contract content",
-      "sha256": "3187634a4df6f30c88c1ff4a1a31bfe203d88048cdece37c0f440dc511d6b933",
+      "sha256": "4e291aff3ccf1fb294cb5a7535edd83b7364073bd5eecc9d1682732cc1dd52b8",
       "token": "r100"
     },
     {
@@ -3021,7 +3021,7 @@
       "count": 2,
       "path": "redagent_platform/gate_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7432bba6b1435d07ce333c4649526718de6ddbcbc37cd49e6b386b7a561aad50",
+      "sha256": "200cc9d401f52a4ae12a5cf04b985b1b588714664caada4a58b0941532545e91",
       "token": "r118"
     },
     {
@@ -4782,10 +4782,10 @@
       "token": "r116"
     },
     {
-      "count": 3,
+      "count": 4,
       "path": "scripts/containment_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "1b72e4cf51fa2ec85ccee4ad148e0ccfbe829846aa3c262a2283ef89447d24c7",
+      "sha256": "b203b581291f28aa123ce73f5fa73eb7e0a9d24bd4f25f0429f509710c3f7330",
       "token": "r101"
     },
     {
@@ -4813,7 +4813,7 @@
       "count": 6,
       "path": "scripts/otel_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "0f03c4cb0b2cabb51e6c7138b152eb1b98763d999c8a5f2edd1ce78ce15e7df1",
+      "sha256": "21caa4200c8b35f5942443f7d46965a3f80378bfa70fe013c60b4b3abcdc2e1b",
       "token": "r102"
     },
     {
@@ -4887,10 +4887,10 @@
       "token": "R118"
     },
     {
-      "count": 3,
+      "count": 4,
       "path": "scripts/runner_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "5a8f7a3678c37de619067b3945b3cecdcb9b3135ad34ca6a5138d96c83929929",
+      "sha256": "148c116fc41d2821c063454737d6c770a7794f051c53c535ab3562fdf5978ea0",
       "token": "r100"
     },
     {
@@ -6213,7 +6213,7 @@
       "count": 1,
       "path": "tests/unit/test_compat_100_runner_topology.py",
       "reason": "compatibility contract identifier",
-      "sha256": "644d7bc7c2151065337e6ca1c8c3de0915e62bc195270256ef6bae9ce9db5903",
+      "sha256": "776cb3d655f060f14643586e72296fabf9fb04814a929cc792351293f8aac8b2",
       "token": "r100"
     },
     {
@@ -7557,7 +7557,7 @@
       "count": 4,
       "path": "tests/unit/test_compat_118_validation_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "9e816372740cf3e7e77cefa54ddca56541c978149a7cd988fa97d8f8ad2d2e1e",
+      "sha256": "f5252602d972787ae4503279d75c379e1b78e2f8d4e6b46980ba84b8ef60495b",
       "token": "r118"
     },
     {
@@ -8390,7 +8390,7 @@
       "count": 1,
       "path": "tests/unit/test_skill_release.py",
       "reason": "compatibility contract identifier",
-      "sha256": "4a56f5616ba4083c2c0d3058aadd99dc96acfdef0aeca66fafc72f02492de2c2",
+      "sha256": "db022fb156bdc41d8f894a7cf9ab2d689b5db58f326fbff88c07bd2cebed3209",
       "token": "r052"
     },
     {

@@ -32,6 +32,7 @@ from redagent_platform.telemetry_service.contracts import (
     TELEMETRY_SCHEMA, ResourceType, ServiceName, SignalKind, SignalOutcome, TelemetryEnvelope,
 )
 from redagent_platform.telemetry_service.sdk import OpenTelemetrySink
+from redagent_platform.conformance_builder import isolated_docker_environment
 
 
 RECEIPTS: queue.Queue[bytes] = queue.Queue(maxsize=4)
@@ -69,10 +70,25 @@ def conformance() -> dict[str, object]:
     server = ThreadingHTTPServer(("127.0.0.1", 58432), _Receiver)
     Thread(target=server.serve_forever, daemon=True).start()
     try:
-        inspect = _docker("image", "inspect", image, "--format", "{{index .RepoDigests 0}}")
-        if str(lock["index_digest"]) not in inspect:
-            raise ConformanceError("collector_image_digest_mismatch")
-        config = ROOT / "config" / "otel-collector" / "collector-conformance.yaml"
+        with isolated_docker_environment(ROOT) as environment:
+            _ensure_collector_image(lock, environment=environment)
+            config = ROOT / "config" / "otel-collector" / "collector-conformance.yaml"
+            return _exercise_collector(lock, image, name, config, environment=environment)
+    finally:
+        server.shutdown()
+
+
+def _exercise_collector(
+    lock: dict[str, object],
+    image: str,
+    name: str,
+    config: Path,
+    *,
+    environment: dict[str, str],
+) -> dict[str, object]:
+    started = False
+    body_error: BaseException | None = None
+    try:
         _docker(
             "run", "--detach", "--name", name, "--read-only", "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges:true", "--memory", "256m",
@@ -80,9 +96,10 @@ def conformance() -> dict[str, object]:
             "--add-host", "host.docker.internal:host-gateway",
             "--publish", "127.0.0.1:58431:4317", "--publish", "127.0.0.1:51318:13133",
             "--volume", f"{config}:/etc/otelcol-contrib/config.yaml:ro",
-            image, "--config=/etc/otelcol-contrib/config.yaml",
+            image, "--config=/etc/otelcol-contrib/config.yaml", environment=environment,
         )
-        _wait_health(name)
+        started = True
+        _wait_health(name, environment=environment)
         exporter = OTLPSpanExporter(endpoint="127.0.0.1:58431", insecure=True, timeout=3)
         provider = TracerProvider()
         provider.add_span_processor(SimpleSpanProcessor(exporter))
@@ -98,7 +115,10 @@ def conformance() -> dict[str, object]:
             measurement_name=None, measurement_value=None,
         )
         OpenTelemetrySink(provider=provider).emit(envelope)
-        body = RECEIPTS.get(timeout=10)
+        try:
+            body = RECEIPTS.get(timeout=10)
+        except queue.Empty as exc:
+            raise ConformanceError("collector_receipt_timeout") from exc
         request = ExportTraceServiceRequest.FromString(body)
         attributes = _attributes(request)
         expected = {
@@ -110,7 +130,10 @@ def conformance() -> dict[str, object]:
         if any(attributes.get(key) != value for key, value in expected.items()):
             raise ConformanceError("collector_attribute_contract_mismatch")
         serialized = json.dumps(attributes, sort_keys=True).lower()
-        forbidden = ("authorization", "cookie", "password", "secret=", "token=", "prompt", "db.statement", "http.url")
+        forbidden = (
+            "authorization", "cookie", "password", "secret=", "token=", "prompt",
+            "db.statement", "http.url",
+        )
         if any(marker in serialized for marker in forbidden):
             raise ConformanceError("collector_sensitive_value_leak")
         return {
@@ -120,9 +143,63 @@ def conformance() -> dict[str, object]:
             "collector_digest": lock["index_digest"], "loopback_receiver": True,
             "read_only_root": True, "cap_drop": ["ALL"], "bounded_receipt_bytes": len(body),
         }
+    except BaseException as exc:
+        body_error = exc
+        raise
     finally:
-        server.shutdown()
-        subprocess.run(["docker", "rm", "--force", name], cwd=ROOT, capture_output=True, check=False)
+        _remove_collector(
+            name,
+            environment=environment,
+            required=started,
+            body_error=body_error,
+        )
+
+
+def _remove_collector(
+    name: str,
+    *,
+    environment: dict[str, str],
+    required: bool,
+    body_error: BaseException | None,
+) -> None:
+    try:
+        if required:
+            _docker("rm", "--force", name, environment=environment)
+        else:
+            _docker("rm", "--force", name, check=False, environment=environment)
+    except ConformanceError as cleanup_error:
+        if body_error is not None:
+            raise ConformanceError(f"{body_error}:collector_cleanup_failed") from cleanup_error
+        raise ConformanceError("collector_cleanup_failed") from cleanup_error
+
+
+def _ensure_collector_image(
+    lock: dict[str, object],
+    *,
+    environment: dict[str, str] | None = None,
+) -> None:
+    image = str(lock["reference"])
+    inspect_kwargs: dict[str, object] = {"check": False}
+    if environment is not None:
+        inspect_kwargs["environment"] = environment
+    repo_digest = _docker("image", "inspect", image, "--format", "{{index .RepoDigests 0}}", **inspect_kwargs)
+    if str(lock["index_digest"]) not in repo_digest:
+        pull_kwargs: dict[str, object] = {}
+        if environment is not None:
+            pull_kwargs["environment"] = environment
+        _docker("pull", "--platform", str(lock["platform"]), image, **pull_kwargs)
+        inspect_kwargs["check"] = True
+        repo_digest = _docker(
+            "image", "inspect", image, "--format", "{{index .RepoDigests 0}}", **inspect_kwargs
+        )
+    if str(lock["index_digest"]) not in repo_digest:
+        raise ConformanceError("collector_image_digest_mismatch")
+    identity_kwargs: dict[str, object] = {}
+    if environment is not None:
+        identity_kwargs["environment"] = environment
+    identity = _docker("image", "inspect", image, "--format", "{{.Os}}/{{.Architecture}}", **identity_kwargs)
+    if identity != lock["platform"]:
+        raise ConformanceError("collector_image_platform_identity_mismatch")
 
 
 def _attributes(request: ExportTraceServiceRequest) -> dict[str, object]:
@@ -142,7 +219,7 @@ def _value(value) -> object:
     return getattr(value, field) if field else None
 
 
-def _wait_health(name: str) -> None:
+def _wait_health(name: str, *, environment: dict[str, str] | None = None) -> None:
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         try:
@@ -151,16 +228,23 @@ def _wait_health(name: str) -> None:
                     return
         except OSError:
             time.sleep(0.25)
-        status = _docker("inspect", name, "--format", "{{.State.Status}}", check=False)
+        status = _docker(
+            "inspect", name, "--format", "{{.State.Status}}", check=False, environment=environment
+        )
         if status.strip() == "exited":
-            logs = _docker("logs", name, check=False)
+            logs = _docker("logs", name, check=False, environment=environment)
             raise ConformanceError(f"collector_start_failed:{logs[-1000:]}")
     raise ConformanceError("collector_health_timeout")
 
 
-def _docker(*args: str, check: bool = True) -> str:
+def _docker(
+    *args: str,
+    check: bool = True,
+    environment: dict[str, str] | None = None,
+) -> str:
     completed = subprocess.run(
-        ["docker", *args], cwd=ROOT, text=True, capture_output=True, timeout=60, check=False,
+        ["docker", *args], cwd=ROOT, env=environment, text=True, capture_output=True,
+        timeout=180, check=False,
     )
     if check and completed.returncode != 0:
         raise ConformanceError(f"docker_failed:{args[0]}:{completed.stderr.strip()[-1000:]}")

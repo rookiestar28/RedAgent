@@ -4,6 +4,16 @@
 .coverage.*
 *.cover
 AGE*.md
+
+# Public operator release documents required by the tracked manifest.
+!docs/sop/AGENT_SKILL_OPERATOR_SOP.md
+docs/sop/AGENT_SKILL_OPERATOR_SOP.md/
+!docs/release/AGENT_SKILL_RELEASE_PACKAGE.md
+docs/release/AGENT_SKILL_RELEASE_PACKAGE.md/
+!docs/security/AGENT_SKILL_OPERATOR_SAFETY_ARCHITECTURE.md
+docs/security/AGENT_SKILL_OPERATOR_SAFETY_ARCHITECTURE.md/
+!docs/security/AGENT_SKILL_VALIDATION_POLICY.md
+docs/security/AGENT_SKILL_VALIDATION_POLICY.md/
 scripts/sync_split.py
 tests_output.txt
 playwright/.cache/

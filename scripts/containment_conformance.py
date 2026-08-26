@@ -6,10 +6,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+import sys
 import time
 
-
 ROOT = Path(__file__).resolve().parents[1]
+# IMPORTANT: direct execution places scripts/ on sys.path; keep repo imports deterministic.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from redagent_platform.conformance_builder import attest_docker_image_config, pinned_conformance_builder
+
+
 CONTEXT = ROOT / "containers" / "containment-synthetic"
 LOCK = ROOT / "config" / "containment-conformance-image.json"
 NETWORK = "redagent-r101-containment"
@@ -21,10 +28,14 @@ class ConformanceError(RuntimeError):
     pass
 
 
-def _docker(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _docker(
+    *arguments: str,
+    check: bool = True,
+    environment: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
-        ["docker", *arguments], cwd=ROOT, text=True, capture_output=True,
-        timeout=120, check=False,
+        ["docker", *arguments], cwd=ROOT, env=environment, text=True, capture_output=True,
+        timeout=180, check=False,
     )
     if check and result.returncode != 0:
         raise ConformanceError(f"containment_docker_failed:{arguments[0]}:{result.stderr.strip()[:160]}")
@@ -46,23 +57,24 @@ def build() -> str:
     if source_date_epoch != 1760544000 or compatibility_version != "20":
         raise ConformanceError("containment_reproducible_build_lock_invalid")
     output = ",".join((
-        "type=image",
+        "type=docker",
         f"name={values['local_tag']}",
         "rewrite-timestamp=true",
-        "unpack=false",
         f"compatibility-version={compatibility_version}",
     ))
     # CRITICAL: rewrite COPY-layer timestamps before comparing the locked ID;
     # checkout mtimes are not an acceptable supply-chain identity input.
-    _docker(
-        "buildx", "build", "--no-cache", "--network", "none", "--provenance=false",
-        "--build-arg", f"SOURCE_DATE_EPOCH={source_date_epoch}", "--output", output,
-        "--file", str(CONTEXT / "Dockerfile"),
-        str(CONTEXT),
+    with pinned_conformance_builder(ROOT, purpose="r101") as builder:
+        _docker(
+            *builder.build_prefix, "--no-cache", "--network", "none", "--provenance=false",
+            "--build-arg", f"SOURCE_DATE_EPOCH={source_date_epoch}", "--output", output,
+            "--file", str(CONTEXT / "Dockerfile"),
+            str(CONTEXT),
+            environment=dict(builder.environment),
+        )
+    observed = attest_docker_image_config(
+        ROOT, str(values["local_tag"]), str(values["derived_image_id"])
     )
-    observed = _docker("image", "inspect", str(values["local_tag"]), "--format", "{{.Id}}").stdout.strip()
-    if observed != values["derived_image_id"]:
-        raise ConformanceError(f"containment_image_digest_mismatch:{observed}")
     return observed
 
 

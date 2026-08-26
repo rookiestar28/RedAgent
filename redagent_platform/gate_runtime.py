@@ -43,10 +43,15 @@ class ContainedProcess:
 
 
 _CREATE_SUSPENDED = 0x00000004
+_CREATE_NEW_PROCESS_GROUP = 0x00000200
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
 
 
 def _uses_windows_process_containment() -> bool:
+    return os.name == "nt"
+
+
+def _uses_windows_runtime_paths() -> bool:
     return os.name == "nt"
 
 
@@ -269,7 +274,9 @@ def start_contained_process(
         raise OSError("validation process Job Object could not be created")
     # CRITICAL: child execution remains suspended until it is assigned to the
     # kill-on-close Job Object; post-start assignment permits an escape race.
-    kwargs["creationflags"] = int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)) | _CREATE_SUSPENDED
+    # IMPORTANT: keep the canonical Win32 bits platform-independent so POSIX can test this branch
+    # without mutating process-global os.name or depending on Windows-only subprocess attributes.
+    kwargs["creationflags"] = _CREATE_NEW_PROCESS_GROUP | _CREATE_SUSPENDED
     try:
         process = launcher(tuple(argv), **kwargs)
     except Exception:
@@ -863,9 +870,10 @@ def prepare_authoritative_runtime(root: Path, *, lease_capability: object) -> di
     root = root.absolute()
     require_authoritative_validation_lease(lease_capability, root)
     venv = attest_active_project_venv(root)
-    cache_name = "pre-commit-r118-windows-v1" if os.name == "nt" else "pre-commit-r118-linux-v1"
+    windows_paths = _uses_windows_runtime_paths()
+    cache_name = "pre-commit-r118-windows-v1" if windows_paths else "pre-commit-r118-linux-v1"
     pre_commit_home = _ensure_contained_real_directory(root, Path(".tmp") / cache_name)
-    scripts = venv / ("Scripts" if os.name == "nt" else "bin")
+    scripts = venv / ("Scripts" if windows_paths else "bin")
     current_path = os.environ.get("PATH", "")
     updates = {
         # CRITICAL: pre-commit stores this path in its SQLite index. Forward
@@ -873,7 +881,7 @@ def prepare_authoritative_runtime(root: Path, *, lease_capability: object) -> di
         "PRE_COMMIT_HOME": pre_commit_home.as_posix(),
         "PATH": str(scripts) if not current_path else f"{scripts}{os.pathsep}{current_path}",
     }
-    if os.name != "nt":
+    if not windows_paths:
         playwright = _ensure_contained_real_directory(root, Path(".tmp") / "playwright")
         updates.update({"TMPDIR": str(playwright), "TMP": str(playwright), "TEMP": str(playwright)})
     return updates

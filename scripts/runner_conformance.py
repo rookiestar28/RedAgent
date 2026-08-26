@@ -16,8 +16,14 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-
 ROOT = Path(__file__).resolve().parents[1]
+# IMPORTANT: direct execution places scripts/ on sys.path; keep repo imports deterministic.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from redagent_platform.conformance_builder import attest_docker_image_config, pinned_conformance_builder
+
+
 LOCK_PATH = ROOT / "config" / "runner-conformance-image.json"
 DOCKERFILE = ROOT / "containers" / "runner-synthetic" / "Dockerfile"
 ENTRYPOINT = ROOT / "containers" / "runner-synthetic" / "synthetic_entry.py"
@@ -33,9 +39,14 @@ def _lock() -> dict[str, object]:
     return json.loads(LOCK_PATH.read_text(encoding="utf-8"))
 
 
-def _docker(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _docker(
+    *arguments: str,
+    check: bool = True,
+    environment: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     completed = subprocess.run(
-        ["docker", *arguments], cwd=ROOT, text=True, capture_output=True, timeout=120, check=False,
+        ["docker", *arguments], cwd=ROOT, env=environment, text=True, capture_output=True,
+        timeout=180, check=False,
     )
     if check and completed.returncode != 0:
         raise ConformanceError(f"docker_command_failed:{arguments[0]}:{completed.stderr.strip()[:200]}")
@@ -64,31 +75,28 @@ def build() -> dict[str, object]:
     source_date_epoch = int(lock["source_date_epoch"])
     compatibility_version = str(lock["buildkit_compatibility_version"])
     output = ",".join((
-        "type=image",
+        "type=docker",
         f"name={lock['local_tag']}",
         "rewrite-timestamp=true",
-        "unpack=false",
         f"compatibility-version={compatibility_version}",
     ))
     # CRITICAL: ordinary `docker build` preserves checkout mtimes in COPY
     # layers, so a tracked image ID drifts across otherwise identical builds.
-    _docker(
-        "buildx", "build", "--no-cache", "--network", "none", "--provenance=false",
-        "--build-arg", f"SOURCE_DATE_EPOCH={source_date_epoch}", "--output", output,
-        "--file", str(DOCKERFILE),
-        "--label", "org.opencontainers.image.source=redagent:r100-synthetic", str(ROOT),
-    )
-    observed = _docker("image", "inspect", str(lock["local_tag"]), "--format", "{{.Id}}").stdout.strip()
-    if observed != lock["derived_image_id"]:
-        raise ConformanceError(f"runner_derived_image_mismatch:{observed}")
+    with pinned_conformance_builder(ROOT, purpose="r100") as builder:
+        _docker(
+            *builder.build_prefix, "--no-cache", "--network", "none", "--provenance=false",
+            "--build-arg", f"SOURCE_DATE_EPOCH={source_date_epoch}", "--output", output,
+            "--file", str(DOCKERFILE),
+            "--label", "org.opencontainers.image.source=redagent:r100-synthetic", str(ROOT),
+            environment=dict(builder.environment),
+        )
+    observed = attest_docker_image_config(ROOT, str(lock["local_tag"]), str(lock["derived_image_id"]))
     return {"ok": True, "action": "build", "image_id": observed}
 
 
 def provision() -> dict[str, object]:
     lock = _lock()
-    observed = _docker("image", "inspect", str(lock["local_tag"]), "--format", "{{.Id}}").stdout.strip()
-    if observed != lock["derived_image_id"]:
-        raise ConformanceError("runner_provision_image_mismatch")
+    observed = attest_docker_image_config(ROOT, str(lock["local_tag"]), str(lock["derived_image_id"]))
     RUNTIME.mkdir(parents=True, exist_ok=True)
     key = Ed25519PrivateKey.generate()
     private_path = RUNTIME / "attestation-private.pem"

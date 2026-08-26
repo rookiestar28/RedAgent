@@ -14,7 +14,7 @@ def test_synthetic_image_lock_pins_official_base_index_platform_and_derived_dige
     assert lock["base_image"] == "docker.io/library/python:3.13.9-alpine3.22"
     assert lock["base_index_digest"] == "sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1"
     assert lock["base_linux_amd64_digest"] == "sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6"
-    assert lock["derived_image_id"] == "sha256:53021de7e52376b1cdf9b3553bfcb8de15dea0ba4cd2afd835594bdfeae017ac"
+    assert lock["derived_image_id"] == "sha256:9700b0b2dc12b00c7b8e8bb902a747a1f23bdb1e38b876bd3d18e406cb07266c"
     assert lock["source_date_epoch"] == 1760544000
     assert lock["buildkit_compatibility_version"] == "20"
     assert lock["local_tag"] == "redagent/r100-synthetic:1.0.0"
@@ -25,6 +25,7 @@ def test_dockerfile_is_digest_pinned_numeric_nonroot_and_has_only_fixed_entrypoi
     source = (ROOT / "containers" / "runner-synthetic" / "Dockerfile").read_text(encoding="utf-8")
     assert source.startswith("FROM docker.io/library/python@sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6")
     assert "USER 65532:65532" in source
+    assert "COPY --chown=0:0 --chmod=0555 containers/runner-synthetic/synthetic_entry.py" in source
     assert 'ENTRYPOINT ["python", "-I", "/app/synthetic_entry.py"]' in source
     for forbidden in ("apt", "apk", "curl", "wget", "ADD ", "latest", "sudo", "HEALTHCHECK", "CMD "):
         assert forbidden not in source
@@ -50,8 +51,8 @@ def test_conformance_script_exposes_only_fixed_actions_and_restricted_docker_fla
     source = (ROOT / "scripts" / "runner_conformance.py").read_text(encoding="utf-8")
     for required in (
         'choices=("validate", "build", "provision", "run", "inspect", "stop", "reset")',
-        '"buildx", "build", "--no-cache", "--network", "none", "--provenance=false"',
-        '"rewrite-timestamp=true"', '"unpack=false"', '"compatibility-version={compatibility_version}"',
+        'builder.build_prefix', "attest_docker_image_config", '"--no-cache", "--network", "none", "--provenance=false"',
+        '"type=docker"', '"rewrite-timestamp=true"', '"compatibility-version={compatibility_version}"',
         '"SOURCE_DATE_EPOCH={source_date_epoch}"',
         '"--network", "none"', '"--read-only"', '"--cap-drop", "ALL"',
         '"--security-opt", "no-new-privileges:true"', '"--pids-limit", "32"',

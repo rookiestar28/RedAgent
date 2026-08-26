@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "base_linux_amd64_digest": "sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6",
-  "derived_image_id": "sha256:5b63165f47811234b5310f278db7080a8a1a576a9d1d231f767d041f4cbe7da3",
+  "derived_image_id": "sha256:3ff5480810e463fbcf12987d7dfd6df2c0ddeacadfdbe4e322ec9aa4c1cf9be2",
   "source_date_epoch": 1760544000,
   "buildkit_compatibility_version": "20",
   "local_tag": "redagent/r101-containment:1.0.0",

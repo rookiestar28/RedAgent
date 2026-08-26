@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 from redagent_platform.skill_release import (
+    REQUIRED_RELEASE_DOCS,
     build_skill_release_manifest,
     validate_skill_release_manifest,
 )
@@ -89,3 +90,31 @@ def test_release_manifest_cli_outputs_json(tmp_path: Path) -> None:
     assert payload["release_version"] == "phase8.r052.v1"
     assert written["skill_name"] == "redagent-operator"
     assert {client["platform"] for client in payload["clients"]} == {"codex", "claude"}
+
+
+def test_release_documents_are_public_safe_and_present_in_the_git_tree() -> None:
+    completed = subprocess.run(
+        ["git", "ls-files", "-z", "--", *REQUIRED_RELEASE_DOCS],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    tracked = {path.decode("utf-8") for path in completed.stdout.split(b"\0") if path}
+    assert tracked == set(REQUIRED_RELEASE_DOCS)
+
+    curated = (
+        "docs/sop/AGENT_SKILL_OPERATOR_SOP.md",
+        "docs/release/AGENT_SKILL_RELEASE_PACKAGE.md",
+        "docs/security/AGENT_SKILL_OPERATOR_SAFETY_ARCHITECTURE.md",
+        "docs/security/AGENT_SKILL_VALIDATION_POLICY.md",
+    )
+    for relative in curated:
+        content = (ROOT / relative).read_text(encoding="utf-8")
+        assert "Roadmap item:" not in content
+        assert "compat_" not in content
+        nested = subprocess.run(
+            ["git", "check-ignore", "--quiet", "--no-index", f"{relative}/nested.txt"],
+            cwd=ROOT,
+            check=False,
+        )
+        assert nested.returncode == 0
