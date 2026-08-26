@@ -62,6 +62,50 @@ def test_locked_images_are_closed_to_the_reviewed_registry_tag_digest_and_platfo
         "docker.io/openpolicyagent/opa:1.18.2-static@"
         "sha256:57f7d06808fff6de3ea1d698e6430990973ca1370be0e54975f0083d615521da"
     )
+
+
+def test_posix_opa_container_uses_the_current_non_root_host_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(opa_conformance.os, "name", "posix")
+    monkeypatch.setattr(opa_conformance.os, "getuid", lambda: 1001, raising=False)
+    monkeypatch.setattr(opa_conformance.os, "getgid", lambda: 127, raising=False)
+
+    assert opa_conformance._container_user() == "1001:127"
+
+
+@pytest.mark.parametrize(
+    ("uid", "gid"),
+    ((0, 1000), (-1, 1000), (1000, 0), (1000, -1), (2**31, 1000)),
+)
+def test_posix_opa_container_rejects_root_or_invalid_host_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    uid: int,
+    gid: int,
+) -> None:
+    monkeypatch.setattr(opa_conformance.os, "name", "posix")
+    monkeypatch.setattr(opa_conformance.os, "getuid", lambda: uid, raising=False)
+    monkeypatch.setattr(opa_conformance.os, "getgid", lambda: gid, raising=False)
+
+    with pytest.raises(opa_conformance.ConformanceError, match="opa_container_identity_invalid"):
+        opa_conformance._container_user()
+
+
+def test_non_posix_opa_container_retains_the_unprivileged_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(opa_conformance.os, "name", "nt")
+
+    assert opa_conformance._container_user() == "65532:65532"
+
+
+def test_every_opa_build_or_verify_container_uses_the_validated_identity() -> None:
+    source = opa_conformance.__file__
+    assert source is not None
+    text = Path(source).read_text(encoding="utf-8")
+
+    assert text.count('f"--user={_container_user()}"') == 5
+    assert "--user=65532:65532" not in text
     assert opa_conformance._bundle_server_image() == (
         "docker.io/library/python:3.13-alpine@"
         "sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0"

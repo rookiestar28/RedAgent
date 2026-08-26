@@ -8,7 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  full-gate:
+  hosted-windows-qualification:
+    name: Hosted Windows qualification (non-authoritative)
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -20,6 +21,6 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - name: Run repository gate
+      - name: Run hosted Windows qualification
         shell: powershell
-        run: powershell -File scripts/run_full_tests_windows.ps1
+        run: powershell -File scripts/run_hosted_windows_qualification.ps1

@@ -283,6 +283,32 @@ def _docker_command(*arguments: str) -> list[str]:
     return ["docker", "--context", "default", *arguments]
 
 
+def _container_user() -> str:
+    """Use the current non-root POSIX owner for bind-mounted private artifacts."""
+
+    if os.name != "posix":
+        return "65532:65532"
+    getuid = getattr(os, "getuid", None)
+    getgid = getattr(os, "getgid", None)
+    if not callable(getuid) or not callable(getgid):
+        raise ConformanceError("opa_container_identity_invalid")
+    uid = getuid()
+    gid = getgid()
+    # CRITICAL: root or an unbounded identity would expand the fixture's host access.
+    if (
+        isinstance(uid, bool)
+        or isinstance(gid, bool)
+        or not isinstance(uid, int)
+        or not isinstance(gid, int)
+        or uid <= 0
+        or gid <= 0
+        or uid >= 2**31
+        or gid >= 2**31
+    ):
+        raise ConformanceError("opa_container_identity_invalid")
+    return f"{uid}:{gid}"
+
+
 def _runtime_directory() -> Path:
     """Create and validate the sole workspace-local mutable OPA runtime root."""
 
@@ -617,7 +643,7 @@ def _opa(*arguments: str) -> subprocess.CompletedProcess[str]:
     command = [
         "run", f"--platform={OPA_PLATFORM}", "--rm", "--network=none", "--read-only",
         "--cap-drop=ALL", "--security-opt=no-new-privileges",
-        "--user=65532:65532", "-v", f"{POLICY}:/policy:ro", _image(), *arguments,
+        f"--user={_container_user()}", "-v", f"{POLICY}:/policy:ro", _image(), *arguments,
     ]
     result = _run_docker(*command, timeout=180)
     if result.returncode:
@@ -639,7 +665,7 @@ def _build() -> dict[str, Any]:
     verified = runtime / "redagent-verified.tar.gz"
     command = [
         "run", f"--platform={OPA_PLATFORM}", "--rm", "--network=none", "--read-only",
-        "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65532:65532",
+        "--cap-drop=ALL", "--security-opt=no-new-privileges", f"--user={_container_user()}",
         "-v", f"{POLICY}:/policy:ro", "-v", f"{runtime}:/output", _image(),
         "build", "--bundle", "--ignore", "*_test.rego", "--signing-alg", "RS256",
         "--signing-key", f"/output/{private_key.name}",
@@ -650,7 +676,7 @@ def _build() -> dict[str, Any]:
         raise ConformanceError(f"opa_command_failed:build:{result.returncode}")
     verify_command = [
         "run", f"--platform={OPA_PLATFORM}", "--rm", "--network=none", "--read-only",
-        "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65532:65532",
+        "--cap-drop=ALL", "--security-opt=no-new-privileges", f"--user={_container_user()}",
         "-v", f"{runtime}:/output", _image(), "build", "--bundle",
         "--verification-key", f"/output/{public_key.name}",
         "--output", "/output/redagent-verified.tar.gz", "/output/redagent.tar.gz",
@@ -698,7 +724,7 @@ def _build_rollback_fixture() -> dict[str, Any]:
     verified = runtime / "redagent-r099-v0-verified.tar.gz"
     command = [
         "run", f"--platform={OPA_PLATFORM}", "--rm", "--network=none", "--read-only",
-        "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65532:65532",
+        "--cap-drop=ALL", "--security-opt=no-new-privileges", f"--user={_container_user()}",
         "-v", f"{stage}:/policy:ro", "-v", f"{runtime}:/output", _image(),
         "build", "--bundle", "--ignore", "*_test.rego", "--signing-alg", "RS256",
         "--signing-key", f"/output/{private_key.name}",
@@ -709,7 +735,7 @@ def _build_rollback_fixture() -> dict[str, Any]:
         raise ConformanceError(f"opa_command_failed:build-rollback:{result.returncode}")
     verify_command = [
         "run", f"--platform={OPA_PLATFORM}", "--rm", "--network=none", "--read-only",
-        "--cap-drop=ALL", "--security-opt=no-new-privileges", "--user=65532:65532",
+        "--cap-drop=ALL", "--security-opt=no-new-privileges", f"--user={_container_user()}",
         "-v", f"{runtime}:/output", _image(), "build", "--bundle",
         "--verification-key", f"/output/{public_key.name}",
         "--output", f"/output/{verified.name}", f"/output/{output.name}",

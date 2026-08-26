@@ -4799,7 +4799,7 @@
       "count": 8,
       "path": "scripts/opa_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "005c5afb8d01b814a6cc8c2a31502f649f5ce93dbaf4495cb51bf8d076cf62c6",
+      "sha256": "4ef63b800fbbeae7de4deeda8931478bb9d230f72ad65055669ae38e686d0566",
       "token": "r099"
     },
     {
@@ -6087,7 +6087,7 @@
       "count": 2,
       "path": "tests/unit/test_compat_099_opa_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d770f87f3ea237c660045684428fcbfc1306fe51148cf8786ebc482bb55cd8b9",
+      "sha256": "1098452d642972f9b4b1f03ccf701a76a45b716a673b87ff5ce601989793928e",
       "token": "r099"
     },
     {

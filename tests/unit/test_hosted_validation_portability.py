@@ -16,10 +16,32 @@ from scripts import run_validation_gate
 
 ROOT = Path(__file__).resolve().parents[2]
 POSIX_VENV_GUARD = ROOT / "scripts/verify_posix_venv_layout.sh"
+HOSTED_WINDOWS_QUALIFICATION = ROOT / "scripts/run_hosted_windows_qualification.ps1"
+WINDOWS_CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
 
 
 def _config_values(command: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(command[index + 1] for index, token in enumerate(command[:-1]) if token == "-c")
+
+
+def test_windows_hosted_workflow_uses_an_explicit_non_docker_qualification() -> None:
+    workflow = WINDOWS_CI_WORKFLOW.read_text(encoding="utf-8")
+    script = HOSTED_WINDOWS_QUALIFICATION.read_text(encoding="utf-8")
+
+    assert "  hosted-windows-qualification:" in workflow
+    assert "name: Hosted Windows qualification (non-authoritative)" in workflow
+    assert "  full-gate:" not in workflow
+    assert "powershell -File scripts/run_hosted_windows_qualification.ps1" in workflow
+    assert "powershell -File scripts/run_full_tests_windows.ps1" not in workflow
+    assert "scripts/run_full_tests_windows.ps1 --provision-dependencies" in script
+    assert "tests/unit/test_hosted_validation_portability.py" in script
+    assert "tests/unit/test_compat_118_validation_bootstrap.py" in script
+    assert "tests/unit/test_compat_118_validation_workflow.py" in script
+    assert "scripts/validate_public_release.py" in script
+    assert "--check-commit-message" in script
+    assert "--force-full" not in script
+    assert "docker" not in script.casefold()
+    assert "hosted_windows_qualification=true" in script
 
 
 def test_direct_git_queries_trust_only_the_exact_authoritative_root() -> None:
