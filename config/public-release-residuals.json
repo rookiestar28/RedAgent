@@ -6101,7 +6101,7 @@
       "count": 1,
       "path": "tests/unit/test_compat_099_opa_topology.py",
       "reason": "compatibility contract identifier",
-      "sha256": "2ead97074a9631076b576039a275435d969cd56ab9204c05f489db9609a974c6",
+      "sha256": "a070e4b5b42cf4d6704f777862fc806a458ab9b97ae0ebbef40141a42202def6",
       "token": "r099"
     },
     {

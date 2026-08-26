@@ -50,7 +50,9 @@ def test_opa_compose_is_loopback_nonroot_readonly_and_has_no_source_mount() -> N
     assert "127.0.0.1:${REDAGENT_OPA_HOST_PORT:-58181}:8181" in compose
     assert compose.count("platform: linux/amd64") == 2
     assert "read_only: true" in compose
-    assert "user: \"65532:65532\"" in compose
+    required_identity = 'user: "${REDAGENT_OPA_CONTAINER_USER:?REDAGENT_OPA_CONTAINER_USER is required}"'
+    assert compose.count(required_identity) == 2
+    assert 'user: "65532:65532"' not in compose
     assert "no-new-privileges:true" in compose and "cap_drop:" in compose
     assert "internal: true" not in compose
     assert "host.docker.internal" not in compose
