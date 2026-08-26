@@ -49,6 +49,16 @@ def _blob_oid(payload: bytes) -> str:
     return hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
 
 
+def _git(repo: Path, *arguments: str) -> str:
+    completed = subprocess.run(
+        ("git", "-c", "core.autocrlf=false", "-C", str(repo), *arguments),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
 def test_public_residual_bytes_accept_only_head_equivalent_utf8_crlf(tmp_path: Path) -> None:
     candidate = tmp_path / "workflow.yml"
     committed = b"name: public\nitem: r" + b"116\n"
@@ -96,3 +106,35 @@ def test_head_blob_inventory_rejects_malformed_git_output(monkeypatch: pytest.Mo
 
     with pytest.raises(VALIDATOR.PublicReleaseValidationError, match="public_head_inventory_invalid"):
         VALIDATOR._head_blob_oids()
+
+
+def test_head_blob_inventory_ignores_replacement_commits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = tmp_path / "replacement-ref-repo"
+    repo.mkdir()
+    _git(repo, "init", "--quiet")
+    _git(repo, "config", "user.name", "Public Validator Test")
+    _git(repo, "config", "user.email", "public-validator@example.invalid")
+
+    marker = repo / "marker.txt"
+    marker.write_bytes(b"replacement tree\n")
+    _git(repo, "add", "--", "marker.txt")
+    _git(repo, "commit", "--quiet", "-m", "replacement tree")
+    replacement_commit = _git(repo, "rev-parse", "HEAD")
+    replacement_oid = _git(repo, "rev-parse", "HEAD:marker.txt")
+
+    marker.write_bytes(b"exact head tree\n")
+    _git(repo, "add", "--", "marker.txt")
+    _git(repo, "commit", "--quiet", "-m", "exact head tree")
+    exact_head = _git(repo, "rev-parse", "HEAD")
+    exact_oid = _git(repo, "rev-parse", "HEAD:marker.txt")
+    _git(repo, "replace", exact_head, replacement_commit)
+
+    plain_inventory = _git(repo, "ls-tree", "--full-tree", "HEAD")
+    assert replacement_oid in plain_inventory
+    assert exact_oid not in plain_inventory
+
+    monkeypatch.setattr(VALIDATOR, "ROOT", repo)
+    assert VALIDATOR._head_blob_oids() == {"marker.txt": exact_oid}

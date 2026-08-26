@@ -9283,7 +9283,7 @@
       "count": 2,
       "path": "scripts/validate_public_release.py",
       "reason": "validator rule literal",
-      "sha256": "2ca712132cd0e010007435a41c82401a9de287e1fd0d1195b5b8f00110d1be0f",
+      "sha256": "460f9a422a98073a2db29a6c406226f1c0972111d2e2e0e0e0c81bfd387b7979",
       "token": ".planning"
     }
   ],

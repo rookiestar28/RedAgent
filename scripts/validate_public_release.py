@@ -122,7 +122,7 @@ def _canonical_bytes(path: Path, *, head_oid: str | None) -> bytes:
 
 def _head_blob_oids() -> dict[str, str]:
     completed = subprocess.run(
-        ("git", "ls-tree", "-rz", "--full-tree", "HEAD"),
+        ("git", "--no-replace-objects", "ls-tree", "-rz", "--full-tree", "HEAD"),
         cwd=ROOT,
         capture_output=True,
         check=False,
