@@ -2,7 +2,7 @@ services:
   bundle-server:
     image: ${REDAGENT_OPA_BUNDLE_SERVER_IMAGE:?REDAGENT_OPA_BUNDLE_SERVER_IMAGE is required}
     platform: linux/amd64
-    user: "65532:65532"
+    user: "${REDAGENT_OPA_CONTAINER_USER:?REDAGENT_OPA_CONTAINER_USER is required}"
     read_only: true
     cap_drop:
       - ALL
@@ -26,7 +26,7 @@ services:
   opa:
     image: ${REDAGENT_OPA_IMAGE:?REDAGENT_OPA_IMAGE is required}
     platform: linux/amd64
-    user: "65532:65532"
+    user: "${REDAGENT_OPA_CONTAINER_USER:?REDAGENT_OPA_CONTAINER_USER is required}"
     read_only: true
     cap_drop:
       - ALL

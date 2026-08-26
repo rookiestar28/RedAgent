@@ -91,15 +91,65 @@ def _git_paths() -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
-def _digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def _blob_oid(payload: bytes, *, expected_oid: str) -> str:
+    if re.fullmatch(r"[0-9a-f]{40}", expected_oid):
+        digest = hashlib.sha1()
+    elif re.fullmatch(r"[0-9a-f]{64}", expected_oid):
+        digest = hashlib.sha256()
+    else:
+        raise PublicReleaseValidationError("public_head_inventory_invalid")
+    digest.update(f"blob {len(payload)}\0".encode("ascii"))
+    digest.update(payload)
+    return digest.hexdigest()
 
 
-def _text(path: Path) -> str | None:
+def _canonical_bytes(path: Path, *, head_oid: str | None) -> bytes:
+    payload = path.read_bytes()
+    if head_oid is None or _blob_oid(payload, expected_oid=head_oid) == head_oid:
+        return payload
     try:
-        return path.read_text(encoding="utf-8")
+        payload.decode("utf-8")
     except UnicodeDecodeError:
-        return None
+        return payload
+    normalized = payload.replace(b"\r\n", b"\n")
+    # IMPORTANT: historical bytes are only an equality witness. Never replace
+    # dirty working-tree content unless its exact Git blob identity proves this
+    # is solely the clean Windows LF-to-CRLF checkout transformation.
+    if normalized != payload and _blob_oid(normalized, expected_oid=head_oid) == head_oid:
+        return normalized
+    return payload
+
+
+def _head_blob_oids() -> dict[str, str]:
+    completed = subprocess.run(
+        ("git", "ls-tree", "-rz", "--full-tree", "HEAD"),
+        cwd=ROOT,
+        capture_output=True,
+        check=False,
+        shell=False,
+    )
+    if completed.returncode != 0:
+        raise PublicReleaseValidationError("public_git_inventory_unavailable")
+    result: dict[str, str] = {}
+    for record in completed.stdout.split(b"\0"):
+        if not record:
+            continue
+        try:
+            header, raw_path = record.split(b"\t", 1)
+            mode, object_type, raw_oid = header.split(b" ", 2)
+            relative = raw_path.decode("utf-8", errors="strict").replace("\\", "/")
+            oid = raw_oid.decode("ascii", errors="strict")
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise PublicReleaseValidationError("public_head_inventory_invalid") from exc
+        if (
+            object_type != b"blob"
+            or mode not in {b"100644", b"100755", b"120000"}
+            or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", oid)
+            or relative in result
+        ):
+            raise PublicReleaseValidationError("public_head_inventory_invalid")
+        result[relative] = oid
+    return result
 
 
 def _entries(rows: Iterable[dict[str, object]]) -> dict[tuple[str, str], dict[str, object]]:
@@ -127,19 +177,22 @@ def collect_observations() -> dict[str, list[dict[str, object]]]:
     filename_rows: list[dict[str, object]] = []
     content_rows: list[dict[str, object]] = []
     legacy_rows: list[dict[str, object]] = []
+    head_oids = _head_blob_oids()
     for relative in _git_paths():
         lowered_parts = {part.casefold() for part in Path(relative).parts}
         if lowered_parts & FORBIDDEN_PATH_PARTS or Path(relative).name.casefold() in FORBIDDEN_PATH_NAMES:
             raise PublicReleaseValidationError(f"forbidden_public_path:{relative}")
         path = ROOT / relative
-        digest = _digest(path)
+        payload = _canonical_bytes(path, head_oid=head_oids.get(relative))
+        digest = hashlib.sha256(payload).hexdigest()
         if relative == MANIFEST_RELATIVE:
             continue
         filename_tokens = Counter(match.group(1) for match in ITEM_FILENAME.finditer(path.name))
         for token, count in sorted(filename_tokens.items()):
             filename_rows.append({"path": relative, "token": token, "count": count, "sha256": digest})
-        text = _text(path)
-        if text is None:
+        try:
+            text = payload.decode("utf-8")
+        except UnicodeDecodeError:
             continue
         _validate_public_text(relative, text)
         content_tokens = Counter(match.group(0) for match in ITEM_TOKEN.finditer(text))

@@ -4799,7 +4799,7 @@
       "count": 8,
       "path": "scripts/opa_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "4ef63b800fbbeae7de4deeda8931478bb9d230f72ad65055669ae38e686d0566",
+      "sha256": "f59fc5dc6d4dcef855464021380687303d32319a02c6f03c87fc938cfc152283",
       "token": "r099"
     },
     {
@@ -6087,7 +6087,7 @@
       "count": 2,
       "path": "tests/unit/test_compat_099_opa_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "1098452d642972f9b4b1f03ccf701a76a45b716a673b87ff5ce601989793928e",
+      "sha256": "59a637093c5d0c1e77dac77029bf5c10cdb48122e2e82cabcac6535b2c7d75d4",
       "token": "r099"
     },
     {
@@ -9283,7 +9283,7 @@
       "count": 2,
       "path": "scripts/validate_public_release.py",
       "reason": "validator rule literal",
-      "sha256": "d3b0b27a5d942eefab9b389e0dd8813c770a016cd790606675be7b5c4ce68040",
+      "sha256": "2ca712132cd0e010007435a41c82401a9de287e1fd0d1195b5b8f00110d1be0f",
       "token": ".planning"
     }
   ],

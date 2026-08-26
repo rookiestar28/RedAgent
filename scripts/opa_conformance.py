@@ -797,6 +797,9 @@ def _compose(
     else:
         env["REDAGENT_OPA_IMAGE"] = _image()
         env["REDAGENT_OPA_BUNDLE_SERVER_IMAGE"] = _bundle_server_image()
+    # CRITICAL: overwrite ambient identity; POSIX bind mounts must use only
+    # the already validated non-root owner that created the runtime artifacts.
+    env["REDAGENT_OPA_CONTAINER_USER"] = _container_user()
     if opa_host_port is not None:
         env["REDAGENT_OPA_HOST_PORT"] = str(opa_host_port)
     elif "up" in arguments and (recorded_port := _load_opa_host_port()):

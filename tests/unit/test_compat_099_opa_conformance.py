@@ -111,6 +111,11 @@ def test_every_opa_build_or_verify_container_uses_the_validated_identity() -> No
         "sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0"
     )
 
+    compose = opa_conformance.COMPOSE.read_text(encoding="utf-8")
+    required_identity = 'user: "${REDAGENT_OPA_CONTAINER_USER:?REDAGENT_OPA_CONTAINER_USER is required}"'
+    assert compose.count(required_identity) == 2
+    assert 'user: "65532:65532"' not in compose
+
 
 @pytest.mark.parametrize(
     ("field", "value"),
@@ -220,6 +225,8 @@ def test_compose_uses_a_workspace_scoped_project_and_sanitizes_ambient_project_n
     monkeypatch.setenv("COMPOSE_PROFILES", "unsafe-profile")
     monkeypatch.setenv("compose_file", "lowercase-outside-compose.yaml")
     monkeypatch.setenv("docker_config", "hostile-docker-config")
+    monkeypatch.setenv("REDAGENT_OPA_CONTAINER_USER", "0:0")
+    monkeypatch.setattr(opa_conformance, "_container_user", lambda: "1001:1002")
     monkeypatch.setattr(
         opa_conformance.subprocess,
         "run",
@@ -238,6 +245,7 @@ def test_compose_uses_a_workspace_scoped_project_and_sanitizes_ambient_project_n
     assert "ambient-hijack" not in kwargs["env"].values()
     assert not any(key.upper().startswith("COMPOSE_") for key in kwargs["env"])
     assert not any(key.upper() == "DOCKER_CONFIG" for key in kwargs["env"])
+    assert kwargs["env"]["REDAGENT_OPA_CONTAINER_USER"] == "1001:1002"
 
 
 def test_compose_project_name_is_deterministic_and_workspace_unique(
