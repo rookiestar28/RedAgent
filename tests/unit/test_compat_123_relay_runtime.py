@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from redagent_platform.campaign_service.relay_runtime import R123RelayPump
+from redagent_platform.campaign_service.relay_runtime import CampaignRelayPump
 from redagent_platform.campaign_service.repository import ClaimedWorkflowStart
 from redagent_platform.campaign_service.resolver import (
     CampaignContextResolver,
@@ -91,7 +91,7 @@ def test_relay_pump_pages_tenants_and_delivers_each_claim_under_its_exact_partit
     tenants = _Tenants()
     repositories = _Repositories()
     gateway = _Gateway()
-    pump = R123RelayPump(
+    pump = CampaignRelayPump(
         tenant_source=tenants,
         repository_factory=repositories,
         resolver=CampaignContextResolver(_Provider()),
@@ -114,7 +114,7 @@ def test_relay_pump_pages_tenants_and_delivers_each_claim_under_its_exact_partit
 
 def test_relay_pump_rejects_a_claim_that_escapes_the_current_tenant_partition() -> None:
     gateway = _Gateway()
-    pump = R123RelayPump(
+    pump = CampaignRelayPump(
         tenant_source=_Tenants(),
         repository_factory=_Repositories(wrong_tenant=True),
         resolver=CampaignContextResolver(_Provider()),

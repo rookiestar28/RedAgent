@@ -6,17 +6,19 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
+from fastapi import (
     Depends,
-    FindingIngestRequest,
     Request,
-    RequestGuard,
+    status,
+)
+from redagent_platform.api.contracts import RequestGuard
+from redagent_platform.api.router_primitives import (
     _idempotency,
     _mutation_response,
     _now,
     _repository,
-    status,
 )
+from redagent_platform.api.schemas.findings import FindingIngestRequest
 
 def register_finding_routes(app: APIRouter, dependencies: ApiDependencies) -> None:
     require_guard = dependencies.require_guard

@@ -14,28 +14,28 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
 
-from redagent_platform.campaign_service.activity_coordinator import R123ActivityCoordinator
+from redagent_platform.campaign_service.activity_coordinator import CampaignActivityCoordinator
 from redagent_platform.campaign_service.activity_store import (
     ActivityReadinessFactsOwner,
     PostgresActivityContainmentOwner,
     PostgresCampaignActivityStateOwner,
-    PostgresR124CampaignRecoveryOwner,
+    PostgresCampaignCoreRecoveryOwner,
     ResolverActivitySafetyGate,
 )
 from redagent_platform.campaign_service.resolver import CampaignContextResolver
 from redagent_platform.campaign_service.relay_runtime import (
     PostgresRelayTenantSource,
-    R123RelayPump,
+    CampaignRelayPump,
     postgres_relay_repository_factory,
 )
 from redagent_platform.campaign_service.runtime import (
-    LocalR123PlanningFactsOwner,
-    PolicyBoundR123AuthorizationOwner,
+    LocalCampaignPlanningFactsOwner,
+    PolicyBoundCampaignAuthorizationOwner,
     PostgresCanonicalAuthorityProvider,
     PostgresEnvelopeAuthorityVerifier,
     PostgresQualificationFixtureOwner,
     PostgresRunnerIdentityOwner,
-    local_r123_promotion_readiness,
+    local_campaign_promotion_readiness,
 )
 from redagent_platform.campaign_service.registry import (
     ExecutionReadinessFacts,
@@ -50,41 +50,41 @@ from redagent_platform.campaign_service.service import (
     PostgresEffectResultOwner,
     PostgresEffectTransitionStore,
     PostgresManifestV2Issuer,
-    R119R121CampaignStartPlanner,
-    R123CampaignStartService,
-    R124CampaignCoreService,
-    R123EffectCoordinator,
+    DeterministicCampaignStartPlanner,
+    CampaignStartService,
+    CampaignCoreService,
+    CampaignEffectCoordinator,
     ResolverAuthorityGate,
 )
-from redagent_platform.campaign_service.repository import PostgresR124AuthorizedOptionOwner
+from redagent_platform.campaign_service.repository import PostgresCampaignCoreAuthorizedOptionOwner
 from redagent_platform.campaign_service.qualification import (
-    R123QualificationService,
-    R123StatusService,
+    CampaignQualificationService,
+    CampaignStatusService,
 )
 from redagent_platform.campaign_service.status import (
-    PostgresR124CampaignPresentationOwner,
-    PostgresR123CampaignStatusOwner,
-    R123CampaignStatusOwner,
+    PostgresCampaignCorePresentationOwner,
+    PostgresCampaignStatusOwner,
+    CampaignStatusOwner,
 )
-from redagent_platform.nuclei_service.compat_123_adapter import NucleiR123Adapter
-from redagent_platform.nuclei_service.compat_123_transport import NucleiDockerTransport
-from redagent_platform.orchestration.compat_123_gateway import R123TemporalStartGateway
+from redagent_platform.nuclei_service.campaign_adapter import NucleiCampaignAdapter
+from redagent_platform.nuclei_service.campaign_transport import NucleiDockerTransport
+from redagent_platform.orchestration.closed_loop_gateway import ClosedLoopTemporalStartGateway
 from redagent_platform.orchestration.gateway import TemporalOrchestrationGateway
 from redagent_platform.evidence_service.backends import LocalAppendOnlyBackend
 from redagent_platform.evidence_service.config import load_evidence_settings
 from redagent_platform.evidence_service.runtime import build_evidence_backend
 from redagent_platform.evidence_service.service import EvidenceService
-from redagent_platform.runner_service.compat_123_dispatch import (
-    ClosedR123Dispatcher,
-    RunnerOwnedR123Dispatcher,
+from redagent_platform.runner_service.campaign_dispatch import (
+    ClosedCampaignDispatcher,
+    RunnerOwnedCampaignDispatcher,
 )
-from redagent_platform.runner_service.compat_123_lifecycle import (
+from redagent_platform.runner_service.campaign_lifecycle import (
     PostgresRunnerLifecycleOwner,
     RunnerIdentityOwner,
 )
-from redagent_platform.runner_service.compat_123_result import PostgresAdapterResultWriter
-from redagent_platform.zap_service.compat_123_adapter import ZapR123Adapter
-from redagent_platform.zap_service.compat_123_transport import ZapDockerTransport
+from redagent_platform.runner_service.campaign_result import PostgresAdapterResultWriter
+from redagent_platform.zap_service.campaign_adapter import ZapCampaignAdapter
+from redagent_platform.zap_service.campaign_transport import ZapDockerTransport
 
 
 _KEY_ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789-"  # pragma: allowlist secret
@@ -94,7 +94,7 @@ async def _temporal_unavailable() -> bool:
     return False
 
 
-class R123WorkerReadinessFactsOwner:
+class CampaignWorkerReadinessFactsOwner:
     """Probe composed infrastructure without treating health as execution authority."""
 
     def __init__(
@@ -126,14 +126,14 @@ class R123WorkerReadinessFactsOwner:
         try:
             async with self._sessions() as session:
                 database_ready = (await session.scalar(select(1))) == 1
-        except Exception:
+        except Exception:  # noqa: BLE001
             database_ready = False
         try:
             # CRITICAL: a configured endpoint is not live Temporal readiness.
             temporal_ready = await self._temporal_probe() is True
-        except Exception:
+        except Exception:  # noqa: BLE001
             temporal_ready = False
-        zap_promotion, nuclei_promotion = local_r123_promotion_readiness(
+        zap_promotion, nuclei_promotion = local_campaign_promotion_readiness(
             self._workspace,
             now=now,
         )
@@ -194,8 +194,8 @@ class R123WorkerReadinessFactsOwner:
             return False
 
 
-class _R123ApiReadinessFactsOwner:
-    def __init__(self, owner: R123WorkerReadinessFactsOwner) -> None:
+class _CampaignApiReadinessFactsOwner:
+    def __init__(self, owner: CampaignWorkerReadinessFactsOwner) -> None:
         self._owner = owner
 
     async def read(self, *, now: datetime) -> ExecutionReadinessFacts:
@@ -207,14 +207,14 @@ class _R123ApiReadinessFactsOwner:
 
 
 @dataclass(frozen=True, slots=True)
-class R123ApiRuntimeServices:
-    qualification_service: R123QualificationService
-    status_service: R123StatusService
-    campaign_status_owner: R123CampaignStatusOwner
-    campaign_core_service: R124CampaignCoreService
+class CampaignApiRuntimeServices:
+    qualification_service: CampaignQualificationService
+    status_service: CampaignStatusService
+    campaign_status_owner: CampaignStatusOwner
+    campaign_core_service: CampaignCoreService
 
 
-def load_r123_signing_identity(
+def load_campaign_signing_identity(
     workspace: Path,
     env: Mapping[str, str],
 ) -> tuple[Ed25519PrivateKey, str]:
@@ -254,7 +254,7 @@ def load_r123_signing_identity(
     return loaded, key_id
 
 
-def build_stock_r123_coordinator_factory(
+def build_stock_campaign_coordinator_factory(
     workspace: Path,
     env: Mapping[str, str],
 ):
@@ -262,7 +262,7 @@ def build_stock_r123_coordinator_factory(
     mode = load_strategy_loop_mode(env)
     if mode is StrategyLoopMode.DISABLED:
         return None
-    signing_key, signing_key_id = load_r123_signing_identity(workspace, env)
+    signing_key, signing_key_id = load_campaign_signing_identity(workspace, env)
     evidence_settings = load_evidence_settings(workspace, env)
     evidence_backend = build_evidence_backend(evidence_settings, env)
     kms_reference = evidence_settings.kms_reference or "kms:redagent:r123-local"
@@ -270,10 +270,10 @@ def build_stock_r123_coordinator_factory(
     async def factory(
         sessions: object,
         temporal_gateway: TemporalOrchestrationGateway,
-    ) -> R123ActivityCoordinator:
+    ) -> CampaignActivityCoordinator:
         if not isinstance(temporal_gateway, TemporalOrchestrationGateway):
             raise ValueError("r123_temporal_readiness_owner_required")
-        readiness_owner = R123WorkerReadinessFactsOwner(
+        readiness_owner = CampaignWorkerReadinessFactsOwner(
             workspace,
             sessions,
             evidence_backend,
@@ -287,7 +287,7 @@ def build_stock_r123_coordinator_factory(
         readiness = evaluate_strategy_loop_readiness(mode, facts)
         if not readiness.ready or not readiness.execution_enabled:
             raise ValueError(readiness.reason)
-        return build_stock_r123_activity_coordinator(
+        return build_stock_campaign_activity_coordinator(
             workspace,
             sessions,
             readiness_facts_owner=readiness_owner,
@@ -301,32 +301,32 @@ def build_stock_r123_coordinator_factory(
     return factory
 
 
-def build_stock_r123_relay_factory(env: Mapping[str, str]):
+def build_stock_campaign_relay_factory(env: Mapping[str, str]):
     """Compose the mandatory tenant-partitioned relay beside an enabled stock worker."""
     mode = load_strategy_loop_mode(env)
     if mode is StrategyLoopMode.DISABLED:
         return None
     instance_id = uuid4().hex[:12]
 
-    def factory(sessions: object, client: object, settings: object) -> R123RelayPump:
+    def factory(sessions: object, client: object, settings: object) -> CampaignRelayPump:
         task_queue = getattr(settings, "task_queue", None)
         if not isinstance(task_queue, str):
             raise ValueError("r123_relay_temporal_settings_invalid")
-        return R123RelayPump(
+        return CampaignRelayPump(
             tenant_source=PostgresRelayTenantSource(sessions),
             repository_factory=postgres_relay_repository_factory(
                 sessions,
                 instance_id=instance_id,
             ),
             resolver=CampaignContextResolver(PostgresCanonicalAuthorityProvider(sessions)),
-            gateway=R123TemporalStartGateway(client, task_queue=task_queue),
+            gateway=ClosedLoopTemporalStartGateway(client, task_queue=task_queue),
             claim_owner=f"r123-relay-{instance_id}",
         )
 
     return factory
 
 
-def build_stock_r123_api_service_factory(
+def build_stock_campaign_api_service_factory(
     workspace: Path,
     env: Mapping[str, str],
     *,
@@ -336,7 +336,7 @@ def build_stock_r123_api_service_factory(
     mode = load_strategy_loop_mode(env)
     if mode is not StrategyLoopMode.TWO_CAPABILITY:
         raise ValueError("r123_api_factory_requires_enabled_mode")
-    signing_key, signing_key_id = load_r123_signing_identity(workspace, env)
+    signing_key, signing_key_id = load_campaign_signing_identity(workspace, env)
     if evidence_backend is None:
         evidence_settings = load_evidence_settings(workspace, env)
         evidence_backend = build_evidence_backend(evidence_settings, env)
@@ -344,20 +344,20 @@ def build_stock_r123_api_service_factory(
     def factory(
         sessions: object,
         temporal_gateway: TemporalOrchestrationGateway | None = None,
-    ) -> R123ApiRuntimeServices:
+    ) -> CampaignApiRuntimeServices:
         resolver = CampaignContextResolver(PostgresCanonicalAuthorityProvider(sessions))
-        starter = R123CampaignStartService(
+        starter = CampaignStartService(
             resolver,
-            R119R121CampaignStartPlanner(
-                LocalR123PlanningFactsOwner(workspace),
-                PolicyBoundR123AuthorizationOwner(
+            DeterministicCampaignStartPlanner(
+                LocalCampaignPlanningFactsOwner(workspace),
+                PolicyBoundCampaignAuthorizationOwner(
                     signing_key,
                     signing_key_id=signing_key_id,
                 ),
             ),
             PostgresCampaignStartStore(sessions),
         )
-        readiness_owner = R123WorkerReadinessFactsOwner(
+        readiness_owner = CampaignWorkerReadinessFactsOwner(
             workspace,
             sessions,
             evidence_backend,
@@ -373,25 +373,25 @@ def build_stock_r123_api_service_factory(
             containment_owner=PostgresActivityContainmentOwner(sessions),
             actor_user_id="redagent-r124-api",
         )
-        return R123ApiRuntimeServices(
-            qualification_service=R123QualificationService(
+        return CampaignApiRuntimeServices(
+            qualification_service=CampaignQualificationService(
                 PostgresQualificationFixtureOwner(sessions),
                 starter,
             ),
-            status_service=R123StatusService(
+            status_service=CampaignStatusService(
                 mode,
-                _R123ApiReadinessFactsOwner(readiness_owner),
+                _CampaignApiReadinessFactsOwner(readiness_owner),
             ),
-            campaign_status_owner=PostgresR123CampaignStatusOwner(sessions),
-            campaign_core_service=R124CampaignCoreService(
-                PostgresR124AuthorizedOptionOwner(sessions),
+            campaign_status_owner=PostgresCampaignStatusOwner(sessions),
+            campaign_core_service=CampaignCoreService(
+                PostgresCampaignCoreAuthorizedOptionOwner(sessions),
                 starter,
-                presentation=PostgresR124CampaignPresentationOwner(sessions),
-                recovery=PostgresR124CampaignRecoveryOwner(
+                presentation=PostgresCampaignCorePresentationOwner(sessions),
+                recovery=PostgresCampaignCoreRecoveryOwner(
                     sessions,
                     recovery_state_owner,
                 ),
-                create_enabled=_r124_create_enabled(env),
+                create_enabled=_campaign_core_create_enabled(env),
             ),
         )
 
@@ -399,14 +399,14 @@ def build_stock_r123_api_service_factory(
     return factory
 
 
-def _r124_create_enabled(env: Mapping[str, str]) -> bool:
+def _campaign_core_create_enabled(env: Mapping[str, str]) -> bool:
     value = env.get("REDAGENT_R124_CAMPAIGN_CORE_ENABLED", "true").strip().lower()
     if value not in {"true", "false"}:
         raise ValueError("r124_campaign_core_flag_invalid")
     return value == "true"
 
 
-def build_r123_activity_coordinator(
+def build_campaign_activity_coordinator(
     workspace: Path,
     sessions: object,
     *,
@@ -419,7 +419,7 @@ def build_r123_activity_coordinator(
     signing_key_id: str,
     actor_user_id: str = "redagent-r123-worker",
     kms_reference: str = "kms:redagent:r123",
-) -> R123ActivityCoordinator:
+) -> CampaignActivityCoordinator:
     """Build the only enabled-mode compat_123 path; all dynamic tenant scope comes from owner reads."""
     result_writer = PostgresAdapterResultWriter(
         sessions,
@@ -427,13 +427,13 @@ def build_r123_activity_coordinator(
         actor_user_id=actor_user_id,
         kms_reference=kms_reference,
     )
-    closed = ClosedR123Dispatcher(
+    closed = ClosedCampaignDispatcher(
         (
-            ZapR123Adapter(ZapDockerTransport(workspace), result_writer),
-            NucleiR123Adapter(NucleiDockerTransport(workspace), result_writer),
+            ZapCampaignAdapter(ZapDockerTransport(workspace), result_writer),
+            NucleiCampaignAdapter(NucleiDockerTransport(workspace), result_writer),
         )
     )
-    dispatcher = RunnerOwnedR123Dispatcher(
+    dispatcher = RunnerOwnedCampaignDispatcher(
         closed,
         PostgresRunnerLifecycleOwner(
             sessions,
@@ -441,7 +441,7 @@ def build_r123_activity_coordinator(
             actor_user_id=actor_user_id,
         ),
     )
-    effect = R123EffectCoordinator(
+    effect = CampaignEffectCoordinator(
         ResolverAuthorityGate(resolver, envelope_verifier),
         PostgresEffectTransitionStore(
             sessions,
@@ -468,10 +468,10 @@ def build_r123_activity_coordinator(
         containment_owner=PostgresActivityContainmentOwner(sessions),
         actor_user_id=actor_user_id,
     )
-    return R123ActivityCoordinator(state, effect)
+    return CampaignActivityCoordinator(state, effect)
 
 
-def build_stock_r123_activity_coordinator(
+def build_stock_campaign_activity_coordinator(
     workspace: Path,
     sessions: object,
     *,
@@ -481,10 +481,10 @@ def build_stock_r123_activity_coordinator(
     signing_key_id: str,
     actor_user_id: str = "redagent-r123-worker",
     kms_reference: str = "kms:redagent:r123",
-) -> R123ActivityCoordinator:
+) -> CampaignActivityCoordinator:
     """Compose canonical relational authority owners for the stock worker path."""
     resolver = CampaignContextResolver(PostgresCanonicalAuthorityProvider(sessions))
-    return build_r123_activity_coordinator(
+    return build_campaign_activity_coordinator(
         workspace,
         sessions,
         resolver=resolver,

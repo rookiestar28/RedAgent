@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from redagent_platform.campaign_service.activity_store import (
     PostgresCampaignActivityStateOwner,
-    PostgresR124CampaignRecoveryOwner,
+    PostgresCampaignCoreRecoveryOwner,
 )
 from redagent_platform.campaign_service.repository import (
-    PostgresR124AuthorizedOptionOwner,
+    PostgresCampaignCoreAuthorizedOptionOwner,
     StartCampaignCommand,
 )
 from redagent_platform.campaign_service.resolver import ResolutionRequest
@@ -24,11 +24,11 @@ from redagent_platform.campaign_service.runtime import _read_base_authority
 from redagent_platform.campaign_service.service import (
     IdempotencyConflict,
     PostgresCampaignStartStore,
-    R124EtagConflict,
+    CampaignCoreEtagConflict,
 )
 from redagent_platform.campaign_service.status import (
-    PostgresR124CampaignPresentationOwner,
-    R124PrincipalInactive,
+    PostgresCampaignCorePresentationOwner,
+    CampaignCorePrincipalInactive,
 )
 from redagent_platform.persistence.database import load_database_settings
 from redagent_platform.persistence.models import metadata
@@ -78,7 +78,7 @@ async def _option_scenario() -> None:
             target=target,
             roe=roe,
         )
-        owner = PostgresR124AuthorizedOptionOwner(sessions)
+        owner = PostgresCampaignCoreAuthorizedOptionOwner(sessions)
         engagements = await owner.list_engagements(
             tenant_id=tenant,
             principal_id=actor,
@@ -103,7 +103,7 @@ async def _option_scenario() -> None:
                 id=service_id,
                 tenant_id=tenant,
                 client_id=f"client-r124-opt-{suffix}",
-                name="compat_124 CLI",
+                name="R124 CLI",
                 secret_hash="0" * 64,
                 roles=["operator"],
                 expires_at=NOW + timedelta(hours=1),
@@ -215,7 +215,7 @@ async def _projection_and_recovery_scenario() -> None:
                 request_sha256="f" * 64,
             )
 
-        presentation = PostgresR124CampaignPresentationOwner(sessions)
+        presentation = PostgresCampaignCorePresentationOwner(sessions)
         listed = await presentation.list_campaigns(
             tenant_id=tenant,
             principal_id=actor,
@@ -224,7 +224,7 @@ async def _projection_and_recovery_scenario() -> None:
             now=NOW,
         )
         assert [item["campaign_id"] for item in listed["data"]] == [campaign]
-        with pytest.raises(R124PrincipalInactive, match="r124_principal_inactive"):
+        with pytest.raises(CampaignCorePrincipalInactive, match="r124_principal_inactive"):
             await presentation.list_campaigns(
                 tenant_id=tenant,
                 principal_id="user-not-a-member",
@@ -278,7 +278,7 @@ async def _projection_and_recovery_scenario() -> None:
             containment_owner=containment,
             actor_user_id=actor,
         )
-        recovery = PostgresR124CampaignRecoveryOwner(sessions, state_owner)
+        recovery = PostgresCampaignCoreRecoveryOwner(sessions, state_owner)
         values = {
             "tenant_id": tenant,
             "campaign_id": campaign,
@@ -302,7 +302,7 @@ async def _projection_and_recovery_scenario() -> None:
         assert containment.calls == 1
         with pytest.raises(IdempotencyConflict, match="idempotency_key_request_mismatch"):
             await recovery.recover(**{**values, "request_sha256": "c" * 64})
-        with pytest.raises(R124EtagConflict, match="r124_etag_conflict"):
+        with pytest.raises(CampaignCoreEtagConflict, match="r124_etag_conflict"):
             await recovery.recover(
                 **{
                     **values,
@@ -361,7 +361,7 @@ async def _recovery_rollback_scenario(monkeypatch) -> None:
             occurred_at=NOW,
         )
         containment = _RecoveryContainmentOwner()
-        recovery = PostgresR124CampaignRecoveryOwner(
+        recovery = PostgresCampaignCoreRecoveryOwner(
             sessions,
             PostgresCampaignActivityStateOwner(
                 sessions,
@@ -479,7 +479,7 @@ async def _bootstrap(
             actor_user_id=actor,
             correlation_id=f"bootstrap-{tenant}",
         )
-        await repo.bootstrap_tenant(name="compat_124 tenant", occurred_at=NOW)
+        await repo.bootstrap_tenant(name="R124 tenant", occurred_at=NOW)
         await repo.bootstrap_user(user_id=actor, subject=actor, occurred_at=NOW)
         await session.execute(
             insert(metadata.tables["tenant_memberships"]).values(
@@ -496,7 +496,7 @@ async def _bootstrap(
         )
         await repo.create_engagement(
             engagement_id=engagement,
-            name="compat_124 owned loopback",
+            name="R124 owned loopback",
             owner_user_id=actor,
             idempotency_key=f"eng-{engagement}",
             occurred_at=NOW,

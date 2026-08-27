@@ -101,7 +101,7 @@ class RelayFailureDecision:
     dead_lettered_at: datetime | None
 
 
-class R123WorkflowRelay:
+class CampaignWorkflowRelay:
     def __init__(
         self,
         *,
@@ -176,7 +176,7 @@ class R123WorkflowRelay:
     ) -> RelayDeliveryResult:
         try:
             existing = await self._gateway.query(workflow_id)
-        except Exception:
+        except Exception:  # noqa: BLE001
             # CRITICAL: an unqueryable duplicate may already have started; never retry it blindly.
             await self._failure(
                 claim,

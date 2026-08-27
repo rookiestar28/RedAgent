@@ -103,7 +103,7 @@ _SENSITIVE_VALUE_MARKERS = (
 )
 
 
-def build_r033_observability_plan() -> ObservabilityIncidentResponsePlan:
+def build_observability_plan() -> ObservabilityIncidentResponsePlan:
     return ObservabilityIncidentResponsePlan(
         plan_id="R033-observability-incident-response",
         metrics=tuple(

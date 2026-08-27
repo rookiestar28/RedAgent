@@ -6,36 +6,48 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CONTRACT_SCHEMA_VERSION,
+from datetime import timedelta
+from fastapi import (
     Depends,
-    EmergencyStopSignal,
-    NetworkAuthorization,
+    Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _match_roe_reference,
+    _now,
+    _orchestration,
+)
+from redagent_platform.api.schemas.network import (
     NetworkCancelRequest,
     NetworkCompileRequest,
     NetworkDashboardResponse,
     NetworkPlanResponse,
-    NetworkProfileId,
     NetworkProfileListResponse,
-    NetworkProtocol,
-    NetworkRepository,
-    NetworkRepositoryConflict,
     NetworkRunCreateRequest,
     NetworkRunResponse,
-    NetworkTargetBinding,
-    Request,
-    RequestGuard,
-    _match_roe_reference,
-    _now,
-    _orchestration,
-    certified_network_profiles,
-    compile_network_plan,
-    metadata,
-    select,
-    status,
-    timedelta,
 )
+from redagent_platform.network_service.compiler import compile_network_plan
+from redagent_platform.network_service.contracts import (
+    NetworkAuthorization,
+    NetworkProfileId,
+    NetworkProtocol,
+    NetworkTargetBinding,
+    certified_profiles as certified_network_profiles,
+)
+from redagent_platform.network_service.repository import (
+    NetworkRepository,
+    NetworkRepositoryConflict,
+)
+from redagent_platform.orchestration.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    EmergencyStopSignal,
+)
+from redagent_platform.persistence.models import metadata
+from sqlalchemy import select
 
 def _public_network_profile(profile) -> dict[str, object]:
     return {

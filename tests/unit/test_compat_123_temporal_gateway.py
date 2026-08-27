@@ -6,11 +6,11 @@ import pytest
 
 from redagent_platform.campaign_service.relay import WorkflowAlreadyStarted
 from redagent_platform.orchestration.contracts import (
-    deterministic_r123_campaign_workflow_id,
-    r123_workflow_request_sha256,
+    deterministic_closed_loop_campaign_workflow_id,
+    closed_loop_workflow_request_sha256,
 )
-from redagent_platform.orchestration.compat_123_gateway import (
-    R123TemporalStartGateway,
+from redagent_platform.orchestration.closed_loop_gateway import (
+    ClosedLoopTemporalStartGateway,
     workflow_input_from_start_payload,
 )
 
@@ -30,7 +30,7 @@ class Client:
             from temporalio.exceptions import WorkflowAlreadyStartedError
 
             raise WorkflowAlreadyStartedError(
-                workflow_id=options["id"], workflow_type="compat_123", run_id="run-existing"
+                workflow_id=options["id"], workflow_type="r123", run_id="run-existing"
             )
         return Handle()
 
@@ -47,10 +47,10 @@ class QueryHandle:
         self.workflow_id = workflow_id
 
     async def query(self, name: str, *, result_type):
-        from redagent_platform.orchestration.contracts import R123CampaignSnapshot
+        from redagent_platform.orchestration.contracts import ClosedLoopCampaignSnapshot
 
         assert name == "status"
-        return R123CampaignSnapshot(
+        return ClosedLoopCampaignSnapshot(
             "1.0",
             "campaign-r123",
             "strategy-r123-v1",
@@ -77,14 +77,14 @@ def _payload() -> dict[str, object]:
         "target_id": "target-r123",
         "campaign_id": "campaign-r123",
         "strategy_revision_id": "strategy-r123-v1",
-        "workflow_id": deterministic_r123_campaign_workflow_id(
+        "workflow_id": deterministic_closed_loop_campaign_workflow_id(
             "tenant-r123", "campaign-r123"
         ),
         "workflow_request_sha256": "0" * 64,
         "envelope_sha256": "1" * 64,
     }
     request = workflow_input_from_start_payload(base, verify_request_digest=False)
-    base["workflow_request_sha256"] = r123_workflow_request_sha256(request)
+    base["workflow_request_sha256"] = closed_loop_workflow_request_sha256(request)
     return base
 
 
@@ -111,7 +111,7 @@ def test_gateway_rejects_wrong_deterministic_id_before_temporal_call() -> None:
 
     with pytest.raises(ValueError, match="r123_workflow_id_mismatch"):
         asyncio.run(
-            R123TemporalStartGateway(client, task_queue="queue-r123").start(
+            ClosedLoopTemporalStartGateway(client, task_queue="queue-r123").start(
                 workflow_id=str(payload["workflow_id"]),
                 request_sha256=str(payload["workflow_request_sha256"]),
                 payload=payload,
@@ -123,7 +123,7 @@ def test_gateway_rejects_wrong_deterministic_id_before_temporal_call() -> None:
 def test_gateway_starts_exact_versioned_workflow_and_surfaces_duplicate() -> None:
     payload = _payload()
     client = Client()
-    gateway = R123TemporalStartGateway(client, task_queue="queue-r123")
+    gateway = ClosedLoopTemporalStartGateway(client, task_queue="queue-r123")
 
     receipt = asyncio.run(
         gateway.start(
@@ -137,7 +137,7 @@ def test_gateway_starts_exact_versioned_workflow_and_surfaces_duplicate() -> Non
     assert client.calls[0]["id"] == payload["workflow_id"]
     assert client.calls[0]["task_queue"] == "queue-r123"
 
-    duplicate = R123TemporalStartGateway(Client(duplicate=True), task_queue="queue-r123")
+    duplicate = ClosedLoopTemporalStartGateway(Client(duplicate=True), task_queue="queue-r123")
     with pytest.raises(WorkflowAlreadyStarted):
         asyncio.run(
             duplicate.start(
@@ -150,7 +150,7 @@ def test_gateway_starts_exact_versioned_workflow_and_surfaces_duplicate() -> Non
 
 def test_gateway_query_returns_exact_workflow_request_binding_and_run() -> None:
     payload = _payload()
-    gateway = R123TemporalStartGateway(Client(), task_queue="queue-r123")
+    gateway = ClosedLoopTemporalStartGateway(Client(), task_queue="queue-r123")
 
     result = asyncio.run(gateway.query(str(payload["workflow_id"])))
 

@@ -167,6 +167,25 @@ def test_validation_errors_use_stable_secret_free_envelope() -> None:
     assert "must-not-echo" not in response.text
 
 
+def test_internal_value_error_uses_the_secret_free_500_envelope() -> None:
+    app = create_app(test_issuer_enabled=True)
+
+    @app.get("/_test/internal-value-error", include_in_schema=False)
+    async def raise_internal_value_error() -> None:
+        raise ValueError("internal-sensitive-detail")
+
+    async def send() -> httpx.Response:
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+            return await client.get("/_test/internal-value-error")
+
+    response = asyncio.run(send())
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "internal_error"
+    assert "internal-sensitive-detail" not in response.text
+
+
 def test_openapi_operation_ids_are_unique_and_all_mutation_models_are_strict() -> None:
     schema = create_app(test_issuer_enabled=True).openapi()
     operation_ids = [

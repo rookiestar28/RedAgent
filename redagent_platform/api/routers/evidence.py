@@ -6,32 +6,40 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    ArtifactClass,
-    ArtifactWriteRequest,
-    DataClassification,
+from datetime import timedelta
+from fastapi import (
     Depends,
-    EvidenceArtifactDetailResponse,
-    EvidenceArtifactListResponse,
-    EvidenceArtifactMutationResponse,
-    EvidenceArtifactResponse,
-    EvidenceDerivativeRequest,
-    EvidenceDeriveRequest,
-    EvidenceLegalHoldRequest,
-    EvidencePurpose,
-    EvidenceSyntheticRegisterRequest,
-    EvidenceVerificationResponse,
-    PaginationQuery,
     Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
     RequestGuard,
-    RetentionMode,
+)
+from redagent_platform.api.router_primitives import (
     _idempotency,
     _list_response,
     _now,
     _probe_limit,
-    status,
-    timedelta,
+)
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.api.schemas.evidence import (
+    EvidenceArtifactDetailResponse,
+    EvidenceArtifactListResponse,
+    EvidenceArtifactMutationResponse,
+    EvidenceArtifactResponse,
+    EvidenceDeriveRequest,
+    EvidenceLegalHoldRequest,
+    EvidenceSyntheticRegisterRequest,
+    EvidenceVerificationResponse,
+)
+from redagent_platform.evidence_service.contracts import (
+    ArtifactClass,
+    ArtifactWriteRequest,
+    DataClassification,
+    EvidenceDerivativeRequest,
+    EvidencePurpose,
+    RetentionMode,
 )
 
 def register_evidence_routes(app: APIRouter, dependencies: ApiDependencies) -> None:

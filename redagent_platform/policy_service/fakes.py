@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 import hashlib
 
 from redagent_platform.policy_service.contracts import (
@@ -24,7 +24,13 @@ class DeterministicFakePolicyProvider:
             raise RuntimeError("fake_policy_revision_mismatch")
         return PolicyProviderReadiness(True, self.revision, "OK")
 
-    async def decide(self, request: PolicyDecisionInput, *, required_revision: str, now):
+    async def decide(
+        self,
+        request: PolicyDecisionInput,
+        *,
+        required_revision: str,
+        now: datetime,
+    ) -> PolicyDecision:
         allowed = _allowed(request) and required_revision == self.revision
         digest = hashlib.sha256(
             f"{request.correlation_id}\0{policy_input_hash(request)}".encode("utf-8")
@@ -73,6 +79,7 @@ def _allowed(request: PolicyDecisionInput) -> bool:
         "runner.evidence.submit": ("runner:evidence", "running", "claimed", "verified"),
     }
     stage = runner_stages.get(request.action)
+    runner_generation = request.attributes.get("runner_generation")
     return (
         request.boundary is PolicyBoundary.RUNNER
         and stage is not None
@@ -84,8 +91,8 @@ def _allowed(request: PolicyDecisionInput) -> bool:
         and request.attributes.get("lease_state") == stage[2]
         and request.attributes.get("sandbox_status") == stage[3]
         and request.attributes.get("cleanup_required") is True
-        and isinstance(request.attributes.get("runner_generation"), int)
-        and request.attributes.get("runner_generation", 0) > 0
+        and isinstance(runner_generation, int)
+        and runner_generation > 0
         and request.attributes.get("identity_generation")
         == request.attributes.get("runner_generation")
     )

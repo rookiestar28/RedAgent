@@ -4,19 +4,20 @@ from __future__ import annotations
 
 from datetime import datetime
 import hashlib
-from typing import Any
 
 from redagent_platform.policy_service.contracts import PolicyBoundary, PolicyDecisionInput
+from redagent_platform.policy_service.enforcement import PolicyBoundaryEnforcer, PolicyEnforcementResult
+from redagent_platform.policy_service.providers import PolicyProviderReadiness
 
 
 class PolicyBoundarySDK:
-    def __init__(self, enforcer: Any, *, required_revision: str) -> None:
+    def __init__(self, enforcer: PolicyBoundaryEnforcer, *, required_revision: str) -> None:
         if enforcer is None or not isinstance(required_revision, str) or not required_revision:
             raise ValueError("policy_boundary_sdk_config_invalid")
         self._enforcer = enforcer
         self.required_revision = required_revision
 
-    async def assess_readiness(self):
+    async def assess_readiness(self) -> PolicyProviderReadiness:
         return await self._enforcer.assess_readiness(required_revision=self.required_revision)
 
     async def enforce_api(
@@ -24,7 +25,7 @@ class PolicyBoundarySDK:
         permissions: tuple[str, ...], action: str, resource_type: str, resource_id: str,
         resource_version: int | None, policy_reference: str, roe_version_id: str | None,
         correlation_id: str, requested_at: datetime,
-    ):
+    ) -> PolicyEnforcementResult:
         attributes: dict[str, object] = {"permission_count": len(permissions)}
         if resource_version is not None:
             attributes["resource_version"] = resource_version
@@ -41,7 +42,7 @@ class PolicyBoundarySDK:
         job_status: str, expected_version: int, dispatch_blocked: bool,
         policy_reference: str, roe_version_id: str, roe_status: str,
         correlation_id: str, requested_at: datetime,
-    ):
+    ) -> PolicyEnforcementResult:
         return await self._enforce(
             PolicyBoundary.WORKFLOW, action=action, tenant_id=tenant_id,
             subject_id=subject_id, roles=("workflow-service",),
@@ -59,7 +60,7 @@ class PolicyBoundarySDK:
         artifact_class: str, classification: str, legal_hold: bool,
         policy_reference: str, roe_version_id: str, correlation_id: str,
         requested_at: datetime,
-    ):
+    ) -> PolicyEnforcementResult:
         return await self._enforce(
             PolicyBoundary.EVIDENCE, action=action, tenant_id=tenant_id,
             subject_id=subject_id, roles=("evidence-service",),
@@ -78,7 +79,7 @@ class PolicyBoundarySDK:
         revoke_pending: bool, permission_digest: str, permission_count: int,
         workload_client_status: str, policy_reference: str, roe_version_id: str,
         correlation_id: str, requested_at: datetime,
-    ):
+    ) -> PolicyEnforcementResult:
         return await self._enforce(
             PolicyBoundary.SECRET, action=action, tenant_id=tenant_id,
             subject_id=subject_id, roles=("secret-service",),
@@ -101,7 +102,7 @@ class PolicyBoundarySDK:
         sandbox_status: str, cleanup_required: bool,
         policy_reference: str, roe_version_id: str, correlation_id: str,
         requested_at: datetime,
-    ):
+    ) -> PolicyEnforcementResult:
         # CRITICAL: runner authorization is rebuilt from current state at every side-effect boundary.
         return await self._enforce(
             PolicyBoundary.RUNNER, action=action, tenant_id=tenant_id,
@@ -128,7 +129,7 @@ class PolicyBoundarySDK:
         resource_type: str, resource_id: str, policy_reference: str,
         roe_version_id: str | None, correlation_id: str, requested_at: datetime,
         attributes: dict[str, object],
-    ):
+    ) -> PolicyEnforcementResult:
         request = PolicyDecisionInput(
             boundary=boundary, action=action, tenant_id=tenant_id, subject_id=subject_id,
             roles=roles, permissions=permissions, resource_type=resource_type,

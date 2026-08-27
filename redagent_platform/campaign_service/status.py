@@ -10,7 +10,7 @@ from typing import Protocol
 from sqlalchemy import func, select
 
 from redagent_platform.campaign_service.registry import closed_execution_registry
-from redagent_platform.campaign_service.repository import r124_principal_is_active
+from redagent_platform.campaign_service.repository import campaign_core_principal_is_active
 from redagent_platform.persistence.models import metadata
 
 
@@ -48,22 +48,22 @@ _DELIVERY_STATES = frozenset({
 })
 
 
-class R123CampaignStatusNotFound(RuntimeError):
+class CampaignStatusNotFound(RuntimeError):
     pass
 
 
-class R124PrincipalInactive(PermissionError):
+class CampaignCorePrincipalInactive(PermissionError):
     pass
 
 
-class R123CampaignStatusOwner(Protocol):
+class CampaignStatusOwner(Protocol):
     async def read(
         self, *, tenant_id: str, campaign_id: str
-    ) -> "R123CampaignStatusV1": ...
+    ) -> "CampaignStatusV1": ...
 
 
 @dataclass(frozen=True, slots=True)
-class R123EffectStatusV1:
+class CampaignEffectStatusV1:
     capability_id: str
     state: str
     reconciliation_state: str
@@ -84,7 +84,7 @@ class R123EffectStatusV1:
 
 
 @dataclass(frozen=True, slots=True)
-class R123CampaignStatusV1:
+class CampaignStatusV1:
     schema_version: str
     campaign_id: str
     status: str
@@ -93,7 +93,7 @@ class R123CampaignStatusV1:
     attention_reason: str | None
     workflow_delivery_state: str
     workflow_reconciliation_state: str
-    effects: tuple[R123EffectStatusV1, ...]
+    effects: tuple[CampaignEffectStatusV1, ...]
     terminal_receipt_present: bool
 
     def __post_init__(self) -> None:
@@ -121,13 +121,13 @@ class R123CampaignStatusV1:
             raise ValueError("r123_status_terminal_receipt_invalid")
 
 
-class PostgresR123CampaignStatusOwner:
+class PostgresCampaignStatusOwner:
     """Read a bounded projection from the existing canonical campaign/outbox/effect owners."""
 
     def __init__(self, sessions: object) -> None:
         self._sessions = sessions
 
-    async def read(self, *, tenant_id: str, campaign_id: str) -> R123CampaignStatusV1:
+    async def read(self, *, tenant_id: str, campaign_id: str) -> CampaignStatusV1:
         _identifier("r123_status_tenant", tenant_id, 64)
         _identifier("r123_status_campaign", campaign_id, 64)
         campaigns = metadata.tables["campaigns"]
@@ -158,7 +158,7 @@ class PostgresR123CampaignStatusOwner:
                 )
             ).mappings().one_or_none()
             if campaign is None:
-                raise R123CampaignStatusNotFound("r123_campaign_status_not_found")
+                raise CampaignStatusNotFound("r123_campaign_status_not_found")
             workflow = (
                 await session.execute(
                     select(
@@ -198,7 +198,7 @@ class PostgresR123CampaignStatusOwner:
         if len(rows) > 2:
             raise ValueError("r123_status_effect_inventory_invalid")
         projected_effects = tuple(_effect_status(row) for row in rows)
-        return R123CampaignStatusV1(
+        return CampaignStatusV1(
             schema_version="redagent.r123-campaign-status/v1",
             campaign_id=str(campaign["id"]),
             status=str(campaign["status"]),
@@ -216,7 +216,7 @@ class PostgresR123CampaignStatusOwner:
         )
 
 
-class PostgresR124CampaignPresentationOwner:
+class PostgresCampaignCorePresentationOwner:
     """Compose operator and inspector views from existing campaign/finding owners."""
 
     def __init__(self, sessions: object) -> None:
@@ -231,11 +231,11 @@ class PostgresR124CampaignPresentationOwner:
         cursor: str | None,
         now: datetime,
     ) -> dict[str, object]:
-        offset = _r124_offset(limit, cursor)
+        offset = _campaign_core_offset(limit, cursor)
         campaigns = metadata.tables["campaigns"]
         async with self._sessions() as session, session.begin():
             await _tenant_context(session, tenant_id)
-            await _require_r124_principal(
+            await _require_campaign_core_principal(
                 session, tenant_id=tenant_id, principal_id=principal_id, now=now
             )
             rows = (
@@ -371,13 +371,13 @@ class PostgresR124CampaignPresentationOwner:
         cursor: str | None,
         now: datetime,
     ) -> dict[str, object]:
-        offset = _r124_offset(limit, cursor)
+        offset = _campaign_core_offset(limit, cursor)
         campaigns = metadata.tables["campaigns"]
         outbox = metadata.tables["outbox_events"]
         effects = metadata.tables["campaign_effects"]
         async with self._sessions() as session, session.begin():
             await _tenant_context(session, tenant_id)
-            await _require_r124_principal(
+            await _require_campaign_core_principal(
                 session, tenant_id=tenant_id, principal_id=principal_id, now=now
             )
             rows = (
@@ -493,7 +493,7 @@ class PostgresR124CampaignPresentationOwner:
                 "next_safe_action": guidance,
                 "occurred_at": now,
             })
-        projected.sort(key=_r124_attention_sort_key)
+        projected.sort(key=_campaign_core_attention_sort_key)
         selected = projected[offset:offset + limit]
         return {
             "data": selected,
@@ -526,7 +526,7 @@ class PostgresR124CampaignPresentationOwner:
         retests = metadata.tables["finding_retests"]
         async with self._sessions() as session, session.begin():
             await _tenant_context(session, tenant_id)
-            await _require_r124_principal(
+            await _require_campaign_core_principal(
                 session, tenant_id=tenant_id, principal_id=principal_id, now=now
             )
             campaign = (
@@ -538,7 +538,7 @@ class PostgresR124CampaignPresentationOwner:
                 )
             ).mappings().one_or_none()
             if campaign is None:
-                raise R123CampaignStatusNotFound("r124_campaign_not_found")
+                raise CampaignStatusNotFound("r124_campaign_not_found")
             strategy = (
                 await session.execute(
                     select(strategies).where(
@@ -609,14 +609,14 @@ class PostgresR124CampaignPresentationOwner:
         }
 
 
-def _effect_status(row: object) -> R123EffectStatusV1:
+def _effect_status(row: object) -> CampaignEffectStatusV1:
     payload = row["effect_intent_payload"]
     if not isinstance(payload, dict):
         raise ValueError("r123_status_effect_intent_invalid")
     evidence = row["evidence_ids"]
     if not isinstance(evidence, list) or len(evidence) > 100:
         raise ValueError("r123_status_evidence_inventory_invalid")
-    return R123EffectStatusV1(
+    return CampaignEffectStatusV1(
         capability_id=str(payload.get("capability_id", "")),
         state=str(row["effect_state"]),
         reconciliation_state=str(row["reconciliation_state"]),
@@ -625,7 +625,7 @@ def _effect_status(row: object) -> R123EffectStatusV1:
     )
 
 
-def _r124_offset(limit: int, cursor: str | None) -> int:
+def _campaign_core_offset(limit: int, cursor: str | None) -> int:
     if isinstance(limit, bool) or not 1 <= limit <= 50:
         raise ValueError("r124_page_limit_invalid")
     if cursor is None:
@@ -721,23 +721,23 @@ def _human_capability(value: object) -> str:
     }.get(str(value), "Unavailable reviewed capability")
 
 
-async def _require_r124_principal(
+async def _require_campaign_core_principal(
     session: object,
     *,
     tenant_id: str,
     principal_id: str,
     now: datetime,
 ) -> None:
-    if not await r124_principal_is_active(
+    if not await campaign_core_principal_is_active(
         session,
         tenant_id=tenant_id,
         principal_id=principal_id,
         now=now,
     ):
-        raise R124PrincipalInactive("r124_principal_inactive")
+        raise CampaignCorePrincipalInactive("r124_principal_inactive")
 
 
-def _r124_attention_sort_key(item: dict[str, object]) -> tuple[float, str]:
+def _campaign_core_attention_sort_key(item: dict[str, object]) -> tuple[float, str]:
     occurred_at = item["occurred_at"]
     if not isinstance(occurred_at, datetime):
         raise ValueError("r124_attention_occurred_at_invalid")

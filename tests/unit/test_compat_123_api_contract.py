@@ -11,8 +11,8 @@ from redagent_platform.campaign_service.qualification import (
     QualificationStartReceiptV1,
 )
 from redagent_platform.campaign_service.status import (
-    R123CampaignStatusV1,
-    R123EffectStatusV1,
+    CampaignStatusV1,
+    CampaignEffectStatusV1,
 )
 
 
@@ -43,7 +43,7 @@ class CampaignStatusOwner:
 
     async def read(self, **values):
         self.calls.append(values)
-        return R123CampaignStatusV1(
+        return CampaignStatusV1(
             schema_version="redagent.r123-campaign-status/v1",
             campaign_id="campaign-server-generated",
             status="workflow_started",
@@ -52,7 +52,7 @@ class CampaignStatusOwner:
             attention_reason=None,
             workflow_delivery_state="delivered",
             workflow_reconciliation_state="none",
-            effects=(R123EffectStatusV1(
+            effects=(CampaignEffectStatusV1(
                 capability_id="zap-controlled-runtime@2",
                 state="confirmed",
                 reconciliation_state="confirmed",
@@ -191,7 +191,7 @@ def test_r123_campaign_status_is_tenant_scoped_and_contains_no_runtime_dispatch_
 
 
 def test_campaign_status_projects_workflow_ambiguity_as_closed_manual_review_state() -> None:
-    status = R123CampaignStatusV1(
+    status = CampaignStatusV1(
         schema_version="redagent.r123-campaign-status/v1",
         campaign_id="campaign-ambiguous",
         status="workflow_started",

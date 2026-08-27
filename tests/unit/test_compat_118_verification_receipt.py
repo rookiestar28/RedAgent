@@ -20,7 +20,7 @@ from redagent_platform.validation import (
     current_configuration_digests,
     verify_verification_receipt,
 )
-from redagent_platform.validation.stages import stage_ids_for_gate
+from redagent_platform.validation.stages import STAGE_REGISTRY_REVISION, stage_ids_for_gate
 
 
 BASE = "a" * 40
@@ -368,7 +368,7 @@ def test_receipt_is_bounded_canonical_secret_free_and_source_bound() -> None:
     assert len(receipt["decision"]["changed_path_digest"]) == 64
     assert receipt["decision"]["changed_path_count"] == 1
     assert "normalized_paths" not in receipt["decision"]
-    assert receipt["stage_registry_revision"] == "r118-stages-v1"
+    assert receipt["stage_registry_revision"] == STAGE_REGISTRY_REVISION
     assert receipt["configuration_digests"] == current_configuration_digests()
     assert receipt["stages"][0]["started_at"] == "2026-07-14T00:00:00Z"
     assert receipt["stages"][0]["ended_at"] == "2026-07-14T00:00:01Z"

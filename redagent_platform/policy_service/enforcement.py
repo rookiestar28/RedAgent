@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import re
-from typing import Any
+from typing import Protocol
 
-from redagent_platform.policy_service.contracts import PolicyDecisionInput
+from redagent_platform.policy_service.contracts import PolicyDecision, PolicyDecisionInput
+from redagent_platform.policy_service.providers import PolicyProviderReadiness
 
 
 _OPERATION = re.compile(r"^[a-z][a-z0-9_.:-]{0,99}$")
@@ -15,6 +16,28 @@ _OPERATION = re.compile(r"^[a-z][a-z0-9_.:-]{0,99}$")
 
 class PolicyEnforcementError(RuntimeError):
     pass
+
+
+class PolicyDecisionProvider(Protocol):
+    async def assess_readiness(self, *, required_revision: str) -> PolicyProviderReadiness: ...
+
+    async def decide(
+        self,
+        request: PolicyDecisionInput,
+        *,
+        required_revision: str,
+        now: datetime,
+    ) -> PolicyDecision: ...
+
+
+class PolicyDecisionRecorder(Protocol):
+    async def persist_decision_and_receipt(
+        self,
+        request: PolicyDecisionInput,
+        decision: PolicyDecision,
+        *,
+        operation: str,
+    ) -> str: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,13 +57,13 @@ class PolicyBoundaryEnforcer:
     receipt, immutable audit event, and outbox event.
     """
 
-    def __init__(self, provider: Any, recorder: Any) -> None:
+    def __init__(self, provider: PolicyDecisionProvider, recorder: PolicyDecisionRecorder) -> None:
         if provider is None or recorder is None:
             raise ValueError("policy_enforcer_dependency_required")
         self._provider = provider
         self._recorder = recorder
 
-    async def assess_readiness(self, *, required_revision: str):
+    async def assess_readiness(self, *, required_revision: str) -> PolicyProviderReadiness:
         try:
             return await self._provider.assess_readiness(required_revision=required_revision)
         except Exception as exc:

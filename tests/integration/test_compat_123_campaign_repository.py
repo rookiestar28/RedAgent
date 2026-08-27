@@ -16,15 +16,15 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from redagent_platform.campaign_service.repository import (
     EffectReservationCommand,
-    R123CampaignRepository,
-    R123ClaimConflict,
-    R123RecordConflict,
+    CampaignRepository,
+    CampaignClaimConflict,
+    CampaignRecordConflict,
     StartCampaignCommand,
 )
 from redagent_platform.campaign_service.relay_runtime import (
     PostgresWorkflowRelayRepository,
 )
-from redagent_platform.campaign_service.activity_coordinator import R123ActivityCoordinator
+from redagent_platform.campaign_service.activity_coordinator import CampaignActivityCoordinator
 from redagent_platform.campaign_service.activity_store import (
     PostgresActivityContainmentOwner,
     PostgresCampaignActivityStateOwner,
@@ -43,7 +43,7 @@ from redagent_platform.campaign_service.resolver import (
     CanonicalAuthoritySnapshot,
 )
 from redagent_platform.campaign_service.registry import closed_execution_registry
-from redagent_platform.campaign_service.status import PostgresR123CampaignStatusOwner
+from redagent_platform.campaign_service.status import PostgresCampaignStatusOwner
 from redagent_platform.campaign_service.service import (
     AuthorityRecheck,
     EffectDispatchCommand,
@@ -63,21 +63,21 @@ from redagent_platform.persistence.models import metadata
 from redagent_platform.persistence.repository import ControlPlaneRepository
 from redagent_platform.runner_service.contracts import canonical_capability_sha256
 from redagent_platform.runner_service.identity import PeerCertificateIdentity
-from redagent_platform.runner_service.compat_123_lifecycle import PostgresRunnerLifecycleOwner
-from redagent_platform.runner_service.compat_123_result import (
+from redagent_platform.runner_service.campaign_lifecycle import PostgresRunnerLifecycleOwner
+from redagent_platform.runner_service.campaign_result import (
     AdapterResultMaterialV1,
     PostgresAdapterResultWriter,
 )
 from redagent_platform.zap_service.capability import build_zap_capability_manifest
-from redagent_platform.runner_service.compat_123_dispatch import (
+from redagent_platform.runner_service.campaign_dispatch import (
     AdapterTerminalReceipt,
-    R123AdapterRequest,
+    CampaignAdapterRequest,
 )
 from redagent_platform.orchestration.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    R123ContainActivityCommand,
-    R123DispatchActivityCommand,
-    R123ReconcileActivityCommand,
+    ClosedLoopContainActivityCommand,
+    ClosedLoopDispatchActivityCommand,
+    ClosedLoopReconcileActivityCommand,
 )
 
 
@@ -230,7 +230,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             roe_id=roe_id,
         )
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -259,7 +259,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             assert row["aggregate_sequence"] == 1
 
         async with sessions() as session, session.begin():
-            other = R123CampaignRepository(
+            other = CampaignRepository(
                 session,
                 tenant_id=f"other-{suffix}",
                 actor_user_id=f"other-user-{suffix}",
@@ -289,7 +289,7 @@ async def _atomic_start_and_relay_scenario() -> None:
         assert claimed[0].payload["workflow_id"] == workflow_id
         event_id = claimed[0].event_id
 
-        with pytest.raises(R123ClaimConflict, match="outbox_claim_conflict"):
+        with pytest.raises(CampaignClaimConflict, match="outbox_claim_conflict"):
             await relay_repo.acknowledge_workflow_start(
                 event_id=event_id,
                 claim_owner="relay-wrong",
@@ -308,7 +308,7 @@ async def _atomic_start_and_relay_scenario() -> None:
         effect_id = f"effect-{suffix}"
         invocation_id = f"invocation-{suffix}"
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -333,7 +333,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             assert reserved.aggregate_sequence == 3
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -348,7 +348,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             )
             assert claimed_effect.effect_state == "claimed"
             assert claimed_effect.claim_version == 1
-            with pytest.raises(R123ClaimConflict, match="effect_claim_conflict"):
+            with pytest.raises(CampaignClaimConflict, match="effect_claim_conflict"):
                 await repo.claim_effect(
                     effect_id=effect_id,
                     claim_owner="runner-relay-r123",
@@ -358,7 +358,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 )
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -381,7 +381,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 actor_user_id=actor_id,
                 correlation_id=f"effect-job-{suffix}",
             )
-            job = await control.create_r123_runner_job(
+            job = await control.create_runner_job(
                 campaign_id=campaign_id,
                 strategy_revision_id=strategy_revision_id,
                 effect_id=effect_id,
@@ -390,7 +390,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 envelope_sha256="8" * 64,
                 occurred_at=NOW + timedelta(seconds=3),
             )
-            replayed_job = await control.create_r123_runner_job(
+            replayed_job = await control.create_runner_job(
                 campaign_id=campaign_id,
                 strategy_revision_id=strategy_revision_id,
                 effect_id=effect_id,
@@ -409,7 +409,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 "envelope_sha256": "8" * 64,
             }
             with pytest.raises(ValueError, match="r123_runner_job_capability_denied"):
-                await control.create_r123_runner_job(
+                await control.create_runner_job(
                     campaign_id=campaign_id,
                     strategy_revision_id=strategy_revision_id,
                     effect_id=effect_id,
@@ -488,7 +488,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 True,
                 "allowed",
                 "runner-r123",
-                "spiffe://redagent.test/runner/compat_123",
+                "spiffe://redagent.test/runner/r123",
             ),
             now=NOW + timedelta(seconds=3),
         )
@@ -498,7 +498,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 True,
                 "allowed",
                 "runner-r123",
-                "spiffe://redagent.test/runner/compat_123",
+                "spiffe://redagent.test/runner/r123",
             ),
             now=NOW + timedelta(seconds=3),
         )
@@ -509,7 +509,7 @@ async def _atomic_start_and_relay_scenario() -> None:
         identity_owner = StaticRunnerIdentityOwner(
             PeerCertificateIdentity(
                 runner_id="runner-r123",
-                spiffe_id="spiffe://redagent.test/runner/compat_123",
+                spiffe_id="spiffe://redagent.test/runner/r123",
                 certificate_fingerprint="a" * 64,
                 certificate_serial=f"issuer-{suffix}",
                 not_before=NOW - timedelta(minutes=1),
@@ -521,7 +521,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             identity_owner,
             actor_user_id=actor_id,
         )
-        runner_request = R123AdapterRequest(
+        runner_request = CampaignAdapterRequest(
             tenant_id=tenant_id,
             capability_id=binding.capability_id,
             capability_revision=binding.capability_revision,
@@ -554,7 +554,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 ),
             ),
             actor_user_id=actor_id,
-            kms_reference="kms:compat_123:synthetic",
+            kms_reference="kms:r123:synthetic",
             retention_days=1,
         )
         lifecycle_receipt = await result_writer.persist(
@@ -580,7 +580,7 @@ async def _atomic_start_and_relay_scenario() -> None:
         ) == lifecycle_receipt
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -592,7 +592,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 expected_claim_version=1,
                 request_sha256="b" * 64,
                 runner_id="runner-r123",
-                workload_identity="spiffe://redagent.test/runner/compat_123",
+                workload_identity="spiffe://redagent.test/runner/r123",
                 occurred_at=NOW + timedelta(seconds=4),
             )
             assert dispatching.effect_state == "dispatching"
@@ -600,7 +600,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             assert dispatching.claim_version == 2
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -615,7 +615,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             )
             assert ambiguous.effect_state == "reconciliation_required"
             assert ambiguous.redispatch_permitted is False
-            with pytest.raises(R123ClaimConflict, match="effect_claim_conflict"):
+            with pytest.raises(CampaignClaimConflict, match="effect_claim_conflict"):
                 await repo.claim_effect(
                     effect_id=effect_id,
                     claim_owner="runner-relay-r123",
@@ -625,7 +625,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 )
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -641,7 +641,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             assert lookup_retry.redispatch_permitted is False
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -655,7 +655,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 dispatch_attempt=1,
                 dispatch_generation=1,
                 runner_id="runner-r123",
-                workload_identity="spiffe://redagent.test/runner/compat_123",
+                workload_identity="spiffe://redagent.test/runner/r123",
                 request_sha256="b" * 64,
                 started_at=NOW + timedelta(seconds=4),
                 completed_at=NOW + timedelta(seconds=7),
@@ -705,13 +705,13 @@ async def _atomic_start_and_relay_scenario() -> None:
             assert proof["evidence_ids"] == [f"evidence-{suffix}"]
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
                 correlation_id=f"effect-reclaim-{suffix}",
             )
-            with pytest.raises(R123ClaimConflict, match="effect_claim_conflict"):
+            with pytest.raises(CampaignClaimConflict, match="effect_claim_conflict"):
                 await repo.claim_effect(
                     effect_id=effect_id,
                     claim_owner="runner-relay-r123",
@@ -730,7 +730,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             assert reclaimed_effect.dispatch_attempt == 1
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -742,7 +742,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 expected_claim_version=reclaimed_effect.claim_version,
                 request_sha256="c" * 64,
                 runner_id="runner-r123",
-                workload_identity="spiffe://redagent.test/runner/compat_123",
+                workload_identity="spiffe://redagent.test/runner/r123",
                 occurred_at=NOW + timedelta(seconds=9),
             )
             assert redispatching.dispatch_attempt == 2
@@ -770,7 +770,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             "dispatch_attempt": 2,
             "dispatch_generation": 2,
             "runner_id": "runner-r123",
-            "workload_identity": "spiffe://redagent.test/runner/compat_123",
+            "workload_identity": "spiffe://redagent.test/runner/r123",
             "request_sha256": "c" * 64,
             "started_at": (NOW + timedelta(seconds=9)).isoformat().replace("+00:00", "Z"),
             "completed_at": (NOW + timedelta(seconds=10)).isoformat().replace("+00:00", "Z"),
@@ -795,7 +795,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             ).encode("utf-8")
         ).hexdigest()
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -822,7 +822,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                     ensure_ascii=True,
                 ).encode("utf-8")
             ).hexdigest()
-            with pytest.raises(R123ClaimConflict, match="effect_receipt_claim_conflict"):
+            with pytest.raises(CampaignClaimConflict, match="effect_receipt_claim_conflict"):
                 await repo.record_effect_receipt(
                     effect_id=effect_id,
                     claim_owner="runner-relay-r123",
@@ -852,13 +852,13 @@ async def _atomic_start_and_relay_scenario() -> None:
             assert confirmed.redispatch_permitted is False
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
                 correlation_id=f"effect-terminal-{suffix}",
             )
-            with pytest.raises(R123ClaimConflict, match="effect_claim_conflict"):
+            with pytest.raises(CampaignClaimConflict, match="effect_claim_conflict"):
                 await repo.claim_effect(
                     effect_id=effect_id,
                     claim_owner="runner-relay-r123",
@@ -905,14 +905,14 @@ async def _atomic_start_and_relay_scenario() -> None:
             terminal_reason="objective_satisfied",
         )
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
                 correlation_id=f"terminal-missing-owner-{suffix}",
             )
             with pytest.raises(
-                R123RecordConflict, match="campaign_terminal_evidence_owner_mismatch"
+                CampaignRecordConflict, match="campaign_terminal_evidence_owner_mismatch"
             ):
                 await repo.finalize_campaign(
                     lineage,
@@ -920,7 +920,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                     occurred_at=NOW + timedelta(seconds=12),
                 )
             with pytest.raises(
-                R123RecordConflict, match="effect_trusted_execution_owner_mismatch"
+                CampaignRecordConflict, match="effect_trusted_execution_owner_mismatch"
             ):
                 await repo.validate_trusted_effect_owners(
                     effect_id=effect_id,
@@ -943,7 +943,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             nodes=(replace(lineage.nodes[0], finding_issue_ids=(issue_id,)),),
         )
         async with sessions() as session, session.begin():
-            trusted = await R123CampaignRepository(
+            trusted = await CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -967,9 +967,9 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(adapter_id="nuclei-service")
             )
             with pytest.raises(
-                R123RecordConflict, match="effect_trusted_finding_import_mismatch"
+                CampaignRecordConflict, match="effect_trusted_finding_import_mismatch"
             ):
-                await R123CampaignRepository(
+                await CampaignRepository(
                     session,
                     tenant_id=tenant_id,
                     actor_user_id=actor_id,
@@ -997,9 +997,9 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(coverage_state="partial")
             )
             with pytest.raises(
-                R123RecordConflict, match="effect_trusted_finding_import_mismatch"
+                CampaignRecordConflict, match="effect_trusted_finding_import_mismatch"
             ):
-                await R123CampaignRepository(
+                await CampaignRepository(
                     session,
                     tenant_id=tenant_id,
                     actor_user_id=actor_id,
@@ -1011,7 +1011,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                     cleanup_receipt_id=f"cleanup-terminal-{suffix}",
                     require_retest=False,
                 )
-            partial = await R123CampaignRepository(
+            partial = await CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -1080,7 +1080,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             correlation_prefix="r123-reconciliation-owner",
         )
         with pytest.raises(
-            R123RecordConflict,
+            CampaignRecordConflict,
             match="effect_trusted_owner_state_invalid",
         ):
             await reconciliation_owner.finalize(
@@ -1105,14 +1105,14 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(effect_state="confirmed")
             )
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
                 correlation_id=f"effect-terminal-retest-{suffix}",
             )
             with pytest.raises(
-                R123RecordConflict, match="effect_trusted_retest_owner_mismatch"
+                CampaignRecordConflict, match="effect_trusted_retest_owner_mismatch"
             ):
                 await repo.validate_trusted_effect_owners(
                     effect_id=effect_id,
@@ -1130,7 +1130,7 @@ async def _atomic_start_and_relay_scenario() -> None:
             )
         async with sessions() as session, session.begin():
             await _set_tenant(session, tenant_id)
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -1143,7 +1143,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(artifact_class="raw", redaction_state="raw")
             )
             with pytest.raises(
-                R123RecordConflict, match="campaign_terminal_evidence_not_report_safe"
+                CampaignRecordConflict, match="campaign_terminal_evidence_not_report_safe"
             ):
                 await repo.finalize_campaign(
                     lineage,
@@ -1163,7 +1163,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(outcome="failed")
             )
             with pytest.raises(
-                R123RecordConflict, match="campaign_terminal_execution_owner_mismatch"
+                CampaignRecordConflict, match="campaign_terminal_execution_owner_mismatch"
             ):
                 await repo.finalize_campaign(
                     lineage,
@@ -1183,7 +1183,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(coverage_state="partial")
             )
             with pytest.raises(
-                R123RecordConflict, match="campaign_terminal_finding_import_mismatch"
+                CampaignRecordConflict, match="campaign_terminal_finding_import_mismatch"
             ):
                 await repo.finalize_campaign(
                     lineage,
@@ -1203,7 +1203,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(result_state="failed")
             )
             with pytest.raises(
-                R123RecordConflict, match="campaign_terminal_retest_owner_mismatch"
+                CampaignRecordConflict, match="campaign_terminal_retest_owner_mismatch"
             ):
                 await repo.finalize_campaign(
                     lineage,
@@ -1216,7 +1216,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 .values(result_state="passed")
             )
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -1240,7 +1240,7 @@ async def _atomic_start_and_relay_scenario() -> None:
         async with sessions() as session, session.begin():
             nested = await session.begin_nested()
             try:
-                repo = R123CampaignRepository(
+                repo = CampaignRepository(
                     session,
                     tenant_id=tenant_id,
                     actor_user_id=actor_id,
@@ -1274,7 +1274,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                     expected_claim_version=claimed.claim_version,
                     request_sha256="d" * 64,
                     runner_id="runner-r123",
-                    workload_identity="spiffe://redagent.test/runner/compat_123",
+                    workload_identity="spiffe://redagent.test/runner/r123",
                     occurred_at=NOW + timedelta(seconds=42),
                 )
                 ambiguous_reconciled = await repo.record_effect_ambiguity(
@@ -1292,7 +1292,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                     dispatch_attempt=1,
                     dispatch_generation=1,
                     runner_id="runner-r123",
-                    workload_identity="spiffe://redagent.test/runner/compat_123",
+                    workload_identity="spiffe://redagent.test/runner/r123",
                     request_sha256="d" * 64,
                     started_at=NOW + timedelta(seconds=42),
                     completed_at=NOW + timedelta(seconds=44),
@@ -1346,7 +1346,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                     expected_claim_version=claimed_manual.claim_version,
                     request_sha256="e" * 64,
                     runner_id="runner-r123",
-                    workload_identity="spiffe://redagent.test/runner/compat_123",
+                    workload_identity="spiffe://redagent.test/runner/r123",
                     occurred_at=NOW + timedelta(seconds=47),
                 )
                 ambiguous_manual = await repo.record_effect_ambiguity(
@@ -1391,7 +1391,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 await nested.rollback()
 
         async with sessions() as session, session.begin():
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -1442,10 +1442,10 @@ async def _bootstrap_terminal_owner_rows(
                 "capability": "zap-controlled-runtime",
                 "approval_timeout_seconds": 300,
                 "max_activity_attempts": 1,
-                "budget_reference": "budget:compat_123:owned-loopback",
+                "budget_reference": "budget:r123:owned-loopback",
             },
             workflow_id=f"job-workflow-{suffix}",
-            policy_reference="policy:compat_123:owned-loopback",
+            policy_reference="policy:r123:owned-loopback",
             campaign_id=campaign_id,
             idempotency_key=f"terminal-job-{suffix}",
             occurred_at=NOW + timedelta(seconds=10),
@@ -1456,7 +1456,7 @@ async def _bootstrap_terminal_owner_rows(
                 engagement_id=engagement_id,
                 job_id=job_id,
                 producer_id=actor_id,
-                object_key=f"compat_123/{suffix}/report-safe.json",
+                object_key=f"r123/{suffix}/report-safe.json",
                 object_version_id="version-1",
                 content_sha256="e" * 64,
                 provider_checksum="e" * 64,
@@ -1468,9 +1468,9 @@ async def _bootstrap_terminal_owner_rows(
                 retention_mode="GOVERNANCE",
                 retain_until=NOW + timedelta(days=1),
                 legal_hold=False,
-                kms_reference="kms:compat_123:synthetic",
+                kms_reference="kms:r123:synthetic",
                 attestation_hash="f" * 64,
-                policy_reference="policy:compat_123:owned-loopback",
+                policy_reference="policy:r123:owned-loopback",
                 quarantine_reason=None,
                 finalized_at=NOW + timedelta(seconds=10),
                 **owned,
@@ -1606,7 +1606,7 @@ async def _bootstrap_terminal_owner_rows(
                         tool_version="2.17.0",
                         rule_id="10001",
                         rule_version="1",
-                        database_version="compat_104",
+                        database_version="r104",
                         title="Synthetic loopback finding",
                         resource_identity="http://127.0.0.1:41731",
                         location="/synthetic",
@@ -1688,7 +1688,7 @@ async def _bootstrap_manifest_issuer_authority(
                 runner_class_record_id=runner_class_id,
                 environment="local-conformance",
                 network_plane="owned-loopback",
-                spiffe_id="spiffe://redagent.test/runner/compat_123",
+                spiffe_id="spiffe://redagent.test/runner/r123",
                 certificate_fingerprint="a" * 64,
                 certificate_serial=f"issuer-{suffix}",
                 adapter_allowlist=["zap-service:2.17.0-r104.2"],
@@ -1765,7 +1765,7 @@ def _authority_snapshot(
         quota_reference="quota-r123",
         quota_available=True,
         runner_id="runner-r123",
-        runner_workload_identity="spiffe://redagent.test/runner/compat_123",
+        runner_workload_identity="spiffe://redagent.test/runner/r123",
         runner_ready=True,
         reservation_id="reservation-r123",
         lease_id="lease-r123",
@@ -1821,8 +1821,8 @@ async def _activity_owner_replay_scenario() -> None:
         safety_gate=_AllowedActivitySafety(),
         containment_owner=containment,
     )
-    coordinator = R123ActivityCoordinator(owner, effect)
-    reconcile_command = R123ReconcileActivityCommand(
+    coordinator = CampaignActivityCoordinator(owner, effect)
+    reconcile_command = ClosedLoopReconcileActivityCommand(
         CONTRACT_SCHEMA_VERSION,
         tenant_id,
         campaign_id,
@@ -1842,7 +1842,7 @@ async def _activity_owner_replay_scenario() -> None:
             roe_id=roe_id,
         )
         async with sessions() as session, session.begin():
-            await R123CampaignRepository(
+            await CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -1862,7 +1862,7 @@ async def _activity_owner_replay_scenario() -> None:
         assert first == replay
         assert first.outcome == "dispatch_once" and first.revision == 2
 
-        dispatch_command = R123DispatchActivityCommand(
+        dispatch_command = ClosedLoopDispatchActivityCommand(
             CONTRACT_SCHEMA_VERSION,
             tenant_id,
             campaign_id,
@@ -1888,7 +1888,7 @@ async def _activity_owner_replay_scenario() -> None:
         assert effect.calls[0].principal_id == actor_id
         assert effect.calls[0].binding == bindings[0]
 
-        contain_command = R123ContainActivityCommand(
+        contain_command = ClosedLoopContainActivityCommand(
             CONTRACT_SCHEMA_VERSION,
             tenant_id,
             campaign_id,
@@ -1973,8 +1973,8 @@ async def _activity_reconciliation_material_scenario() -> None:
         safety_gate=_AllowedActivitySafety(),
         containment_owner=_ContainmentOwner(),
     )
-    coordinator = R123ActivityCoordinator(owner, _ConfirmedEffectCoordinator())
-    reconcile_command = R123ReconcileActivityCommand(
+    coordinator = CampaignActivityCoordinator(owner, _ConfirmedEffectCoordinator())
+    reconcile_command = ClosedLoopReconcileActivityCommand(
         CONTRACT_SCHEMA_VERSION,
         tenant_id,
         campaign_id,
@@ -1994,7 +1994,7 @@ async def _activity_reconciliation_material_scenario() -> None:
             roe_id=roe_id,
         )
         async with sessions() as session, session.begin():
-            await R123CampaignRepository(
+            await CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -2006,7 +2006,7 @@ async def _activity_reconciliation_material_scenario() -> None:
             occurred_at=NOW + timedelta(seconds=1),
             correlation_id=f"activity-rec-reserve-{suffix}",
         )
-        dispatch_command = R123DispatchActivityCommand(
+        dispatch_command = ClosedLoopDispatchActivityCommand(
             CONTRACT_SCHEMA_VERSION,
             tenant_id,
             campaign_id,
@@ -2023,7 +2023,7 @@ async def _activity_reconciliation_material_scenario() -> None:
         )
         effect_command = dispatch_material.effect_command
         binding = effect_command.binding
-        request = R123AdapterRequest(
+        request = CampaignAdapterRequest(
             tenant_id=tenant_id,
             capability_id=binding.capability_id,
             capability_revision=binding.capability_revision,
@@ -2059,10 +2059,10 @@ async def _activity_reconciliation_material_scenario() -> None:
                     "capability": "zap-controlled-runtime",
                     "approval_timeout_seconds": 300,
                     "max_activity_attempts": 1,
-                    "budget_reference": "budget:compat_123:owned-loopback",
+                    "budget_reference": "budget:r123:owned-loopback",
                 },
                 workflow_id=f"job-workflow-rec-{suffix}",
-                policy_reference="policy:compat_123:owned-loopback",
+                policy_reference="policy:r123:owned-loopback",
                 campaign_id=campaign_id,
                 idempotency_key=f"activity-rec-job-{suffix}",
                 occurred_at=NOW + timedelta(seconds=2),
@@ -2081,7 +2081,7 @@ async def _activity_reconciliation_material_scenario() -> None:
                     manifest_v2_sha256=manifest_v2_sha256,
                 )
             )
-            repo = R123CampaignRepository(
+            repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -2100,7 +2100,7 @@ async def _activity_reconciliation_material_scenario() -> None:
                 expected_claim_version=claimed.claim_version,
                 request_sha256=request_sha256,
                 runner_id="runner-r123",
-                workload_identity="spiffe://redagent.test/runner/compat_123",
+                workload_identity="spiffe://redagent.test/runner/r123",
                 occurred_at=NOW + timedelta(seconds=3),
             )
 
@@ -2114,7 +2114,7 @@ async def _activity_reconciliation_material_scenario() -> None:
         )
         assert recovered_revision == reserved.revision + 1
         async with sessions() as session, session.begin():
-            ambiguity_replay = await R123CampaignRepository(
+            ambiguity_replay = await CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -2146,7 +2146,7 @@ async def _activity_reconciliation_material_scenario() -> None:
         assert reconstructed.effect_command.expected_dispatch_attempt == 1
         assert reconstructed.effect_command.expected_dispatch_generation == 1
         assert reconstructed.runner_id == "runner-r123"
-        assert reconstructed.workload_identity == "spiffe://redagent.test/runner/compat_123"
+        assert reconstructed.workload_identity == "spiffe://redagent.test/runner/r123"
         assert reconstructed.started_at == NOW + timedelta(seconds=3)
     finally:
         await engine.dispose()
@@ -2195,7 +2195,7 @@ async def _rollback_scenario() -> None:
         )
         with pytest.raises(RuntimeError, match="force rollback"):
             async with sessions() as session, session.begin():
-                repo = R123CampaignRepository(
+                repo = CampaignRepository(
                     session,
                     tenant_id=tenant_id,
                     actor_user_id=actor_id,
@@ -2250,7 +2250,7 @@ async def _status_projection_scenario() -> None:
             roe_id=roe_id,
         )
         async with sessions() as session, session.begin():
-            await R123CampaignRepository(
+            await CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -2268,7 +2268,7 @@ async def _status_projection_scenario() -> None:
                 occurred_at=NOW,
             )
 
-        initial = await PostgresR123CampaignStatusOwner(sessions).read(
+        initial = await PostgresCampaignStatusOwner(sessions).read(
             tenant_id=tenant_id,
             campaign_id=campaign_id,
         )
@@ -2280,7 +2280,7 @@ async def _status_projection_scenario() -> None:
         assert initial.terminal_receipt_present is False
 
         async with sessions() as session, session.begin():
-            await R123CampaignRepository(
+            await CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=actor_id,
@@ -2300,7 +2300,7 @@ async def _status_projection_scenario() -> None:
                 occurred_at=NOW + timedelta(seconds=1),
             )
 
-        projected = await PostgresR123CampaignStatusOwner(sessions).read(
+        projected = await PostgresCampaignStatusOwner(sessions).read(
             tenant_id=tenant_id,
             campaign_id=campaign_id,
         )
@@ -2317,7 +2317,7 @@ async def _status_projection_scenario() -> None:
 def _command(**ids: str) -> StartCampaignCommand:
     return StartCampaignCommand(
         **ids,
-        name="compat_123 owned-loopback qualification",
+        name="R123 owned-loopback qualification",
         intent_sha256="1" * 64,
         context_schema="redagent.r119-context/v1",
         context_sha256="2" * 64,
@@ -2355,11 +2355,11 @@ async def _bootstrap(
             actor_user_id=actor_id,
             correlation_id=f"bootstrap-{tenant_id}",
         )
-        await repo.bootstrap_tenant(name="compat_123 tenant", occurred_at=NOW)
+        await repo.bootstrap_tenant(name="R123 tenant", occurred_at=NOW)
         await repo.bootstrap_user(user_id=actor_id, subject=actor_id, occurred_at=NOW)
         await repo.create_engagement(
             engagement_id=engagement_id,
-            name="compat_123 engagement",
+            name="R123 engagement",
             owner_user_id=actor_id,
             idempotency_key=f"eng-{engagement_id}",
             occurred_at=NOW,

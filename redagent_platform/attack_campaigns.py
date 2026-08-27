@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 
+from redagent_platform.campaign_service.contracts import TelemetrySource
 from redagent_platform.domain import TargetType, TestRiskClass
 from redagent_platform.evidence_chain import AuditAction, EvidenceChain
 
@@ -18,14 +19,6 @@ class AttackSafetyClass(str, Enum):
     LAB_ONLY = "lab_only"
     CONTROLLED_ACTIVE = "controlled_active"
     HIGH_RISK_REVIEW_REQUIRED = "high_risk_review_required"
-
-
-class TelemetrySource(str, Enum):
-    SIEM = "siem"
-    EDR = "edr"
-    CLOUD_AUDIT = "cloud_audit"
-    APPLICATION_LOG = "application_log"
-    NETWORK_SENSOR = "network_sensor"
 
 
 @dataclass(frozen=True, kw_only=True)

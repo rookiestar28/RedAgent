@@ -270,7 +270,7 @@ def _wait_ready() -> dict[str, Any]:
                 payload = response.json()
                 if isinstance(payload, dict):
                     return payload
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
         time.sleep(1)
     raise ConformanceError("openbao_startup_timeout")
@@ -327,7 +327,7 @@ def _token_is_valid(token: str) -> bool:
             timeout=5,
         )
         return response.status_code == 200
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
 
 

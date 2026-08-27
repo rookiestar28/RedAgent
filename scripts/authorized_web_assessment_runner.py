@@ -1235,7 +1235,7 @@ def main(argv: list[str]) -> int:
     except SafetyError as error:
         print(f"SAFETY ERROR: {error}", file=sys.stderr)
         return 10
-    except Exception as error:  # pragma: no cover - final safety net for CLI use.
+    except Exception as error:  # pragma: no cover - final safety net for CLI use.  # noqa: BLE001
         print(f"RUNNER ERROR: {error}", file=sys.stderr)
         return 1
 

@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
+import builtins
 from dataclasses import InitVar, asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
 import json
 import re
-from typing import Mapping
-
+from typing import Any, Mapping, cast
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _SHA = re.compile(r"^[0-9a-f]{64}$")
 _SAFE_PATH = re.compile(r"^/(?:[A-Za-z0-9._~-]+/)*[A-Za-z0-9._~-]+$")
 _SNAPSHOT_VALIDATION_TOKEN = object()
 _R121_VALIDATION_TOKEN = object()
+_DETECTION_VALIDATION_TOKEN = object()
+_ATTACK_TECHNIQUE_ID = re.compile(r"^T\d{4}(?:\.\d{3})?$")
 _HEADER_CODES = frozenset({"content-security-policy", "x-content-type-options"})
 _OBSERVATION_OBJECT_KINDS = frozenset(
     {"target", "http-response", "security-header", "capability", "evidence"}
@@ -65,6 +67,33 @@ class Confidence(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+
+
+class DetectionSeverity(str, Enum):
+    INFORMATIONAL = "informational"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class DetectionDisposition(str, Enum):
+    UNCONFIRMED = "unconfirmed"
+    CONFIRMED = "confirmed"
+    DISMISSED = "dismissed"
+
+
+class DetectionPromotionKind(str, Enum):
+    HUMAN_REVIEW = "human_review"
+    DETERMINISTIC_CORRELATION = "deterministic_correlation"
+
+
+class TelemetrySource(str, Enum):
+    SIEM = "siem"
+    EDR = "edr"
+    CLOUD_AUDIT = "cloud_audit"
+    APPLICATION_LOG = "application_log"
+    NETWORK_SENSOR = "network_sensor"
 
 
 class InvalidationState(str, Enum):
@@ -117,7 +146,7 @@ class CapabilitySemanticsDefinitionV1:
             raise ValueError("r119_semantics_schema_invalid")
         _identifier("semantics_id", self.semantics_id)
         _positive_int("semantics_revision", self.revision)
-        for name, value in (
+        for identifier_name, identifier_value in (
             ("target_class", self.target_class),
             ("environment_class", self.environment_class),
             ("risk_class", self.risk_class),
@@ -129,7 +158,7 @@ class CapabilitySemanticsDefinitionV1:
             ("qualification", self.qualification),
             ("deprecation", self.deprecation),
         ):
-            _identifier(name, value)
+            _identifier(identifier_name, identifier_value)
         _closed_identifiers("semantics_preconditions", self.preconditions, maximum=16)
         _closed_identifiers("semantics_effects", self.effects, maximum=8)
         _closed_identifiers("semantics_evidence_schemas", self.evidence_schemas, maximum=8)
@@ -171,28 +200,28 @@ class CapabilityBindingKeyV1:
     def __post_init__(self) -> None:
         if self.schema_version != "redagent.r119-capability-binding/v1":
             raise ValueError("r119_binding_schema_invalid")
-        for name, value in (
+        for identifier_name, identifier_value in (
             ("binding_capability_id", self.capability_id),
             ("binding_adapter_id", self.adapter_id),
             ("binding_adapter_version", self.adapter_version),
             ("binding_profile_id", self.profile_id),
         ):
-            _identifier(name, value)
-        for name, value in (
+            _identifier(identifier_name, identifier_value)
+        for revision_name, revision_value in (
             ("binding_capability_revision", self.capability_revision),
             ("binding_profile_revision", self.profile_revision),
             ("binding_semantics_revision", self.semantics_revision),
             ("binding_projection_revision", self.projection_revision),
         ):
-            _positive_int(name, value)
-        for name, value in (
+            _positive_int(revision_name, revision_value)
+        for digest_name, digest_value in (
             ("binding_execution_manifest_sha256", self.execution_manifest_sha256),
             ("binding_profile_sha256", self.profile_sha256),
             ("binding_semantics_sha256", self.semantics_sha256),
             ("binding_normalized_output_sha256", self.normalized_output_sha256),
             ("binding_projection_sha256", self.projection_sha256),
         ):
-            _sha256(name, value)
+            _sha256(digest_name, digest_value)
         bundle_values = (self.bundle_id, self.bundle_revision, self.bundle_sha256)
         if any(value is None for value in bundle_values) and not all(value is None for value in bundle_values):
             raise ValueError("r119_binding_bundle_partial")
@@ -238,13 +267,13 @@ class TargetRouteV1:
 
     def __post_init__(self) -> None:
         _sha256("target_route_binding_sha256", self.binding_key_sha256)
-        for name, value in (
+        for route_name, route_value in (
             ("target_route_target_class", self.target_class),
             ("target_route_application_class", self.application_class),
             ("target_route_environment_class", self.environment_class),
             ("target_route_path_class", self.path_class),
         ):
-            _identifier(name, value)
+            _identifier(route_name, route_value)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -298,7 +327,7 @@ class AuthorityContextV1:
     def __post_init__(self) -> None:
         if self.schema_version != "redagent.r119-authority-context/v1":
             raise ValueError("r119_authority_schema_invalid")
-        for name, value in (
+        for identifier_name, identifier_value in (
             ("authority_tenant_id", self.tenant_id),
             ("authority_engagement_id", self.engagement_id),
             ("authority_principal_id", self.principal_id),
@@ -310,13 +339,13 @@ class AuthorityContextV1:
             ("authority_environment_class", self.environment_class),
             ("authority_url_class", self.url_class),
         ):
-            _identifier(name, value)
-        for name, value in (
+            _identifier(identifier_name, identifier_value)
+        for digest_name, digest_value in (
             ("authority_target_mapping_sha256", self.target_mapping_sha256),
             ("authority_roe_sha256", self.roe_sha256),
             ("authority_policy_sha256", self.policy_sha256),
         ):
-            _sha256(name, value)
+            _sha256(digest_name, digest_value)
         if self.target.kind != "target":
             raise ValueError("r119_authority_target_kind_invalid")
         if self.roe_status != "approved" or self.policy_status != "allowed":
@@ -450,17 +479,17 @@ class ObservationFactV1:
             raise ValueError("r119_observation_object_mismatch")
         if self.kind is ObservationKind.EVIDENCE_IDENTITY and self.object != self.evidence:
             raise ValueError("r119_observation_object_mismatch")
-        for name, value in (
+        for timestamp_name, timestamp_value in (
             ("observation_observed_at", self.observed_at),
             ("observation_valid_from", self.valid_from),
             ("observation_ingested_at", self.ingested_at),
             ("observation_expires_at", self.expires_at),
         ):
-            _aware(name, value)
+            _aware(timestamp_name, timestamp_value)
         if not self.valid_from <= self.observed_at <= self.ingested_at < self.expires_at:
             raise ValueError("r119_observation_time_invalid")
 
-    def identity_body(self) -> tuple[object, ...]:
+    def identity_body(self) -> tuple[builtins.object, ...]:
         return (
             self.tenant_id,
             self.engagement_id,
@@ -473,6 +502,162 @@ class ObservationFactV1:
             self.object.sha256,
             self.kind.value,
         )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DetectionPromotionV1:
+    kind: DetectionPromotionKind
+    proof_ref: TypedReferenceV1
+    promoted_at: datetime
+    _validation_token: InitVar[object] = None
+
+    def __post_init__(self, _validation_token: object) -> None:
+        if _validation_token is not _DETECTION_VALIDATION_TOKEN:
+            raise ValueError("detection_promotion_factory_required")
+        if not isinstance(self.kind, DetectionPromotionKind):
+            raise ValueError("detection_promotion_kind_invalid")
+        expected_kind = (
+            "human-review"
+            if self.kind is DetectionPromotionKind.HUMAN_REVIEW
+            else "correlation-receipt"
+        )
+        if self.proof_ref.kind != expected_kind:
+            raise ValueError("detection_promotion_reference_invalid")
+        _aware("detection_promoted_at", self.promoted_at)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DetectionObservationV1:
+    schema_version: str
+    observation_id: str
+    tenant_id: str
+    engagement_id: str
+    correlation_key: str
+    capability_id: str
+    source: TelemetrySource
+    source_system: str
+    attack_technique_id: str
+    attack_version: str
+    confidence: Confidence
+    severity: DetectionSeverity
+    disposition: DetectionDisposition
+    promotion: DetectionPromotionV1 | None
+    evidence_ref: TypedReferenceV1
+    observed_at: datetime
+    ingested_at: datetime
+    expires_at: datetime
+    ocsf_class_uid: int | None
+    ocsf_category_uid: int | None
+    _validation_token: InitVar[object] = None
+
+    def __post_init__(self, _validation_token: object) -> None:
+        # CRITICAL: detection observations are factory-minted; raw alert text is never a field.
+        if _validation_token is not _DETECTION_VALIDATION_TOKEN:
+            raise ValueError("detection_observation_factory_required")
+        if self.schema_version != "redagent.detection-observation/v1":
+            raise ValueError("detection_observation_schema_invalid")
+        for name, value in (
+            ("detection_observation_id", self.observation_id),
+            ("detection_tenant_id", self.tenant_id),
+            ("detection_engagement_id", self.engagement_id),
+            ("detection_correlation_key", self.correlation_key),
+            ("detection_capability_id", self.capability_id),
+            ("detection_source_system", self.source_system),
+            ("detection_attack_version", self.attack_version),
+        ):
+            _identifier(name, value)
+        if not isinstance(self.source, TelemetrySource):
+            raise ValueError("detection_source_invalid")
+        if not _ATTACK_TECHNIQUE_ID.fullmatch(self.attack_technique_id):
+            raise ValueError("detection_attack_technique_invalid")
+        if not isinstance(self.confidence, Confidence) or not isinstance(
+            self.severity, DetectionSeverity
+        ):
+            raise ValueError("detection_scoring_invalid")
+        if not isinstance(self.disposition, DetectionDisposition):
+            raise ValueError("detection_disposition_invalid")
+        if self.disposition is DetectionDisposition.UNCONFIRMED:
+            if self.promotion is not None:
+                raise ValueError("detection_unconfirmed_promotion_forbidden")
+        elif not isinstance(self.promotion, DetectionPromotionV1):
+            raise ValueError("detection_promotion_required")
+        if self.evidence_ref.kind != "evidence":
+            raise ValueError("detection_evidence_reference_invalid")
+        for timestamp_name, timestamp_value in (
+            ("detection_observed_at", self.observed_at),
+            ("detection_ingested_at", self.ingested_at),
+            ("detection_expires_at", self.expires_at),
+        ):
+            _aware(timestamp_name, timestamp_value)
+        if not self.observed_at <= self.ingested_at < self.expires_at:
+            raise ValueError("detection_observation_time_invalid")
+        if (self.ocsf_class_uid, self.ocsf_category_uid) not in {
+            (None, None),
+            (2004, 2),
+        }:
+            raise ValueError("detection_ocsf_finding_shape_invalid")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DetectionCorrelationDispositionV1:
+    schema_version: str
+    tenant_id: str
+    engagement_id: str
+    correlation_key: str
+    attack_technique_id: str
+    input_observation_bindings: tuple[tuple[str, str], ...]
+    correlated: bool
+    qualified_observation_ids: tuple[str, ...]
+    excluded: tuple[tuple[str, str], ...]
+    evaluated_at: datetime
+    max_age_seconds: int
+    correlation_sha256: str
+    _validation_token: InitVar[object] = None
+
+    def __post_init__(self, _validation_token: object) -> None:
+        if _validation_token is not _DETECTION_VALIDATION_TOKEN:
+            raise ValueError("detection_correlation_factory_required")
+        if self.schema_version != "redagent.detection-correlation/v1":
+            raise ValueError("detection_correlation_schema_invalid")
+        _identifier("detection_correlation_tenant", self.tenant_id)
+        _identifier("detection_correlation_engagement", self.engagement_id)
+        _identifier("detection_correlation_key", self.correlation_key)
+        if not _ATTACK_TECHNIQUE_ID.fullmatch(self.attack_technique_id):
+            raise ValueError("detection_correlation_technique_invalid")
+        if not isinstance(self.correlated, bool):
+            raise ValueError("detection_correlation_result_invalid")
+        if tuple(sorted(set(self.input_observation_bindings))) != self.input_observation_bindings:
+            raise ValueError("detection_correlation_input_bindings_invalid")
+        input_ids: list[str] = []
+        for observation_id, observation_sha256 in self.input_observation_bindings:
+            _identifier("detection_correlation_input_observation", observation_id)
+            _sha256("detection_correlation_input_observation_sha256", observation_sha256)
+            input_ids.append(observation_id)
+        if len(set(input_ids)) != len(input_ids):
+            raise ValueError("detection_correlation_input_identity_conflict")
+        if tuple(sorted(set(self.qualified_observation_ids))) != self.qualified_observation_ids:
+            raise ValueError("detection_correlation_qualified_invalid")
+        for observation_id in self.qualified_observation_ids:
+            _identifier("detection_correlation_observation", observation_id)
+        if tuple(sorted(set(self.excluded))) != self.excluded:
+            raise ValueError("detection_correlation_excluded_invalid")
+        for observation_id, reason in self.excluded:
+            _identifier("detection_correlation_observation", observation_id)
+            _identifier("detection_correlation_reason", reason)
+        if self.correlated != bool(self.qualified_observation_ids):
+            raise ValueError("detection_correlation_count_mismatch")
+        _aware("detection_correlation_evaluated_at", self.evaluated_at)
+        _bounded_int("detection_correlation_max_age", self.max_age_seconds, 1, 3600)
+        _sha256("detection_correlation_sha256", self.correlation_sha256)
+        if self.correlation_sha256 != canonical_sha256(self.canonical_body()):
+            raise ValueError("detection_correlation_digest_mismatch")
+
+    def canonical_body(self) -> dict[str, object]:
+        return {
+            field: getattr(self, field)
+            for field in self.__dataclass_fields__
+            if field not in {"correlation_sha256", "_validation_token"}
+        }
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -508,7 +693,7 @@ class FindingFactV1:
     def __post_init__(self) -> None:
         if self.schema_version != "redagent.r119-finding-fact/v1":
             raise ValueError("r119_finding_schema_invalid")
-        for name, value in (
+        for identifier_name, identifier_value in (
             ("finding_fact_id", self.fact_id),
             ("finding_tenant_id", self.tenant_id),
             ("finding_engagement_id", self.engagement_id),
@@ -522,7 +707,7 @@ class FindingFactV1:
             ("finding_disposition", self.disposition),
             ("finding_retest_state", self.retest_state),
         ):
-            _identifier(name, value)
+            _identifier(identifier_name, identifier_value)
         _sha256("finding_binding_key_sha256", self.binding_key_sha256)
         if self.observation_kind is not ObservationKind.SECURITY_HEADER_MISSING:
             raise ValueError("r119_finding_observation_kind_invalid")
@@ -542,12 +727,12 @@ class FindingFactV1:
             raise ValueError("r119_finding_reference_kind_invalid")
         if not isinstance(self.invalidation_state, InvalidationState):
             raise ValueError("r119_finding_invalidation_invalid")
-        for name, value in (
+        for timestamp_name, timestamp_value in (
             ("finding_observed_at", self.observed_at),
             ("finding_updated_at", self.updated_at),
             ("finding_expires_at", self.expires_at),
         ):
-            _aware(name, value)
+            _aware(timestamp_name, timestamp_value)
         if not self.observed_at <= self.updated_at < self.expires_at:
             raise ValueError("r119_finding_time_invalid")
 
@@ -588,6 +773,7 @@ class DecisionContextSnapshotV1:
     finding_facts: tuple[FindingFactV1, ...]
     dispositions: tuple[FactDispositionV1, ...]
     conflicts: tuple[FactConflictV1, ...]
+    detection_observations: tuple[DetectionObservationV1, ...]
     capability_section_sha256: str
     trusted_section_sha256: str
     snapshot_sha256: str
@@ -596,8 +782,15 @@ class DecisionContextSnapshotV1:
     def __post_init__(self, _validation_token: object) -> None:
         if _validation_token is not _SNAPSHOT_VALIDATION_TOKEN:
             raise ValueError("r119_snapshot_factory_required")
-        if self.schema_version != "redagent.r119-decision-context/v1":
+        if self.schema_version not in {
+            "redagent.r119-decision-context/v1",
+            "redagent.detection-decision-context/v2",
+        }:
             raise ValueError("r119_snapshot_schema_invalid")
+        if (self.schema_version == "redagent.r119-decision-context/v1") != (
+            not self.detection_observations
+        ):
+            raise ValueError("detection_snapshot_schema_mismatch")
         _aware("r119_snapshot_at", self.snapshot_at)
         if not isinstance(self.collection_state, CollectionState):
             raise ValueError("r119_collection_state_invalid")
@@ -610,16 +803,17 @@ class DecisionContextSnapshotV1:
         ):
             _sha256(name, value)
         capability_expected = canonical_sha256(self.semantics)
-        trusted_expected = canonical_sha256(
-            {
-                "collection_state": self.collection_state,
-                "observations": self.observations,
-                "evidence_facts": self.evidence_facts,
-                "finding_facts": self.finding_facts,
-                "dispositions": self.dispositions,
-                "conflicts": self.conflicts,
-            }
-        )
+        trusted_body: dict[str, object] = {
+            "collection_state": self.collection_state,
+            "observations": self.observations,
+            "evidence_facts": self.evidence_facts,
+            "finding_facts": self.finding_facts,
+            "dispositions": self.dispositions,
+            "conflicts": self.conflicts,
+        }
+        if self.detection_observations:
+            trusted_body["detection_observations"] = self.detection_observations
+        trusted_expected = canonical_sha256(trusted_body)
         snapshot_expected = canonical_sha256(
             {
                 "schema_version": self.schema_version,
@@ -636,6 +830,16 @@ class DecisionContextSnapshotV1:
             or self.snapshot_sha256 != snapshot_expected
         ):
             raise ValueError("r119_snapshot_digest_mismatch")
+
+    def canonical_body(self) -> dict[str, object]:
+        body = {
+            field: getattr(self, field)
+            for field in self.__dataclass_fields__
+            if field != "_validation_token"
+        }
+        if self.schema_version == "redagent.r119-decision-context/v1":
+            body.pop("detection_observations")
+        return body
 
 
 class StrategyObjectiveKind(str, Enum):
@@ -821,13 +1025,18 @@ class StrategyDecisionReceiptV1:
     matched_rule: str
     reason: str
     selected_binding_sha256: str | None
+    detection_disposition: DetectionCorrelationDispositionV1 | None
+    coverage_matrix_sha256: str | None
     receipt_sha256: str
     _validation_token: InitVar[object] = None
 
     def __post_init__(self, _validation_token: object) -> None:
         if _validation_token is not _R121_VALIDATION_TOKEN:
             raise ValueError("r121_receipt_factory_required")
-        if self.schema_version != "redagent.r121-strategy-receipt/v1":
+        if self.schema_version not in {
+            "redagent.r121-strategy-receipt/v1",
+            "redagent.detection-strategy-receipt/v2",
+        }:
             raise ValueError("r121_receipt_schema_invalid")
         if not isinstance(self.objective, StrategyObjectiveV1):
             raise ValueError("r121_receipt_objective_invalid")
@@ -869,15 +1078,32 @@ class StrategyDecisionReceiptV1:
             _sha256("r121_receipt_selected_binding", self.selected_binding_sha256)
         if (self.outcome is StrategyOutcome.SELECT) != (self.selected_binding_sha256 is not None):
             raise ValueError("r121_receipt_selection_invalid")
+        if (self.detection_disposition is None) != (self.coverage_matrix_sha256 is None):
+            raise ValueError("detection_receipt_binding_invalid")
+        if self.schema_version == "redagent.r121-strategy-receipt/v1" and (
+            self.snapshot.schema_version != "redagent.r119-decision-context/v1"
+            or self.detection_disposition is not None
+        ):
+            raise ValueError("detection_receipt_schema_mismatch")
+        if self.schema_version == "redagent.detection-strategy-receipt/v2" and (
+            self.snapshot.schema_version != "redagent.detection-decision-context/v2"
+        ):
+            raise ValueError("detection_receipt_schema_mismatch")
+        if self.detection_disposition is not None:
+            _sha256("detection_receipt_matrix", self.coverage_matrix_sha256)
         if self.receipt_sha256 != canonical_sha256(self.canonical_body()):
             raise ValueError("r121_receipt_digest_mismatch")
 
     def canonical_body(self) -> dict[str, object]:
-        return {
+        body = {
             field: getattr(self, field)
             for field in self.__dataclass_fields__
             if field not in {"receipt_sha256", "_validation_token"}
         }
+        if self.schema_version == "redagent.r121-strategy-receipt/v1":
+            body.pop("detection_disposition")
+            body.pop("coverage_matrix_sha256")
+        return body
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -954,9 +1180,32 @@ def _validated_plan_revision(**values: object) -> PlanRevisionV1:
 
 def _validated_decision_context_snapshot(**values: object) -> DecisionContextSnapshotV1:
     """Mint a snapshot only after the campaign context builder validates every input."""
-    return DecisionContextSnapshotV1(  # type: ignore[arg-type]
+    return DecisionContextSnapshotV1(
         _validation_token=_SNAPSHOT_VALIDATION_TOKEN,
-        **values,
+        **cast(Any, values),
+    )
+
+
+def _validated_detection_promotion(**values: object) -> DetectionPromotionV1:
+    return DetectionPromotionV1(
+        _validation_token=_DETECTION_VALIDATION_TOKEN,
+        **cast(Any, values),
+    )
+
+
+def _validated_detection_observation(**values: object) -> DetectionObservationV1:
+    return DetectionObservationV1(
+        _validation_token=_DETECTION_VALIDATION_TOKEN,
+        **cast(Any, values),
+    )
+
+
+def _validated_detection_correlation(
+    **values: object,
+) -> DetectionCorrelationDispositionV1:
+    return DetectionCorrelationDispositionV1(
+        _validation_token=_DETECTION_VALIDATION_TOKEN,
+        **cast(Any, values),
     )
 
 
@@ -975,8 +1224,13 @@ def _normalize(value: object) -> object:
         return value.astimezone(timezone.utc).isoformat(timespec="microseconds")
     if isinstance(value, Enum):
         return value.value
+    # IMPORTANT: additive detection fields must not drift frozen v1 canonical evidence.
+    if isinstance(value, DecisionContextSnapshotV1):
+        return _normalize(value.canonical_body())
+    if isinstance(value, StrategyDecisionReceiptV1):
+        return _normalize(value.canonical_body())
     if hasattr(value, "__dataclass_fields__"):
-        return _normalize(asdict(value))
+        return _normalize(asdict(cast(Any, value)))
     if isinstance(value, Mapping):
         if any(not isinstance(key, str) for key in value):
             raise ValueError("r119_canonical_key_invalid")

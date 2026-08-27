@@ -6,33 +6,42 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    AttestedFakeWorkload,
+from datetime import timedelta
+from fastapi import (
     Depends,
-    LeaseIssueRequest,
-    PaginationQuery,
     Request,
+    status,
+)
+import hashlib
+from redagent_platform.api.contracts import (
+    ApiError,
     RequestGuard,
-    SecretLeaseBroker,
-    SecretLeaseListResponse,
-    SecretLeaseResponse,
-    SecretReference,
-    SecretReferenceKind,
-    SecretReferenceListResponse,
-    SecretReferenceStatus,
-    SecretRevokeRequest,
-    SecretSyntheticIssueRequest,
-    TransactionalSecretLeaseStore,
-    WorkloadClient,
+)
+from redagent_platform.api.router_primitives import (
     _idempotency,
     _list_response,
     _now,
     _probe_limit,
-    hashlib,
-    status,
-    timedelta,
 )
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.api.schemas.secrets import (
+    SecretLeaseListResponse,
+    SecretLeaseResponse,
+    SecretReferenceListResponse,
+    SecretRevokeRequest,
+    SecretSyntheticIssueRequest,
+)
+from redagent_platform.secret_service.broker import SecretLeaseBroker
+from redagent_platform.secret_service.contracts import (
+    LeaseIssueRequest,
+    SecretReference,
+    SecretReferenceKind,
+    SecretReferenceStatus,
+    WorkloadClient,
+)
+from redagent_platform.secret_service.fakes import AttestedFakeWorkload
+from redagent_platform.secret_service.repository import TransactionalSecretLeaseStore
+
 
 def _secret_store(request: Request) -> TransactionalSecretLeaseStore:
     factory = request.app.state.session_factory
@@ -43,25 +52,42 @@ def _secret_store(request: Request) -> TransactionalSecretLeaseStore:
 
 def _public_secret_reference(row: dict[str, object]) -> dict[str, object]:
     return {
-        "reference_id": row["id"], "tenant_id": row["tenant_id"],
-        "engagement_id": row["engagement_id"], "reference_kind": row["reference_kind"],
-        "provider_alias": row["provider_alias"], "allowed_capabilities": row["allowed_capabilities"],
-        "allowed_permissions": row["allowed_permissions"], "expires_at": row["expires_at"],
-        "rotation_due_at": row["rotation_due_at"], "reference_status": row["reference_status"],
-        "redaction_label": row["redaction_label"], "version": row["version"],
+        "reference_id": row["id"],
+        "tenant_id": row["tenant_id"],
+        "engagement_id": row["engagement_id"],
+        "reference_kind": row["reference_kind"],
+        "provider_alias": row["provider_alias"],
+        "allowed_capabilities": row["allowed_capabilities"],
+        "allowed_permissions": row["allowed_permissions"],
+        "expires_at": row["expires_at"],
+        "rotation_due_at": row["rotation_due_at"],
+        "reference_status": row["reference_status"],
+        "redaction_label": row["redaction_label"],
+        "version": row["version"],
     }
 
 
 def _public_secret_lease(row: dict[str, object]) -> dict[str, object]:
     return {
-        "lease_id": row["id"], "tenant_id": row["tenant_id"], "reference_id": row["reference_id"],
-        "engagement_id": row["engagement_id"], "job_id": row["job_id"],
-        "workload_client_id": row["workload_client_id"], "capability": row["capability"],
-        "permission_count": row["permission_count"], "issued_at": row["issued_at"],
-        "expires_at": row["expires_at"], "renewed_at": row["renewed_at"], "revoked_at": row["revoked_at"],
-        "renewable": row["renewable"], "renewal_count": row["renewal_count"],
-        "lease_state": row["lease_state"], "policy_reference": row["policy_reference"],
-        "roe_version_id": row["roe_version_id"], "failure_code": row["failure_code"], "version": row["version"],
+        "lease_id": row["id"],
+        "tenant_id": row["tenant_id"],
+        "reference_id": row["reference_id"],
+        "engagement_id": row["engagement_id"],
+        "job_id": row["job_id"],
+        "workload_client_id": row["workload_client_id"],
+        "capability": row["capability"],
+        "permission_count": row["permission_count"],
+        "issued_at": row["issued_at"],
+        "expires_at": row["expires_at"],
+        "renewed_at": row["renewed_at"],
+        "revoked_at": row["revoked_at"],
+        "renewable": row["renewable"],
+        "renewal_count": row["renewal_count"],
+        "lease_state": row["lease_state"],
+        "policy_reference": row["policy_reference"],
+        "roe_version_id": row["roe_version_id"],
+        "failure_code": row["failure_code"],
+        "version": row["version"],
     }
 
 
@@ -121,48 +147,74 @@ def register_secret_routes(app: APIRouter, dependencies: ApiDependencies) -> Non
         if provider is None:
             raise ApiError(503, "secret_provider_not_configured", "Secret provider is not configured.")
         store = _secret_store(request)
-        now = await store.issue_requested_at(
-            tenant_id=guard.security.tenant_id, idempotency_key=_idempotency(guard)
-        ) or _now()
+        now = (
+            await store.issue_requested_at(tenant_id=guard.security.tenant_id, idempotency_key=_idempotency(guard))
+            or _now()
+        )
         deadline = now + timedelta(seconds=payload.ttl_seconds)
         attestation = hashlib.sha256(
             f"{guard.security.tenant_id}:{payload.job_id}:{payload.workload_client_id}".encode()
         ).hexdigest()
         await store.register_reference(
             SecretReference(
-                tenant_id=guard.security.tenant_id, reference_id=payload.reference_id,
-                engagement_id=payload.engagement_id, owner_user_id=guard.security.subject,
-                kind=SecretReferenceKind.DYNAMIC_DATABASE, provider_alias="synthetic-local",
-                role_reference="role:database-readonly-v1", allowed_capabilities=("synthetic-noop",),
-                allowed_permissions=("read",), created_at=now, expires_at=now + timedelta(hours=1),
-                rotation_due_at=now + timedelta(minutes=30), status=SecretReferenceStatus.ACTIVE,
+                tenant_id=guard.security.tenant_id,
+                reference_id=payload.reference_id,
+                engagement_id=payload.engagement_id,
+                owner_user_id=guard.security.subject,
+                kind=SecretReferenceKind.DYNAMIC_DATABASE,
+                provider_alias="synthetic-local",
+                role_reference="role:database-readonly-v1",
+                allowed_capabilities=("synthetic-noop",),
+                allowed_permissions=("read",),
+                created_at=now,
+                expires_at=now + timedelta(hours=1),
+                rotation_due_at=now + timedelta(minutes=30),
+                status=SecretReferenceStatus.ACTIVE,
                 redaction_label="synthetic-database-reference",
             ),
-            actor_user_id=guard.security.subject, correlation_id=guard.correlation_id,
+            actor_user_id=guard.security.subject,
+            correlation_id=guard.correlation_id,
         )
         await store.register_workload(
             WorkloadClient(
-                tenant_id=guard.security.tenant_id, client_id=payload.workload_client_id,
-                job_id=payload.job_id, capability="synthetic-noop",
-                attestation_fingerprint=attestation, expires_at=deadline, revoked_at=None,
+                tenant_id=guard.security.tenant_id,
+                client_id=payload.workload_client_id,
+                job_id=payload.job_id,
+                capability="synthetic-noop",
+                attestation_fingerprint=attestation,
+                expires_at=deadline,
+                revoked_at=None,
             ),
-            actor_user_id=guard.security.subject, correlation_id=guard.correlation_id, occurred_at=now,
+            actor_user_id=guard.security.subject,
+            correlation_id=guard.correlation_id,
+            occurred_at=now,
         )
         result = await SecretLeaseBroker(
-            store, provider,
+            store,
+            provider,
             AttestedFakeWorkload(client_id=payload.workload_client_id, attestation_fingerprint=attestation),
             request.app.state.policy_sdk,
         ).issue(
             LeaseIssueRequest(
-                tenant_id=guard.security.tenant_id, lease_id=payload.lease_id,
-                reference_id=payload.reference_id, engagement_id=payload.engagement_id,
-                job_id=payload.job_id, workload_client_id=payload.workload_client_id,
-                capability="synthetic-noop", requested_permissions=("read",), requested_at=now,
-                ttl_seconds=payload.ttl_seconds, job_deadline=deadline, policy_expires_at=deadline,
-                roe_expires_at=deadline, policy_reference=guard.policy_reference,
-                roe_version_id=str(guard.roe_version_id), idempotency_key=_idempotency(guard),
+                tenant_id=guard.security.tenant_id,
+                lease_id=payload.lease_id,
+                reference_id=payload.reference_id,
+                engagement_id=payload.engagement_id,
+                job_id=payload.job_id,
+                workload_client_id=payload.workload_client_id,
+                capability="synthetic-noop",
+                requested_permissions=("read",),
+                requested_at=now,
+                ttl_seconds=payload.ttl_seconds,
+                job_deadline=deadline,
+                policy_expires_at=deadline,
+                roe_expires_at=deadline,
+                policy_reference=guard.policy_reference,
+                roe_version_id=str(guard.roe_version_id),
+                idempotency_key=_idempotency(guard),
             ),
-            actor_user_id=guard.security.subject, correlation_id=guard.correlation_id,
+            actor_user_id=guard.security.subject,
+            correlation_id=guard.correlation_id,
         )
         return {"data": _public_secret_lease(result.lease), "meta": {"replayed": result.replayed}}
 
@@ -181,10 +233,16 @@ def register_secret_routes(app: APIRouter, dependencies: ApiDependencies) -> Non
         if provider is None:
             raise ApiError(503, "secret_provider_not_configured", "Secret provider is not configured.")
         result = await SecretLeaseBroker(
-            _secret_store(request), provider, None, request.app.state.policy_sdk,
+            _secret_store(request),
+            provider,
+            None,
+            request.app.state.policy_sdk,
         ).revoke(
-            tenant_id=guard.security.tenant_id, lease_id=lease_id,
-            expected_version=payload.expected_version, actor_user_id=guard.security.subject,
-            correlation_id=guard.correlation_id, occurred_at=_now(),
+            tenant_id=guard.security.tenant_id,
+            lease_id=lease_id,
+            expected_version=payload.expected_version,
+            actor_user_id=guard.security.subject,
+            correlation_id=guard.correlation_id,
+            occurred_at=_now(),
         )
         return {"data": _public_secret_lease(result.lease), "meta": {"replayed": result.replayed}}

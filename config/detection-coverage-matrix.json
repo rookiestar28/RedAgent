@@ -1,0 +1,23 @@
+{
+  "schema_version": "redagent.detection-coverage-matrix/v1",
+  "matrix_id": "owned-loopback-http-detection",
+  "revision": 1,
+  "attack_version": "18.0",
+  "authoring_source": "human",
+  "approved_by": "security-engineering",
+  "approval_ref": "owned-lab-matrix-review-1",
+  "entries": [
+    {
+      "attack_technique_id": "T1595.002",
+      "capability_id": "nuclei-trusted-runtime",
+      "expected_detectability": "expected",
+      "last_confirmed_status": "unknown"
+    },
+    {
+      "attack_technique_id": "T1595.002",
+      "capability_id": "zap-controlled-runtime",
+      "expected_detectability": "expected",
+      "last_confirmed_status": "unknown"
+    }
+  ]
+}

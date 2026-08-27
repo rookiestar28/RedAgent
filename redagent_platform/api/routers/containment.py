@@ -6,34 +6,46 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CONTRACT_SCHEMA_VERSION,
-    ContainmentApprovalRequest,
-    ContainmentControlListResponse,
-    ContainmentControlResponse,
-    ContainmentRecoveryRequest,
-    ContainmentRepository,
-    ContainmentRepositoryConflict,
-    ContainmentStopRequest,
-    ControlScope,
-    ControlScopeKind,
+from fastapi import (
     Depends,
-    EmergencyStopSignal,
-    JobContainmentResponse,
-    PaginationQuery,
-    QuotaStatusResponse,
     Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
     RequestGuard,
-    StopApproval,
-    StopRequest,
+)
+from redagent_platform.api.router_primitives import (
     _idempotency,
     _list_response,
     _now,
     _orchestration,
     _probe_limit,
     _repository,
-    status,
+)
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.api.schemas.containment import (
+    ContainmentApprovalRequest,
+    ContainmentControlListResponse,
+    ContainmentControlResponse,
+    ContainmentRecoveryRequest,
+    ContainmentStopRequest,
+    JobContainmentResponse,
+    QuotaStatusResponse,
+)
+from redagent_platform.containment_service.contracts import (
+    ControlScope,
+    ControlScopeKind,
+    StopApproval,
+    StopRequest,
+)
+from redagent_platform.containment_service.repository import (
+    ContainmentRepository,
+    ContainmentRepositoryConflict,
+)
+from redagent_platform.orchestration.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    EmergencyStopSignal,
 )
 
 async def _signal_containment_jobs(

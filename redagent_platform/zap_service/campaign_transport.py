@@ -1,11 +1,11 @@
-"""Fixed Docker transport primitives for the compat_123 Nuclei product adapter."""
+"""Fixed Docker transport primitives for the compat_123 passive ZAP product adapter."""
 
 from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -15,35 +15,27 @@ import subprocess
 import tempfile
 import threading
 
-from redagent_platform.nuclei_service.artifact_promotion import (
-    verify_current_nuclei_artifact_promotion,
+from redagent_platform.zap_service.contracts import (
+    CertifiedProfileId,
+    ZAP_ADDON_INVENTORY_COUNT,
+    ZAP_ADDON_INVENTORY_SHA256,
 )
-from redagent_platform.nuclei_service.contracts import (
-    NucleiProfileId,
-    NucleiTargetBinding,
-    TARGET_NETWORK,
-)
-from redagent_platform.nuclei_service.normalization import normalize_nuclei_jsonl
-from redagent_platform.nuclei_service.promotion import (
-    verify_current_nuclei_bundle_promotion,
-)
-from redagent_platform.nuclei_service.compat_123_adapter import (
-    NUCLEI_FIXED_ARGV,
-    NucleiFixedInvocation,
-    NucleiRuntimeReceipt,
-)
-from redagent_platform.runner_service.compat_123_result import NormalizedAdapterFindingV1
+from redagent_platform.zap_service.normalization import normalize_alerts
+from redagent_platform.zap_service.promotion import verify_current_zap_promotion
+from redagent_platform.zap_service.campaign_adapter import ZapFixedInvocation, ZapRuntimeReceipt
+from redagent_platform.runner_service.campaign_result import NormalizedAdapterFindingV1
 
 
-_IMAGE = "redagent/r105-nuclei:3.11.1-r105.2"
-_OWNER = "redagent.owner=r123-nuclei"
+_IMAGE = "redagent/r104-zap:2.17.0-r104.2"
+_OWNER = "redagent.owner=r123-zap"
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
-NUCLEI_EXECUTION_TIMEOUT_SECONDS = 60
-NUCLEI_RESPONSE_BYTES_LIMIT = 1_048_576
+ZAP_EXECUTION_TIMEOUT_SECONDS = 60
+ZAP_GATEWAY_TIMEOUT_SECONDS = 60
+ZAP_RESPONSE_BYTES_LIMIT = 1_048_576
 
 
 @dataclass(frozen=True, slots=True)
-class NucleiDockerResources:
+class ZapDockerResources:
     worker: str
     target: str
     gateway: str
@@ -51,47 +43,44 @@ class NucleiDockerResources:
     target_network: str
 
 
-def nuclei_docker_resources(invocation_id: str) -> NucleiDockerResources:
+def zap_docker_resources(invocation_id: str) -> ZapDockerResources:
     if not _ID.fullmatch(invocation_id):
-        raise ValueError("r123_nuclei_invocation_id_invalid")
+        raise ValueError("r123_zap_invocation_id_invalid")
     suffix = hashlib.sha256(invocation_id.encode("utf-8")).hexdigest()[:12]
-    return NucleiDockerResources(
-        worker=f"redagent-r123-nuclei-worker-{suffix}",
-        target=f"redagent-r123-nuclei-target-{suffix}",
-        gateway=f"redagent-r123-nuclei-gateway-{suffix}",
-        worker_network=f"redagent-r123-nuclei-worker-net-{suffix}",
-        target_network=f"redagent-r123-nuclei-target-net-{suffix}",
+    return ZapDockerResources(
+        worker=f"redagent-r123-zap-worker-{suffix}",
+        target=f"redagent-r123-zap-target-{suffix}",
+        gateway=f"redagent-r123-zap-gateway-{suffix}",
+        worker_network=f"redagent-r123-zap-worker-net-{suffix}",
+        target_network=f"redagent-r123-zap-target-net-{suffix}",
     )
 
 
-def build_nuclei_worker_command(
+def build_zap_worker_command(
     workspace: Path,
     *,
-    invocation: NucleiFixedInvocation,
+    invocation: ZapFixedInvocation,
     network: str,
-    results_path: Path,
+    runtime: Path,
 ) -> tuple[str, ...]:
-    """Return the only executable Nuclei command admitted by the compat_123 product path."""
+    """Return the only executable ZAP command admitted by the compat_123 product path."""
     root = workspace.resolve()
-    template = _contained(
-        root, root / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml"
-    )
-    certificate = _contained(root, root / "config/trust/r105-nuclei-user.crt")
-    results = _contained(root, results_path)
-    resources = nuclei_docker_resources(invocation.invocation_id)
+    plan = _contained(root, root / "config/r123-zap-passive.yaml")
+    runtime_path = _contained(root, runtime)
+    resources = zap_docker_resources(invocation.invocation_id)
     if (
-        invocation.profile_id != "nuclei-http-header-v1"
-        or invocation.argv != NUCLEI_FIXED_ARGV
+        invocation.profile_id != "zap-passive-v1"
+        or invocation.allowed_paths != ("/passive/missing-header",)
         or network != resources.worker_network
     ):
-        raise ValueError("r123_nuclei_transport_binding_invalid")
+        raise ValueError("r123_zap_transport_binding_invalid")
     return (
         "docker",
         "run",
         "--name",
         resources.worker,
         "--label",
-        "redagent.owner=r123-nuclei",
+        "redagent.owner=r123-zap",
         "--label",
         f"redagent.invocation={invocation.invocation_id}",
         "--network",
@@ -100,48 +89,44 @@ def build_nuclei_worker_command(
         "--cap-drop",
         "ALL",
         "--security-opt",
-        "no-new-privileges",
+        "no-new-privileges:true",
         "--pids-limit",
-        "64",
+        "192",
         "--memory",
-        "512m",
+        "2048m",
         "--cpus",
-        "1",
+        "2",
         "--tmpfs",
-        "/home/redagent:rw,noexec,nosuid,nodev,size=32m,mode=1777",
+        "/tmp:rw,noexec,nosuid,nodev,size=256m",
         "--tmpfs",
-        "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+        "/home/zap:rw,nosuid,nodev,size=768m,uid=1000,gid=1000,mode=0700",
         "--mount",
-        f"type=bind,source={template},target=/opt/redagent/bundle/templates/redagent-r105-missing-header.yaml,readonly",
+        f"type=bind,source={plan},target=/run/redagent/r123-zap-passive.yaml,readonly",
         "--mount",
-        f"type=bind,source={certificate},target=/run/redagent/nuclei-user.crt,readonly",
-        "--mount",
-        f"type=bind,source={results},target=/work/results.jsonl",
-        "-e",
-        "NUCLEI_USER_CERTIFICATE=/run/redagent/nuclei-user.crt",
+        f"type=bind,source={runtime_path},target=/work",
+        "--entrypoint",
+        invocation.argv[0],
         _IMAGE,
-        *invocation.argv,
+        *invocation.argv[1:],
     )
 
 
 def _contained(root: Path, path: Path) -> Path:
     resolved = path.resolve()
     if not resolved.is_relative_to(root) or resolved == root:
-        raise ValueError("r123_nuclei_transport_path_forbidden")
+        raise ValueError("r123_zap_transport_path_forbidden")
     return resolved
 
 
-class NucleiDockerTransport:
-    """Exact local Docker implementation; no caller-controlled target, template, or flags."""
+class ZapDockerTransport:
+    """Exact passive local Docker implementation with durable read-only receipt lookup."""
 
     def __init__(self, workspace: Path) -> None:
         self._workspace = workspace.resolve()
-        self._runtime = _contained(
-            self._workspace, self._workspace / ".local/redagent/r123-nuclei"
-        )
+        self._runtime = _contained(self._workspace, self._workspace / ".local/redagent/r123-zap")
 
-    async def execute(self, invocation: NucleiFixedInvocation) -> NucleiRuntimeReceipt:
-        resources = nuclei_docker_resources(invocation.invocation_id)
+    async def execute(self, invocation: ZapFixedInvocation) -> ZapRuntimeReceipt:
+        resources = zap_docker_resources(invocation.invocation_id)
         cancelled = threading.Event()
         task = asyncio.create_task(
             asyncio.to_thread(self._execute, invocation, resources, cancelled)
@@ -157,34 +142,34 @@ class NucleiDockerTransport:
                     resources,
                     invocation.invocation_id,
                 )
-            except BaseException:
+            except BaseException:  # noqa: BLE001
                 # CRITICAL: cleanup failure must not replace the caller's cancellation signal.
                 pass
             try:
                 await asyncio.wait_for(asyncio.shield(task), timeout=5)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # IMPORTANT: an adapter failure after cancellation must not mask CancelledError.
                 if not task.done():
                     task.add_done_callback(_consume_background_result)
             raise
 
-    async def lookup(self, invocation_id: str) -> NucleiRuntimeReceipt | None:
+    async def lookup(self, invocation_id: str) -> ZapRuntimeReceipt | None:
         return await asyncio.to_thread(self._lookup, invocation_id)
 
     def _execute(
         self,
-        invocation: NucleiFixedInvocation,
-        resources: NucleiDockerResources,
+        invocation: ZapFixedInvocation,
+        resources: ZapDockerResources,
         cancelled: threading.Event,
-    ) -> NucleiRuntimeReceipt:
+    ) -> ZapRuntimeReceipt:
         started_at = datetime.now(timezone.utc).replace(microsecond=0)
-        lock = self._validate_locked_inputs(invocation, now=started_at)
+        value = self._validate_locked_inputs(invocation, now=started_at)
         existing = self._lookup(invocation.invocation_id)
         if existing is not None:
             if existing.terminal_state != "not_applied":
                 return existing
             _receipt_path(self._runtime, invocation.invocation_id).unlink(missing_ok=True)
-        _raise_if_cancelled(cancelled, "nuclei")
+        _raise_if_cancelled(cancelled, "zap")
         self._cleanup(resources, invocation.invocation_id)
         self._runtime.mkdir(parents=True, exist_ok=True)
         run_root = _contained(
@@ -192,10 +177,11 @@ class NucleiDockerTransport:
             self._runtime / hashlib.sha256(invocation.invocation_id.encode()).hexdigest()[:24],
         )
         run_root.mkdir(parents=True, exist_ok=True)
-        results = run_root / "results.jsonl"
-        # CRITICAL: a crash-retry must never accept or be blocked by stale output.
-        results.unlink(missing_ok=True)
-        results.touch(exist_ok=False)
+        report_path = run_root / "zap-report.json"
+        # CRITICAL: a crash-retry must never accept output from an earlier attempt.
+        report_path.unlink(missing_ok=True)
+        auth = run_root / "r104-auth"
+        auth.write_text(hashlib.sha256(invocation.envelope_sha256.encode()).hexdigest(), encoding="utf-8")
         scanner_started = False
         failure_before_scanner = False
         primary_failure = False
@@ -205,112 +191,115 @@ class NucleiDockerTransport:
                 "--label", f"redagent.invocation={invocation.invocation_id}",
                 resources.worker_network,
             )
-            _raise_if_cancelled(cancelled, "nuclei")
+            _raise_if_cancelled(cancelled, "zap")
             self._docker(
                 "network", "create", "--internal", "--label", _OWNER,
                 "--label", f"redagent.invocation={invocation.invocation_id}",
                 resources.target_network,
             )
-            _raise_if_cancelled(cancelled, "nuclei")
+            _raise_if_cancelled(cancelled, "zap")
             self._docker(
                 *self._service_prefix(
                     resources.target,
                     resources.target_network,
                     invocation.invocation_id,
                 ),
-                "--network-alias", "redagent-r105-target",
-                "redagent/r105-target:1.0.1",
+                "--network-alias", "redagent-r104-target",
+                "--mount", f"type=bind,source={auth.resolve()},target=/run/redagent/r104-auth,readonly",
+                "redagent/r104-target:1.0.1",
             )
-            _raise_if_cancelled(cancelled, "nuclei")
+            _raise_if_cancelled(cancelled, "zap")
             target_ip = self._container_ip(resources.target, resources.target_network)
             policy = {
-                "schema": "redagent.r105-gateway-policy/v1",
+                "schema": "redagent.r104-gateway-policy/v1",
+                "profile_id": "zap-passive-v1",
                 "expected_target_ip": target_ip,
-                "allowed_paths": ["/nuclei/missing-header"],
+                "allowed_paths": ["/passive/missing-header"],
                 "request_limit": 20,
                 "request_rate_per_second": 2,
                 "concurrency": 1,
-                "timeout_seconds": 60,
-                "response_bytes_limit": NUCLEI_RESPONSE_BYTES_LIMIT,
+                "timeout_seconds": ZAP_GATEWAY_TIMEOUT_SECONDS,
+                "response_bytes_limit": ZAP_RESPONSE_BYTES_LIMIT,
+                "max_query_bytes": 0,
+                "inject_auth": False,
             }
             policy_path = run_root / "gateway-policy.json"
             policy_path.write_text(
                 json.dumps(policy, sort_keys=True, separators=(",", ":")) + "\n",
                 encoding="utf-8",
             )
-            gateway = [
+            self._docker(
                 *self._service_prefix(
                     resources.gateway,
                     resources.target_network,
                     invocation.invocation_id,
                 ),
-                "--network-alias",
-                "redagent-r105-gateway",
-                "--mount",
-                f"type=bind,source={policy_path.resolve()},target=/run/redagent/gateway-policy.json,readonly",
-                "redagent/r105-gateway:1.0.1",
-            ]
-            self._docker(*gateway)
+                "--network-alias", "redagent-r104-gateway",
+                "--mount", f"type=bind,source={policy_path.resolve()},target=/run/redagent/gateway-policy.json,readonly",
+                "--mount", f"type=bind,source={auth.resolve()},target=/run/redagent/r104-auth,readonly",
+                "redagent/r104-gateway:1.0.1",
+            )
             self._docker(
-                "network", "connect", "--alias", "redagent-r105-gateway",
+                "network", "connect", "--alias", "redagent-r104-gateway",
                 resources.worker_network, resources.gateway,
             )
-            _raise_if_cancelled(cancelled, "nuclei")
+            _raise_if_cancelled(cancelled, "zap")
             self._assert_topology(resources)
-            command = build_nuclei_worker_command(
+            command = build_zap_worker_command(
                 self._workspace,
                 invocation=invocation,
                 network=resources.worker_network,
-                results_path=results,
+                runtime=run_root,
             )
-            _raise_if_cancelled(cancelled, "nuclei")
+            _raise_if_cancelled(cancelled, "zap")
             scanner_started = True
-            self._run(command, timeout=NUCLEI_EXECUTION_TIMEOUT_SECONDS)
-            _raise_if_cancelled(cancelled, "nuclei")
-            observed_at = datetime.now(timezone.utc).replace(microsecond=0)
-            bundle = self._verify_promotions(lock, now=observed_at)
-            target = self._trusted_target(
-                observed_at, target_ip, resources.target_network
-            )
-            normalized = normalize_nuclei_jsonl(results.read_bytes(), bundle=bundle, target=target)
-            if len(normalized) != 1 or normalized[0].affected_resource != "/nuclei/missing-header":
-                raise RuntimeError("r123_nuclei_expected_finding_mismatch")
-            evidence_sha = hashlib.sha256(results.read_bytes()).hexdigest()
+            self._run(command, timeout=ZAP_EXECUTION_TIMEOUT_SECONDS)
+            _raise_if_cancelled(cancelled, "zap")
+            if not report_path.is_file() or not 1 <= report_path.stat().st_size <= 1024 * 1024:
+                raise RuntimeError("r123_zap_output_incomplete")
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            alerts = _report_alerts(report)
+            selected = _canonical_zap_alerts(alerts, rule_id="10021")
+            normalized = normalize_alerts(selected, profile_id=CertifiedProfileId.PASSIVE)
+            if not normalized:
+                raise RuntimeError("r123_zap_expected_alert_missing")
+            evidence_sha = hashlib.sha256(report_path.read_bytes()).hexdigest()
             findings = tuple(
                 NormalizedAdapterFindingV1(
-                    source_record_id=f"nuclei-{item.fingerprint[:24]}",
-                    tool="nuclei",
-                    tool_version="3.11.1",
-                    rule_id=item.template_id,
-                    rule_version="r105",
-                    database_version="r105-http-header-bundle:2",
+                    source_record_id=f"zap-{item.fingerprint[:24]}",
+                    tool="zap",
+                    tool_version="2.17.0",
+                    rule_id=item.rule_id,
+                    rule_version="r104",
+                    database_version="r104",
                     title=item.title,
                     resource_identity=f"owned-loopback:{item.affected_resource}",
                     location=item.affected_resource,
                     severity=item.severity,
-                    confidence="high",
+                    confidence=item.confidence,
                     taxonomy_ids=(),
                     control_ids=(),
                 )
                 for item in normalized
             )
-            receipt = NucleiRuntimeReceipt(
+            observed_at = datetime.now(timezone.utc).replace(microsecond=0)
+            self._verify_promotion(value, now=observed_at)
+            receipt = ZapRuntimeReceipt(
                 invocation_id=invocation.invocation_id,
                 effect_id=invocation.effect_id,
                 terminal_state="completed",
-                bundle_id=bundle.bundle_id,
-                bundle_revision=bundle.revision,
-                bundle_sha256=bundle.bundle_sha256,
-                signed_bundle_verified=True,
+                automation_plan_complete=True,
+                addon_inventory_count=ZAP_ADDON_INVENTORY_COUNT,
+                addon_inventory_sha256=ZAP_ADDON_INVENTORY_SHA256,
                 output_complete=True,
-                result_count=len(normalized),
+                active_request_count=0,
                 external_contact_count=0,
-                evidence_ids=(f"evidence-r123-nuclei-{evidence_sha[:24]}",),
+                evidence_ids=(f"evidence-r123-zap-{evidence_sha[:24]}",),
                 cleanup_receipt_id=f"cleanup-{invocation.invocation_id}",
                 external_receipt_id=f"receipt-{invocation.invocation_id}",
                 report_safe_payload={
                     "schema": "redagent.r123-result/v1",
-                    "adapter_id": "nuclei-service",
+                    "adapter_id": "zap-service",
                     "output_complete": True,
                     "findings": [asdict(item) for item in findings],
                 },
@@ -325,25 +314,24 @@ class NucleiDockerTransport:
             cleanup_complete = False
             try:
                 cleanup_complete = self._cleanup(resources, invocation.invocation_id)
-                results.unlink(missing_ok=True)
+                auth.unlink(missing_ok=True)
                 if failure_before_scanner and cleanup_complete:
                     observed_at = datetime.now(timezone.utc).replace(microsecond=0)
                     digest = hashlib.sha256(
                         f"{invocation.invocation_id}\0not-applied".encode()
                     ).hexdigest()[:24]
                     self._write_receipt(
-                        NucleiRuntimeReceipt(
+                        ZapRuntimeReceipt(
                             invocation_id=invocation.invocation_id,
                             effect_id=invocation.effect_id,
                             terminal_state="not_applied",
-                            bundle_id=invocation.bundle_id,
-                            bundle_revision=invocation.bundle_revision,
-                            bundle_sha256=invocation.bundle_sha256,
-                            signed_bundle_verified=False,
+                            automation_plan_complete=False,
+                            addon_inventory_count=0,
+                            addon_inventory_sha256="0" * 64,
                             output_complete=True,
-                            result_count=0,
+                            active_request_count=0,
                             external_contact_count=0,
-                            evidence_ids=(f"evidence-r123-nuclei-status-{digest}",),
+                            evidence_ids=(f"evidence-r123-zap-status-{digest}",),
                             cleanup_receipt_id=f"cleanup-{invocation.invocation_id}",
                             external_receipt_id=f"status-not-applied-{invocation.invocation_id}",
                             report_safe_payload=None,
@@ -357,92 +345,63 @@ class NucleiDockerTransport:
                 if not primary_failure:
                     raise
         if not cleanup_complete:
-            raise RuntimeError("r123_nuclei_cleanup_incomplete")
+            raise RuntimeError("r123_zap_cleanup_incomplete")
         self._write_receipt(receipt)
         return receipt
 
-    def _verify_promotions(
-        self,
-        lock: dict[str, object],
-        *,
-        now: datetime,
-    ):
-        planning = self._workspace / "runtime-assets" / "attestations"
-        qualification = (
-            planning / "260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
-        ).read_bytes()
-        artifact, _ = verify_current_nuclei_artifact_promotion(
-            promotion_bytes=(planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json").read_bytes(),
-            signature_bundle_bytes=(planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json").read_bytes(),
-            public_key_bytes=(planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub").read_bytes(),
-            runtime_lock_bytes=(self._workspace / "config/r105-nuclei-runtime-v2.json").read_bytes(),
-            qualification_bytes=qualification,
-            now=now,
-        )
-        bundle = verify_current_nuclei_bundle_promotion(
-            manifest_bytes=(self._workspace / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
-            signature_bundle_bytes=(planning / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json").read_bytes(),
-            public_key_bytes=(planning / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub").read_bytes(),
-            template_bytes=(self._workspace / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml").read_bytes(),
-            certificate_bytes=(self._workspace / "config/trust/r105-nuclei-user.crt").read_bytes(),
-            qualification_bytes=qualification,
-            now=now,
-        )
-        if artifact.image_digest != lock["engine_image_id"]:
-            raise RuntimeError("r123_nuclei_artifact_runtime_mismatch")
-        return bundle
-
-    def _trusted_target(
-        self,
-        now: datetime,
-        target_ip: str,
-        target_network: str,
-    ) -> NucleiTargetBinding:
-        return NucleiTargetBinding(
-            target_id="r123-owned-loopback-nuclei",
-            attestation_sha256=hashlib.sha256(
-                f"{target_ip}\0{target_network}\0r123".encode()
-            ).hexdigest(),
-            endpoint="http://redagent-r105-gateway:8080",
-            allowed_paths=("/nuclei/missing-header",),
-            # CRITICAL: the per-invocation Docker name is attestation material, not policy identity.
-            network_id=TARGET_NETWORK,
-            non_production=True,
-            issued_at=now,
-            expires_at=now + timedelta(minutes=15),
-        )
-
     def _validate_locked_inputs(
         self,
-        invocation: NucleiFixedInvocation,
+        invocation: ZapFixedInvocation,
         *,
         now: datetime,
     ) -> dict[str, object]:
-        value = self._lock()
-        # CRITICAL: runtime-lock identity is not current engine/bundle promotion authority.
-        self._verify_promotions(value, now=now)
-        expected = {
-            _IMAGE: value["local_image_id"],
-            "redagent/r105-target:1.0.1": value["target_image_id"],
-            "redagent/r105-gateway:1.0.1": value["gateway_image_id"],
-        }
-        for image, image_id in expected.items():
-            if self._docker("image", "inspect", image, "--format", "{{.Id}}").stdout.strip() != image_id:
-                raise RuntimeError("r123_nuclei_image_identity_mismatch")
-        if invocation.argv != NUCLEI_FIXED_ARGV:
-            raise ValueError("r123_nuclei_target_forbidden")
+        lock_path = self._workspace / "config/r104-zap-runtime-v2.json"
+        value = json.loads(lock_path.read_text(encoding="utf-8"))
+        if (
+            value.get("schema") != "redagent.r104-runtime-lock/v2"
+            or value.get("runtime_update_allowed") is not False
+            or value.get("external_target_allowed") is not False
+            or value.get("zap_addon_inventory_count") != ZAP_ADDON_INVENTORY_COUNT
+            or value.get("zap_addon_inventory_sha256") != ZAP_ADDON_INVENTORY_SHA256
+        ):
+            raise RuntimeError("r123_zap_runtime_lock_invalid")
+        # CRITICAL: runtime-lock identity is not current promotion authority.
+        self._verify_promotion(value, now=now)
+        for image, expected in (
+            (_IMAGE, value["engine_image_id"]),
+            ("redagent/r104-target:1.0.1", value["target_image_id"]),
+            ("redagent/r104-gateway:1.0.1", value["gateway_image_id"]),
+        ):
+            if self._docker("image", "inspect", image, "--format", "{{.Id}}").stdout.strip() != expected:
+                raise RuntimeError("r123_zap_image_identity_mismatch")
+        if invocation.argv != (
+            "/zap/zap.sh", "-cmd", "-autorun", "/run/redagent/r123-zap-passive.yaml"
+        ):
+            raise ValueError("r123_zap_command_forbidden")
         return value
 
-    def _lock(self) -> dict[str, object]:
-        value = json.loads((self._workspace / "config/r105-nuclei-runtime-v2.json").read_text(encoding="utf-8"))
-        if (
-            value.get("schema") != "redagent.r105-runtime-lock/v2"
-            or value.get("runtime_update_allowed") is not False
-            or value.get("community_templates_allowed") is not False
-            or value.get("external_target_allowed") is not False
-        ):
-            raise RuntimeError("r123_nuclei_runtime_lock_invalid")
-        return {**value, "local_image_id": value.get("engine_image_id")}
+    def _verify_promotion(self, lock: dict[str, object], *, now: datetime) -> None:
+        attestations = self._workspace / "runtime-assets" / "attestations"
+        receipt, _ = verify_current_zap_promotion(
+            promotion_bytes=(
+                attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json"
+            ).read_bytes(),
+            bundle_bytes=(
+                attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.sigstore.json"
+            ).read_bytes(),
+            public_key_bytes=(
+                attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.pub"
+            ).read_bytes(),
+            runtime_lock_bytes=(
+                self._workspace / "config/r104-zap-runtime-v2.json"
+            ).read_bytes(),
+            qualification_bytes=(
+                attestations / "260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
+            ).read_bytes(),
+            now=now,
+        )
+        if receipt.image_digest != lock["engine_image_id"]:
+            raise RuntimeError("r123_zap_promotion_runtime_mismatch")
 
     def _service_prefix(
         self,
@@ -453,18 +412,18 @@ class NucleiDockerTransport:
         return (
             "run", "-d", "--name", name, "--label", _OWNER,
             "--label", f"redagent.invocation={invocation_id}", "--network", network,
-            "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+            "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
             "--pids-limit", "64", "--memory", "128m", "--cpus", "0.5",
-            "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777",
+            "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=1m",
         )
 
-    def _assert_topology(self, resources: NucleiDockerResources) -> None:
+    def _assert_topology(self, resources: ZapDockerResources) -> None:
         target = self._inspect(resources.target)
         gateway = self._inspect(resources.gateway)
         if set(target["NetworkSettings"]["Networks"]) != {resources.target_network} or set(
             gateway["NetworkSettings"]["Networks"]
         ) != {resources.target_network, resources.worker_network}:
-            raise RuntimeError("r123_nuclei_network_boundary_invalid")
+            raise RuntimeError("r123_zap_network_boundary_invalid")
 
     def _container_ip(self, name: str, network: str) -> str:
         return str(self._inspect(name)["NetworkSettings"]["Networks"][network]["IPAddress"])
@@ -474,7 +433,7 @@ class NucleiDockerTransport:
 
     def _cleanup(
         self,
-        resources: NucleiDockerResources,
+        resources: ZapDockerResources,
         invocation_id: str,
     ) -> bool:
         for name in (resources.worker, resources.gateway, resources.target):
@@ -482,48 +441,48 @@ class NucleiDockerTransport:
             if result.returncode != 0:
                 if _docker_resource_absent(result):
                     continue
-                raise RuntimeError("r123_nuclei_cleanup_state_unknown")
+                raise RuntimeError("r123_zap_cleanup_state_unknown")
             value = json.loads(result.stdout)[0]
             labels = value.get("Config", {}).get("Labels", {})
             if (
-                labels.get("redagent.owner") != "r123-nuclei"
+                labels.get("redagent.owner") != "r123-zap"
                 or labels.get("redagent.invocation") != invocation_id
             ):
-                raise RuntimeError("r123_nuclei_resource_ownership_mismatch")
+                raise RuntimeError("r123_zap_resource_ownership_mismatch")
             removed = self._docker("rm", "-f", name, check=False)
             if removed.returncode != 0:
-                raise RuntimeError("r123_nuclei_cleanup_remove_failed")
+                raise RuntimeError("r123_zap_cleanup_remove_failed")
         for name in (resources.worker_network, resources.target_network):
             result = self._docker("network", "inspect", name, check=False)
             if result.returncode != 0:
                 if _docker_resource_absent(result):
                     continue
-                raise RuntimeError("r123_nuclei_cleanup_state_unknown")
+                raise RuntimeError("r123_zap_cleanup_state_unknown")
             value = json.loads(result.stdout)[0]
             labels = value.get("Labels", {})
             if (
-                labels.get("redagent.owner") != "r123-nuclei"
+                labels.get("redagent.owner") != "r123-zap"
                 or labels.get("redagent.invocation") != invocation_id
             ):
-                raise RuntimeError("r123_nuclei_resource_ownership_mismatch")
+                raise RuntimeError("r123_zap_resource_ownership_mismatch")
             removed = self._docker("network", "rm", name, check=False)
             if removed.returncode != 0:
-                raise RuntimeError("r123_nuclei_cleanup_remove_failed")
+                raise RuntimeError("r123_zap_cleanup_remove_failed")
         for name in (resources.worker, resources.gateway, resources.target):
             result = self._docker("inspect", name, check=False)
             if result.returncode == 0:
                 return False
             if not _docker_resource_absent(result):
-                raise RuntimeError("r123_nuclei_cleanup_state_unknown")
+                raise RuntimeError("r123_zap_cleanup_state_unknown")
         for name in (resources.worker_network, resources.target_network):
             result = self._docker("network", "inspect", name, check=False)
             if result.returncode == 0:
                 return False
             if not _docker_resource_absent(result):
-                raise RuntimeError("r123_nuclei_cleanup_state_unknown")
+                raise RuntimeError("r123_zap_cleanup_state_unknown")
         return True
 
-    def _write_receipt(self, receipt: NucleiRuntimeReceipt) -> None:
+    def _write_receipt(self, receipt: ZapRuntimeReceipt) -> None:
         self._runtime.mkdir(parents=True, exist_ok=True)
         path = _receipt_path(self._runtime, receipt.invocation_id)
         payload = asdict(receipt)
@@ -534,17 +493,17 @@ class NucleiDockerTransport:
             json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
         )
 
-    def _lookup(self, invocation_id: str) -> NucleiRuntimeReceipt | None:
+    def _lookup(self, invocation_id: str) -> ZapRuntimeReceipt | None:
         if not _ID.fullmatch(invocation_id):
-            raise ValueError("r123_nuclei_invocation_id_invalid")
+            raise ValueError("r123_zap_invocation_id_invalid")
         path = _receipt_path(self._runtime, invocation_id)
         if not path.is_file():
             return None
         if not 1 <= path.stat().st_size <= 1_048_576:
-            raise ValueError("r123_nuclei_receipt_size_invalid")
+            raise ValueError("r123_zap_receipt_size_invalid")
         value = json.loads(path.read_text(encoding="utf-8"))
         if value.get("invocation_id") != invocation_id:
-            raise ValueError("r123_nuclei_receipt_binding_mismatch")
+            raise ValueError("r123_zap_receipt_binding_mismatch")
         value["evidence_ids"] = tuple(value["evidence_ids"])
         value["normalized_findings"] = tuple(
             NormalizedAdapterFindingV1(**item)
@@ -552,7 +511,7 @@ class NucleiDockerTransport:
         )
         if value.get("observed_at") is not None:
             value["observed_at"] = datetime.fromisoformat(value["observed_at"])
-        return NucleiRuntimeReceipt(**value)
+        return ZapRuntimeReceipt(**value)
 
     def _docker(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return self._run(("docker", *args), check=check)
@@ -560,17 +519,11 @@ class NucleiDockerTransport:
         self, command: tuple[str, ...], *, check: bool = True, timeout: int = 60
     ) -> subprocess.CompletedProcess[str]:
         result = subprocess.run(
-            command,
-            cwd=self._workspace,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            check=False,
-            timeout=timeout,
+            command, cwd=self._workspace, text=True, encoding="utf-8", errors="replace",
+            capture_output=True, check=False, timeout=timeout,
         )
         if check and result.returncode:
-            raise RuntimeError(f"r123_nuclei_docker_failed:{command[1]}:{result.returncode}")
+            raise RuntimeError(f"r123_zap_docker_failed:{command[1]}:{result.returncode}")
         return result
 
 
@@ -597,7 +550,7 @@ def _raise_if_cancelled(cancelled: threading.Event, adapter: str) -> None:
 def _consume_background_result(task: asyncio.Task[object]) -> None:
     try:
         task.exception()
-    except BaseException:
+    except BaseException:  # noqa: BLE001
         pass
 
 
@@ -627,3 +580,66 @@ def _atomic_write_text(path: Path, value: str) -> None:
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _report_alerts(value: object) -> list[dict[str, object]]:
+    alerts: list[dict[str, object]] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "alerts" and isinstance(item, list):
+                alerts.extend(entry for entry in item if isinstance(entry, dict))
+            else:
+                alerts.extend(_report_alerts(item))
+    elif isinstance(value, list):
+        for item in value:
+            alerts.extend(_report_alerts(item))
+    return alerts
+
+
+def _canonical_zap_alerts(
+    alerts: list[dict[str, object]],
+    *,
+    rule_id: str,
+) -> list[dict[str, object]]:
+    """Map the two reviewed ZAP JSON shapes into the strict compat_104 normalizer schema."""
+    if len(alerts) > 1000:
+        raise ValueError("r123_zap_alert_count_exceeded")
+    risk = {"0": "informational", "1": "low", "2": "medium", "3": "high"}
+    confidence = {"1": "low", "2": "medium", "3": "high", "4": "confirmed"}
+    output: list[dict[str, object]] = []
+    for alert in alerts:
+        api_rule = alert.get("pluginId")
+        report_rule = alert.get("pluginid")
+        if api_rule is not None and report_rule is not None and api_rule != report_rule:
+            raise ValueError("r123_zap_alert_rule_ambiguous")
+        observed_rule = api_rule if api_rule is not None else report_rule
+        if str(observed_rule) != rule_id:
+            continue
+        if api_rule is not None:
+            output.append({
+                name: alert.get(name)
+                for name in ("pluginId", "name", "risk", "confidence", "method", "url")
+            })
+            continue
+        instances = alert.get("instances")
+        if not isinstance(instances, list) or not 1 <= len(instances) <= 100:
+            raise ValueError("r123_zap_alert_instances_invalid")
+        mapped_risk = risk.get(str(alert.get("riskcode")))
+        mapped_confidence = confidence.get(str(alert.get("confidence")))
+        title = alert.get("name")
+        if mapped_risk is None or mapped_confidence is None or not isinstance(title, str):
+            raise ValueError("r123_zap_alert_summary_invalid")
+        for instance in instances:
+            if not isinstance(instance, dict):
+                raise ValueError("r123_zap_alert_instance_invalid")
+            output.append({
+                "pluginId": rule_id,
+                "name": title,
+                "risk": mapped_risk,
+                "confidence": mapped_confidence,
+                "method": instance.get("method"),
+                "url": instance.get("uri"),
+            })
+    if len(output) > 1000:
+        raise ValueError("r123_zap_alert_count_exceeded")
+    return output

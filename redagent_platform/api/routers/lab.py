@@ -6,13 +6,13 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
+from fastapi import (
     Depends,
-    LabDashboardResponse,
-    LabRepository,
     Request,
-    RequestGuard,
 )
+from redagent_platform.api.contracts import RequestGuard
+from redagent_platform.api.schemas.lab import LabDashboardResponse
+from redagent_platform.lab_service.repository import LabRepository
 
 def register_lab_routes(app: APIRouter, dependencies: ApiDependencies) -> None:
     require_guard = dependencies.require_guard

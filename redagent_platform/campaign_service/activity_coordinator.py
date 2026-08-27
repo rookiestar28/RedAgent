@@ -22,16 +22,16 @@ from redagent_platform.campaign_service.service import (
     EffectAmbiguityPersistenceError,
     EffectDispatchCommand,
     EffectReconciliationCommand,
-    R123EffectCoordinator,
+    CampaignEffectCoordinator,
 )
 from redagent_platform.orchestration.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    R123ContainActivityCommand,
-    R123ContainActivityResult,
-    R123DispatchActivityCommand,
-    R123DispatchActivityResult,
-    R123ReconcileActivityCommand,
-    R123ReconcileActivityResult,
+    ClosedLoopContainActivityCommand,
+    ClosedLoopContainActivityResult,
+    ClosedLoopDispatchActivityCommand,
+    ClosedLoopDispatchActivityResult,
+    ClosedLoopReconcileActivityCommand,
+    ClosedLoopReconcileActivityResult,
 )
 
 
@@ -80,7 +80,7 @@ class ContainmentCommit:
 class CampaignActivityStateOwner(Protocol):
     async def read_reconcile(
         self,
-        command: R123ReconcileActivityCommand,
+        command: ClosedLoopReconcileActivityCommand,
         *,
         now: datetime,
         correlation_id: str,
@@ -88,7 +88,7 @@ class CampaignActivityStateOwner(Protocol):
 
     async def commit_reconcile(
         self,
-        command: R123ReconcileActivityCommand,
+        command: ClosedLoopReconcileActivityCommand,
         material: ReconcileMaterial,
         decision: ReconcileResultV1,
         *,
@@ -98,7 +98,7 @@ class CampaignActivityStateOwner(Protocol):
 
     async def read_dispatch(
         self,
-        command: R123DispatchActivityCommand,
+        command: ClosedLoopDispatchActivityCommand,
         *,
         now: datetime,
         correlation_id: str,
@@ -106,7 +106,7 @@ class CampaignActivityStateOwner(Protocol):
 
     async def commit_dispatch(
         self,
-        command: R123DispatchActivityCommand,
+        command: ClosedLoopDispatchActivityCommand,
         material: DispatchMaterial,
         *,
         state: str,
@@ -117,31 +117,31 @@ class CampaignActivityStateOwner(Protocol):
 
     async def contain(
         self,
-        command: R123ContainActivityCommand,
+        command: ClosedLoopContainActivityCommand,
         *,
         now: datetime,
         correlation_id: str,
     ) -> ContainmentCommit: ...
 
 
-class R123ActivityCoordinator:
+class CampaignActivityCoordinator:
     """Bind Temporal commands to fresh PostgreSQL-owned state and side effects."""
 
     def __init__(
         self,
         state_owner: CampaignActivityStateOwner,
-        effect_coordinator: R123EffectCoordinator,
+        effect_coordinator: CampaignEffectCoordinator,
     ) -> None:
         self._state_owner = state_owner
         self._effect_coordinator = effect_coordinator
 
     async def reconcile(
         self,
-        command: R123ReconcileActivityCommand,
+        command: ClosedLoopReconcileActivityCommand,
         *,
         occurred_at: datetime,
         correlation_id: str,
-    ) -> R123ReconcileActivityResult:
+    ) -> ClosedLoopReconcileActivityResult:
         material = await self._state_owner.read_reconcile(
             command, now=occurred_at, correlation_id=correlation_id
         )
@@ -177,7 +177,7 @@ class R123ActivityCoordinator:
             if decision.retry_at is None:
                 raise RuntimeError("r123_reconcile_retry_missing")
             retry_delay = max(1, min(300, int((decision.retry_at - occurred_at).total_seconds())))
-        return R123ReconcileActivityResult(
+        return ClosedLoopReconcileActivityResult(
             schema_version=CONTRACT_SCHEMA_VERSION,
             campaign_id=material.campaign_id,
             strategy_revision_id=material.strategy_revision_id,
@@ -200,11 +200,11 @@ class R123ActivityCoordinator:
 
     async def dispatch(
         self,
-        command: R123DispatchActivityCommand,
+        command: ClosedLoopDispatchActivityCommand,
         *,
         occurred_at: datetime,
         correlation_id: str,
-    ) -> R123DispatchActivityResult:
+    ) -> ClosedLoopDispatchActivityResult:
         material = await self._state_owner.read_dispatch(
             command, now=occurred_at, correlation_id=correlation_id
         )
@@ -216,7 +216,7 @@ class R123ActivityCoordinator:
                 "blocked",
             } or material.committed_revision <= command.expected_revision:
                 raise ValueError("r123_dispatch_replay_invalid")
-            return R123DispatchActivityResult(
+            return ClosedLoopDispatchActivityResult(
                 schema_version=CONTRACT_SCHEMA_VERSION,
                 campaign_id=material.campaign_id,
                 effect_id=material.effect_id,
@@ -250,7 +250,7 @@ class R123ActivityCoordinator:
                         now=occurred_at,
                         correlation_id=correlation_id,
                     ))
-                except BaseException:
+                except BaseException:  # noqa: BLE001
                     exc.add_note("activity_ambiguity_fallback_persistence_failed")
                 raise
             except EffectAmbiguityPersistenceError:
@@ -274,7 +274,7 @@ class R123ActivityCoordinator:
         )
         if revision <= command.expected_revision:
             raise RuntimeError("r123_dispatch_revision_not_advanced")
-        return R123DispatchActivityResult(
+        return ClosedLoopDispatchActivityResult(
             schema_version=CONTRACT_SCHEMA_VERSION,
             campaign_id=material.campaign_id,
             effect_id=material.effect_id,
@@ -285,11 +285,11 @@ class R123ActivityCoordinator:
 
     async def contain(
         self,
-        command: R123ContainActivityCommand,
+        command: ClosedLoopContainActivityCommand,
         *,
         occurred_at: datetime,
         correlation_id: str,
-    ) -> R123ContainActivityResult:
+    ) -> ClosedLoopContainActivityResult:
         result = await self._state_owner.contain(
             command, now=occurred_at, correlation_id=correlation_id
         )
@@ -297,7 +297,7 @@ class R123ActivityCoordinator:
             raise ValueError("r123_containment_campaign_mismatch")
         if result.revision <= command.expected_revision:
             raise RuntimeError("r123_containment_revision_not_advanced")
-        return R123ContainActivityResult(
+        return ClosedLoopContainActivityResult(
             schema_version=CONTRACT_SCHEMA_VERSION,
             campaign_id=result.campaign_id,
             state=result.state,
@@ -307,7 +307,7 @@ class R123ActivityCoordinator:
 
 
 def _validate_reconcile_binding(
-    command: R123ReconcileActivityCommand, material: ReconcileMaterial
+    command: ClosedLoopReconcileActivityCommand, material: ReconcileMaterial
 ) -> None:
     if (
         material.tenant_id != command.tenant_id
@@ -324,7 +324,7 @@ def _validate_reconcile_binding(
 
 
 def _validate_dispatch_binding(
-    command: R123DispatchActivityCommand, material: DispatchMaterial
+    command: ClosedLoopDispatchActivityCommand, material: DispatchMaterial
 ) -> None:
     effect = material.effect_command
     if (

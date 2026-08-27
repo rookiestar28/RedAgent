@@ -1,0 +1,2 @@
+ruleDirs:
+  - config/validation/ast-grep

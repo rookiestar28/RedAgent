@@ -99,7 +99,7 @@ _STATUS_BY_DECISION = {
 }
 
 
-def r021_statuses_supported() -> bool:
+def statuses_supported() -> bool:
     return REQUIRED_R021_STATUSES.issubset(set(FindingStatus))
 
 

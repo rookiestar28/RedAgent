@@ -1,0 +1,1034 @@
+redagent_platform/adapter_certification.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, tuple[dict[str, object], ...] | str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/adapter_certification.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/adapter_certification.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/agent_kernel/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/agent_kernel/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/agent_kernel/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/agent_kernel/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/agent_kernel/repository.py:0: error: No overload variant of "min" matches argument types "object", "datetime"  [call-overload]
+redagent_platform/agent_kernel/repository.py:0: error: Unsupported operand types for < ("datetime" and "object")  [operator]
+redagent_platform/agent_kernel/repository.py:0: error: Unsupported operand types for >= ("datetime" and "object")  [operator]
+redagent_platform/agent_kernel/repository.py:0: note: Possible overload variants:
+redagent_platform/agent_kernel/repository.py:0: note: Possible overload variants:
+redagent_platform/agent_kernel/repository.py:0: note: Possible overload variants:
+redagent_platform/agent_kernel/repository.py:0: note: Possible overload variants:
+redagent_platform/agent_kernel/repository.py:0: note: Possible overload variants:
+redagent_platform/agent_kernel/repository.py:0: note: def [SupportsRichComparisonT: SupportsDunderLT[Any] | SupportsDunderGT[Any], _T] min(Iterable[SupportsRichComparisonT], /, *, key: None = ..., default: _T) -> SupportsRichComparisonT | _T
+redagent_platform/agent_kernel/repository.py:0: note: def [SupportsRichComparisonT: SupportsDunderLT[Any] | SupportsDunderGT[Any]] min(Iterable[SupportsRichComparisonT], /, *, key: None = ...) -> SupportsRichComparisonT
+redagent_platform/agent_kernel/repository.py:0: note: def [SupportsRichComparisonT: SupportsDunderLT[Any] | SupportsDunderGT[Any]] min(SupportsRichComparisonT, SupportsRichComparisonT, /, *_args: SupportsRichComparisonT, key: None = ...) -> SupportsRichComparisonT
+redagent_platform/agent_kernel/repository.py:0: note: def [_T1, _T2] min(Iterable[_T1], /, *, key: Callable[[_T1], SupportsDunderLT[Any] | SupportsDunderGT[Any]], default: _T2) -> _T1 | _T2
+redagent_platform/agent_kernel/repository.py:0: note: def [_T] min(Iterable[_T], /, *, key: Callable[[_T], SupportsDunderLT[Any] | SupportsDunderGT[Any]]) -> _T
+redagent_platform/agent_kernel/repository.py:0: note: def [_T] min(_T, _T, /, *_args: _T, key: Callable[[_T], SupportsDunderLT[Any] | SupportsDunderGT[Any]]) -> _T
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/agent_kernel/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/app.py:0: error: Argument 1 to "PolicyBoundaryEnforcer" has incompatible type "object"; expected "PolicyDecisionProvider"  [arg-type]
+redagent_platform/api/dependencies.py:0: error: "object" has no attribute "enforce_csrf"  [attr-defined]
+redagent_platform/api/dependencies.py:0: error: "object" has no attribute "resolve_request"  [attr-defined]
+redagent_platform/api/routers/api_differential.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/api/routers/api_differential.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/api/routers/artifact.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/artifact.py:0: error: No overload variant of "list" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/artifact.py:0: note: Possible overload variants:
+redagent_platform/api/routers/artifact.py:0: note: Possible overload variants:
+redagent_platform/api/routers/artifact.py:0: note: def [_T] list() -> list[_T]
+redagent_platform/api/routers/artifact.py:0: note: def [_T] list(Iterable[_T], /) -> list[_T]
+redagent_platform/api/routers/artifact.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/artifact.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/cloud.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/cloud.py:0: error: No overload variant of "list" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/cloud.py:0: note: Possible overload variants:
+redagent_platform/api/routers/cloud.py:0: note: Possible overload variants:
+redagent_platform/api/routers/cloud.py:0: note: def [_T] list() -> list[_T]
+redagent_platform/api/routers/cloud.py:0: note: def [_T] list(Iterable[_T], /) -> list[_T]
+redagent_platform/api/routers/cloud.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/cloud.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/finding_operations.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/finding_operations.py:0: note: Possible overload variants:
+redagent_platform/api/routers/finding_operations.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/finding_operations.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/human_simulation.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/human_simulation.py:0: note: Possible overload variants:
+redagent_platform/api/routers/human_simulation.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/human_simulation.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/identity_saas.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/identity_saas.py:0: error: No overload variant of "list" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/identity_saas.py:0: note: Possible overload variants:
+redagent_platform/api/routers/identity_saas.py:0: note: Possible overload variants:
+redagent_platform/api/routers/identity_saas.py:0: note: def [_T] list() -> list[_T]
+redagent_platform/api/routers/identity_saas.py:0: note: def [_T] list(Iterable[_T], /) -> list[_T]
+redagent_platform/api/routers/identity_saas.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/identity_saas.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/jobs.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/jobs.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/jobs.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/jobs.py:0: note: Possible overload variants:
+redagent_platform/api/routers/jobs.py:0: note: Possible overload variants:
+redagent_platform/api/routers/jobs.py:0: note: Possible overload variants:
+redagent_platform/api/routers/jobs.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/jobs.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/jobs.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/jobs.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/jobs.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/jobs.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/lab.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/lab.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/lab.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/api/routers/lab.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/api/routers/network.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/network.py:0: note: Possible overload variants:
+redagent_platform/api/routers/network.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/network.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/nuclei.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/api/routers/nuclei.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/api/routers/purple.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api/routers/purple.py:0: note: Possible overload variants:
+redagent_platform/api/routers/purple.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api/routers/purple.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/routers/zap.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/api/runtime.py:0: error: Argument "environment" to "OperatorShellContextData" has incompatible type "str"; expected "Literal['local', 'production', 'unknown']"  [arg-type]
+redagent_platform/api/runtime.py:0: error: Argument "safety_profile" to "OperatorShellContextData" has incompatible type "str"; expected "Literal['synthetic-local', 'local-conformance', 'production', 'unknown']"  [arg-type]
+redagent_platform/api_differential_service/compiler.py:0: error: Incompatible types in assignment (expression has type "tuple[str, str]", variable has type "tuple[str, str, str]")  [assignment]
+redagent_platform/api_differential_service/compiler.py:0: error: Incompatible types in assignment (expression has type "tuple[str]", variable has type "tuple[str, str, str]")  [assignment]
+redagent_platform/api_differential_service/compiler.py:0: error: Incompatible types in assignment (expression has type "tuple[str]", variable has type "tuple[str, str, str]")  [assignment]
+redagent_platform/api_differential_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api_differential_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api_differential_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api_differential_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/api_differential_service/repository.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/api_differential_service/repository.py:0: note: Possible overload variants:
+redagent_platform/api_differential_service/repository.py:0: note: Possible overload variants:
+redagent_platform/api_differential_service/repository.py:0: note: Possible overload variants:
+redagent_platform/api_differential_service/repository.py:0: note: Possible overload variants:
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api_differential_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/artifact_pipeline/analysis.py:0: error: Invalid index type "str | None" for "Mapping[str, tuple[str, str]]"; expected type "str"  [index]
+redagent_platform/artifact_pipeline/repository.py:0: error: Unsupported operand types for >= ("datetime" and "object")  [operator]
+redagent_platform/auth_sessions.py:0: error: Incompatible return value type (got "tuple[tuple[dict[str, str], ...], bool]", expected "tuple[tuple[dict[str, str], bool]]")  [return-value]
+redagent_platform/auth_sessions.py:0: error: Need more than 1 value to unpack (2 expected)  [misc]
+redagent_platform/auth_sessions.py:0: error: Need more than 1 value to unpack (2 expected)  [misc]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/activity_store.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/api.py:0: error: "object" has no attribute "idempotency_key"  [attr-defined]
+redagent_platform/campaign_service/api.py:0: error: "object" has no attribute "security"  [attr-defined]
+redagent_platform/campaign_service/api.py:0: error: "object" has no attribute "security"  [attr-defined]
+redagent_platform/campaign_service/api.py:0: error: Argument "schema_version" to "CampaignStatusData" has incompatible type "str"; expected "Literal['redagent.r123-campaign-status/v1']"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "CampaignQualificationData" has incompatible type "**dict[str, object]"; expected "Literal['dispatch_pending']"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "CampaignQualificationData" has incompatible type "**dict[str, object]"; expected "Literal['redagent.r123-qualification-start-receipt/v1']"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "CampaignQualificationData" has incompatible type "**dict[str, object]"; expected "Literal[1]"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "CampaignQualificationData" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/api.py:0: error: Argument 1 to "Depends" has incompatible type "object"; expected "Callable[..., Any] | None"  [arg-type]
+redagent_platform/campaign_service/composition.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/composition.py:0: error: Argument "presentation" to "CampaignCoreService" has incompatible type "PostgresCampaignCorePresentationOwner"; expected "CampaignCorePresentationOwner | None"  [arg-type]
+redagent_platform/campaign_service/composition.py:0: error: Argument "recovery" to "CampaignCoreService" has incompatible type "PostgresCampaignCoreRecoveryOwner"; expected "CampaignCoreRecoveryOwner | None"  [arg-type]
+redagent_platform/campaign_service/composition.py:0: error: Argument 1 to "CampaignCoreService" has incompatible type "PostgresCampaignCoreAuthorizedOptionOwner"; expected "CampaignCoreAuthorizedOptionOwner"  [arg-type]
+redagent_platform/campaign_service/composition.py:0: error: Argument 2 to "RunnerOwnedCampaignDispatcher" has incompatible type "PostgresRunnerLifecycleOwner"; expected "RunnerLifecycleOwner"  [arg-type]
+redagent_platform/campaign_service/composition.py:0: error: Argument 3 to "CampaignStartService" has incompatible type "PostgresCampaignStartStore"; expected "CampaignStartStore"  [arg-type]
+redagent_platform/campaign_service/composition.py:0: note: <2 more conflict(s) not shown>
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Expected:
+redagent_platform/campaign_service/composition.py:0: note: Following member(s) of "PostgresCampaignCoreAuthorizedOptionOwner" have conflicts:
+redagent_platform/campaign_service/composition.py:0: note: Following member(s) of "PostgresCampaignCorePresentationOwner" have conflicts:
+redagent_platform/campaign_service/composition.py:0: note: Following member(s) of "PostgresCampaignCoreRecoveryOwner" have conflicts:
+redagent_platform/campaign_service/composition.py:0: note: Following member(s) of "PostgresCampaignStartStore" have conflicts:
+redagent_platform/campaign_service/composition.py:0: note: Following member(s) of "PostgresRunnerLifecycleOwner" have conflicts:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: Got:
+redagent_platform/campaign_service/composition.py:0: note: def ambiguity(self, request: CampaignAdapterRequest, handle: PostgresRunnerLifecycleHandle, *, failure_code: str, occurred_at: datetime) -> Coroutine[Any, Any, None]
+redagent_platform/campaign_service/composition.py:0: note: def ambiguity(self, request: CampaignAdapterRequest, handle: object, *, failure_code: str, occurred_at: datetime) -> Coroutine[Any, Any, None]
+redagent_platform/campaign_service/composition.py:0: note: def complete(self, request: CampaignAdapterRequest, handle: PostgresRunnerLifecycleHandle, receipt: AdapterTerminalReceipt, *, occurred_at: datetime) -> Coroutine[Any, Any, AdapterTerminalReceipt]
+redagent_platform/campaign_service/composition.py:0: note: def complete(self, request: CampaignAdapterRequest, handle: object, receipt: AdapterTerminalReceipt, *, occurred_at: datetime) -> Coroutine[Any, Any, AdapterTerminalReceipt]
+redagent_platform/campaign_service/composition.py:0: note: def inspect_campaign(self, **values: object) -> Coroutine[Any, Any, dict[str, object]]
+redagent_platform/campaign_service/composition.py:0: note: def inspect_campaign(self, *, tenant_id: str, principal_id: str, campaign_id: str, now: datetime) -> Coroutine[Any, Any, dict[str, object]]
+redagent_platform/campaign_service/composition.py:0: note: def list_attention(self, **values: object) -> Coroutine[Any, Any, dict[str, object]]
+redagent_platform/campaign_service/composition.py:0: note: def list_attention(self, *, tenant_id: str, principal_id: str, limit: int, cursor: str | None, now: datetime) -> Coroutine[Any, Any, dict[str, object]]
+redagent_platform/campaign_service/composition.py:0: note: def list_engagements(self, *, tenant_id: str, principal_id: str, now: datetime) -> Coroutine[Any, Any, tuple[CampaignCoreAuthorizedResource, ...]]
+redagent_platform/campaign_service/composition.py:0: note: def list_engagements(self, *, tenant_id: str, principal_id: str, now: datetime) -> Coroutine[Any, Any, tuple[object, ...]]
+redagent_platform/campaign_service/composition.py:0: note: def list_targets(self, *, tenant_id: str, principal_id: str, engagement_id: str, now: datetime) -> Coroutine[Any, Any, tuple[CampaignCoreAuthorizedResource, ...]]
+redagent_platform/campaign_service/composition.py:0: note: def list_targets(self, *, tenant_id: str, principal_id: str, engagement_id: str, now: datetime) -> Coroutine[Any, Any, tuple[object, ...]]
+redagent_platform/campaign_service/composition.py:0: note: def recover(self, **values: object) -> Coroutine[Any, Any, object]
+redagent_platform/campaign_service/composition.py:0: note: def recover(self, *, tenant_id: str, campaign_id: str, signal_id: str, actor_user_id: str, reason_sha256: str, expected_revision: int, idempotency_key: str, request_sha256: str, now: datetime, correlation_id: str) -> Coroutine[Any, Any, CampaignCoreRecoveryCommit]
+redagent_platform/campaign_service/composition.py:0: note: def replay(self, **values: object) -> Coroutine[Any, Any, object | None]
+redagent_platform/campaign_service/composition.py:0: note: def replay(self, *, tenant_id: str, actor_user_id: str, idempotency_key: str, request_sha256: str) -> Coroutine[Any, Any, CampaignTransitionResult | None]
+redagent_platform/campaign_service/context.py:0: error: "FactConflictV1" has no attribute "identity_body"  [attr-defined]
+redagent_platform/campaign_service/context.py:0: error: Argument 1 to "append" of "list" has incompatible type "FactConflictV1"; expected "ObservationFactV1"  [arg-type]
+redagent_platform/campaign_service/context.py:0: error: Incompatible types in assignment (expression has type "ObservationFactV1", variable has type "FactConflictV1")  [assignment]
+redagent_platform/campaign_service/execution.py:0: error: Argument 2 to "ApprovalReceiptV1" has incompatible type "**dict[str, object]"; expected "datetime"  [arg-type]
+redagent_platform/campaign_service/execution.py:0: error: Argument 2 to "ApprovalReceiptV1" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/campaign_service/execution.py:0: error: Argument 2 to "ApprovalReceiptV1" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/campaign_service/execution.py:0: error: No overload variant of "asdict" matches argument type "object"  [call-overload]
+redagent_platform/campaign_service/execution.py:0: note: Possible overload variants:
+redagent_platform/campaign_service/execution.py:0: note: def [_T] asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, Any]]], _T]) -> _T
+redagent_platform/campaign_service/execution.py:0: note: def asdict(obj: DataclassInstance) -> dict[str, Any]
+redagent_platform/campaign_service/relay_runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/relay_runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/relay_runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/relay_runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "CampaignRepository" has incompatible type "object"; expected "AsyncSession"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "acknowledge_workflow_start" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "acknowledge_workflow_start" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "datetime"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "acknowledge_workflow_start" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "claim_workflow_starts" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "datetime"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "claim_workflow_starts" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "claim_workflow_starts" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "record_workflow_start_failure" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "datetime"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "record_workflow_start_failure" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Argument 1 to "record_workflow_start_failure" of "CampaignRepository" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/campaign_service/relay_runtime.py:0: error: Function does not return a value (it only ever returns None)  [func-returns-value]
+redagent_platform/campaign_service/repository.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/repository.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/repository.py:0: error: Argument "adapter_accepted" to "EffectReceiptV1" has incompatible type "object"; expected "bool"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "cleanup_receipt_id" to "EffectReceiptV1" has incompatible type "object"; expected "str | None"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "dispatch_attempt" to "EffectReceiptV1" has incompatible type "object"; expected "int"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "dispatch_generation" to "EffectReceiptV1" has incompatible type "object"; expected "int"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "effect_id" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "effect_intent_sha256" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "envelope_sha256" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "external_contact_count" to "EffectReceiptV1" has incompatible type "object"; expected "int"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "external_receipt_id" to "EffectReceiptV1" has incompatible type "object"; expected "str | None"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "external_status" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "failure_code" to "EffectReceiptV1" has incompatible type "object"; expected "str | None"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "output_complete" to "EffectReceiptV1" has incompatible type "object"; expected "bool"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "payload" to "_record_transition" of "CampaignRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "redispatch_permitted" to "EffectReceiptV1" has incompatible type "object"; expected "bool"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "request_sha256" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "runner_id" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "schema_version" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument "workload_identity" to "EffectReceiptV1" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument 1 to "fromisoformat" of "date" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument 1 to "fromisoformat" of "date" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Argument 2 to "_json_object" has incompatible type "str"; expected "dict[str, object]"  [arg-type]
+redagent_platform/campaign_service/repository.py:0: error: Incompatible types in assignment (expression has type "dict[str, object]", variable has type "str")  [assignment]
+redagent_platform/campaign_service/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/campaign_service/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/campaign_service/resolver.py:0: error: Argument 2 to "_aware" has incompatible type "str"; expected "datetime"  [arg-type]
+redagent_platform/campaign_service/resolver.py:0: error: Incompatible types in assignment (expression has type "bool", variable has type "str")  [assignment]
+redagent_platform/campaign_service/resolver.py:0: error: Incompatible types in assignment (expression has type "datetime", variable has type "str")  [assignment]
+redagent_platform/campaign_service/resolver.py:0: error: Incompatible types in assignment (expression has type "int", variable has type "str")  [assignment]
+redagent_platform/campaign_service/resolver.py:0: error: Incompatible types in assignment (expression has type "int", variable has type "str")  [assignment]
+redagent_platform/campaign_service/resolver.py:0: error: Unsupported operand types for < ("str" and "int")  [operator]
+redagent_platform/campaign_service/resolver.py:0: error: Unsupported operand types for < ("str" and "int")  [operator]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" has no attribute "scalar"  [attr-defined]
+redagent_platform/campaign_service/runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/runtime.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/runtime.py:0: error: Argument 1 to "campaign_core_principal_is_active" has incompatible type "object"; expected "AsyncSession"  [arg-type]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/runtime.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/service.py:0: error: Argument "decision_payload" to "CampaignStartMaterial" has incompatible type "object"; expected "dict[str, object]"  [arg-type]
+redagent_platform/campaign_service/service.py:0: error: Argument "plan_payload" to "CampaignStartMaterial" has incompatible type "object"; expected "dict[str, object]"  [arg-type]
+redagent_platform/campaign_service/service.py:0: error: Argument 1 to "CampaignRepository" has incompatible type "object"; expected "AsyncSession"  [arg-type]
+redagent_platform/campaign_service/service.py:0: error: Argument 2 to "start" of "CampaignStartStore" has incompatible type "**dict[str, object]"; expected "datetime"  [arg-type]
+redagent_platform/campaign_service/service.py:0: error: Argument 2 to "start" of "CampaignStartStore" has incompatible type "**dict[str, object]"; expected "str | None"  [arg-type]
+redagent_platform/campaign_service/service.py:0: error: Argument 2 to "start" of "CampaignStartStore" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/campaign_service/service.py:0: error: Incompatible return value type (got "object", expected "str")  [return-value]
+redagent_platform/campaign_service/service.py:0: error: No overload variant of "asdict" matches argument type "object"  [call-overload]
+redagent_platform/campaign_service/service.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/service.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/service.py:0: note: Possible overload variants:
+redagent_platform/campaign_service/service.py:0: note: def [_T] asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, Any]]], _T]) -> _T
+redagent_platform/campaign_service/service.py:0: note: def asdict(obj: DataclassInstance) -> dict[str, Any]
+redagent_platform/campaign_service/status.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/campaign_service/status.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/campaign_service/status.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/status.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/status.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/status.py:0: error: "object" not callable  [operator]
+redagent_platform/campaign_service/status.py:0: error: Argument 1 to "campaign_core_principal_is_active" has incompatible type "object"; expected "AsyncSession"  [arg-type]
+redagent_platform/campaign_service/status.py:0: error: Argument 2 to "_recovery_guidance" has incompatible type "object"; expected "list[object]"  [arg-type]
+redagent_platform/campaign_service/status.py:0: error: Name "import_records" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "import_records" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "import_records" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "imports" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "imports" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "imports" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "imports" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "imports" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "imports" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "issues" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "issues" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "issues" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "issues" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "issues" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "issues" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "occurrences" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "occurrences" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "occurrences" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "retests" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "retests" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "retests" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "retests" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Name "retests" is not defined  [name-defined]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/campaign_service/status.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/cloud_connectors/http_transport.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/cloud_connectors/http_transport.py:0: note: Possible overload variants:
+redagent_platform/cloud_connectors/http_transport.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/cloud_connectors/http_transport.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/cloud_connectors/repository.py:0: error: "object" has no attribute "expected_identity"  [attr-defined]
+redagent_platform/cloud_connectors/repository.py:0: error: No overload variant of "asdict" matches argument type "object"  [call-overload]
+redagent_platform/cloud_connectors/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/cloud_connectors/repository.py:0: error: Unsupported operand types for >= ("datetime" and "object")  [operator]
+redagent_platform/cloud_connectors/repository.py:0: note: Error code "attr-defined" not covered by "type: ignore[index, union-attr]" comment
+redagent_platform/cloud_connectors/repository.py:0: note: Error code "call-overload" not covered by "type: ignore[arg-type]" comment
+redagent_platform/cloud_connectors/repository.py:0: note: Possible overload variants:
+redagent_platform/cloud_connectors/repository.py:0: note: Possible overload variants:
+redagent_platform/cloud_connectors/repository.py:0: note: def [_T] asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, Any]]], _T]) -> _T
+redagent_platform/cloud_connectors/repository.py:0: note: def asdict(obj: DataclassInstance) -> dict[str, Any]
+redagent_platform/cloud_connectors/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/cloud_connectors/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/containment_service/reconciliation.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/containment_service/reconciliation.py:0: error: Argument 1 to "len" has incompatible type "object"; expected "Sized"  [arg-type]
+redagent_platform/containment_service/reconciliation.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/containment_service/reconciliation.py:0: note: Possible overload variants:
+redagent_platform/containment_service/reconciliation.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/containment_service/reconciliation.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/containment_service/repository.py:0: error: Incompatible return value type (got "dict[str, datetime | int | str]", expected "dict[str, object]")  [return-value]
+redagent_platform/containment_service/repository.py:0: error: Incompatible return value type (got "dict[str, int | datetime | str | None]", expected "dict[str, object]")  [return-value]
+redagent_platform/containment_service/repository.py:0: error: Incompatible return value type (got "dict[str, int | str | datetime | None]", expected "dict[str, object]")  [return-value]
+redagent_platform/containment_service/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/containment_service/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/containment_service/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/containment_service/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/containment_service/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/containment_service/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/containment_service/repository.py:0: note: Perhaps you need a type annotation for "row"? Suggestion: "dict[str, object]"
+redagent_platform/containment_service/repository.py:0: note: Perhaps you need a type annotation for "row"? Suggestion: "dict[str, object]"
+redagent_platform/containment_service/repository.py:0: note: Perhaps you need a type annotation for "row"? Suggestion: "dict[str, object]"
+redagent_platform/containment_service/runtime.py:0: error: Argument 1 to "tuple" has incompatible type "object"; expected "Iterable[str]"  [arg-type]
+redagent_platform/deployment_release/kubernetes.py:0: error: Item "None" of "ProbeSpec | None" has no attribute "timeout_seconds"  [union-attr]
+redagent_platform/deployment_release/kubernetes.py:0: error: Item "None" of "ProbeSpec | None" has no attribute "timeout_seconds"  [union-attr]
+redagent_platform/deployment_release/kubernetes.py:0: error: Item "None" of "ProbeSpec | None" has no attribute "timeout_seconds"  [union-attr]
+redagent_platform/deployment_release/promotion.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/deployment_release/qualification.py:0: error: Argument "public_key" to "verify_signed_bundle" has incompatible type "object"; expected "EllipticCurvePublicKey"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument "public_key" to "verify_signed_bundle" has incompatible type "object"; expected "EllipticCurvePublicKey"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 1 to "advance_upgrade" has incompatible type "object"; expected "UpgradeState"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 1 to "advance_upgrade" has incompatible type "object"; expected "UpgradeState"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 1 to "verify_signed_bundle" has incompatible type "object"; expected "SignedBundle"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 1 to "verify_signed_bundle" has incompatible type "object"; expected "SignedBundle"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "DeploymentMode"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "ProbeSpec | None"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "str | None"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "ComponentSpec" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "ProfileKind"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "QualificationLevel"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "tuple[ComponentSpec, ...]"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "tuple[NetworkFlowSpec, ...]"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "tuple[NetworkPolicySpec, ...]"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "tuple[ReviewedException, ...]"  [arg-type]
+redagent_platform/deployment_release/qualification.py:0: error: Argument 2 to "replace" of "DeploymentProfile" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/deployment_release/upgrade.py:0: error: Argument 2 to "replace" of "UpgradeState" has incompatible type "**dict[str, object]"; expected "UpgradePhase"  [arg-type]
+redagent_platform/deployment_release/upgrade.py:0: error: Argument 2 to "replace" of "UpgradeState" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/deployment_release/upgrade.py:0: error: Argument 2 to "replace" of "UpgradeState" has incompatible type "**dict[str, object]"; expected "datetime"  [arg-type]
+redagent_platform/deployment_release/upgrade.py:0: error: Argument 2 to "replace" of "UpgradeState" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/deployment_release/upgrade.py:0: error: Argument 2 to "replace" of "UpgradeState" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/deployment_release/upgrade.py:0: error: Argument 2 to "replace" of "UpgradeState" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/dlp_runtime.py:0: error: Item "None" of "str | None" has no attribute "strip"  [union-attr]
+redagent_platform/dlp_runtime.py:0: error: Item "None" of "str | None" has no attribute "strip"  [union-attr]
+redagent_platform/emergency_stop.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/emergency_stop.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/emergency_stop.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, tuple[dict[str, object], ...] | tuple[str, ...] | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/emergency_stop.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/emergency_stop.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/emergency_stop.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/emergency_stop.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/emergency_stop.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/emergency_stop.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/evidence_service/runtime.py:0: error: Skipping analyzing "boto3": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+redagent_platform/evidence_service/runtime.py:0: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#missing-imports
+redagent_platform/evidence_service/service.py:0: error: Argument 3 to "mutation_replay" of "EvidenceRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/evidence_service/service.py:0: error: Argument 3 to "record_mutation_response" of "EvidenceRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/evidence_service/service.py:0: error: Name "results" already defined on line 0  [no-redef]
+redagent_platform/evidence_service/service.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/evidence_service/service.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/evidence_service/service.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/evidence_service/service.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/evidence_service/service.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/evidence_service/service.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/evidence_service/service.py:0: note: Possible overload variants:
+redagent_platform/evidence_service/service.py:0: note: Possible overload variants:
+redagent_platform/evidence_service/service.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/evidence_service/service.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/evidence_service/service.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/evidence_service/service.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/evidence_store.py:0: error: No overload variant of "dict" matches argument type "object"  [call-overload]
+redagent_platform/evidence_store.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/evidence_store.py:0: note: Error code "call-overload" not covered by "type: ignore[arg-type]" comment
+redagent_platform/evidence_store.py:0: note: Possible overload variants:
+redagent_platform/evidence_store.py:0: note: Possible overload variants:
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict() -> dict[_KT, _VT]
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict(**kwargs: _VT) -> dict[str, _VT]
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict(Iterable[list[bytes]], /) -> dict[bytes, bytes]
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict(Iterable[list[str]], /) -> dict[str, str]
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict(Iterable[tuple[_KT, _VT]], /) -> dict[_KT, _VT]
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict(Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> dict[str, _VT]
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict(SupportsKeysAndGetItem[_KT, _VT], /) -> dict[_KT, _VT]
+redagent_platform/evidence_store.py:0: note: def [_KT, _VT] dict(SupportsKeysAndGetItem[str, _VT], /, **kwargs: _VT) -> dict[str, _VT]
+redagent_platform/evidence_store.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/evidence_store.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: error: "tuple[str, ...]" has no attribute "append"  [attr-defined]
+redagent_platform/finding_operations/repository.py:0: error: Name "issue_ids" already defined on line 0  [no-redef]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/finding_operations/repository.py:0: error: Value of type variable "SupportsRichComparisonT" of "max" cannot be "object"  [type-var]
+redagent_platform/finding_operations/repository.py:0: error: Value of type variable "SupportsRichComparisonT" of "min" cannot be "object"  [type-var]
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: Possible overload variants:
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/gate_lease.py:0: error: Module has no attribute "LOCK_EX"  [attr-defined]
+redagent_platform/gate_lease.py:0: error: Module has no attribute "LOCK_NB"  [attr-defined]
+redagent_platform/gate_lease.py:0: error: Module has no attribute "LOCK_UN"  [attr-defined]
+redagent_platform/gate_lease.py:0: error: Module has no attribute "flock"  [attr-defined]
+redagent_platform/gate_lease.py:0: error: Module has no attribute "flock"  [attr-defined]
+redagent_platform/gate_runtime.py:0: error: Item "None" of "IO[Any] | None" has no attribute "read"  [union-attr]
+redagent_platform/gate_runtime.py:0: error: Module has no attribute "SIGKILL"; maybe "SIGILL"?  [attr-defined]
+redagent_platform/gate_runtime.py:0: error: Module has no attribute "killpg"  [attr-defined]
+redagent_platform/gate_runtime.py:0: error: Module has no attribute "killpg"  [attr-defined]
+redagent_platform/gate_runtime.py:0: error: No overload variant of "Popen" matches argument types "tuple[str, ...]", "dict[str, object]"  [call-overload]
+redagent_platform/gate_runtime.py:0: error: No overload variant of "Popen" matches argument types "tuple[str, ...]", "dict[str, object]"  [call-overload]
+redagent_platform/gate_runtime.py:0: note: Possible overload variants:
+redagent_platform/gate_runtime.py:0: note: Possible overload variants:
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., *, universal_newlines: Literal[True], startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., text: bool | None = ..., encoding: str | None = ..., errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., *, universal_newlines: Literal[True], startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., text: bool | None = ..., encoding: str | None = ..., errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: Literal[False] | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: Literal[False] | None = ..., encoding: None = ..., errors: None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[bytes]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: Literal[False] | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: Literal[False] | None = ..., encoding: None = ..., errors: None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[bytes]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: Literal[True] | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: Literal[True], encoding: str | None = ..., errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: Literal[True] | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: Literal[True], encoding: str | None = ..., errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: bool | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: bool | None = ..., encoding: str | None = ..., errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[Any]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: bool | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: bool | None = ..., encoding: str | None = ..., errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[Any]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: bool | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: bool | None = ..., encoding: str | None = ..., errors: str, user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: bool | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: bool | None = ..., encoding: str | None = ..., errors: str, user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: bool | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: bool | None = ..., encoding: str, errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/gate_runtime.py:0: note: def [AnyStr: (str, bytes)] Popen(args: str | bytes | PathLike[str] | PathLike[bytes] | Sequence[str | bytes | PathLike[str] | PathLike[bytes]], bufsize: int = ..., executable: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., stdin: int | IO[Any] | None = ..., stdout: int | IO[Any] | None = ..., stderr: int | IO[Any] | None = ..., preexec_fn: Callable[[], object] | None = ..., close_fds: bool = ..., shell: bool = ..., cwd: str | bytes | PathLike[str] | PathLike[bytes] | None = ..., env: Mapping[str, str] | None = ..., universal_newlines: bool | None = ..., startupinfo: Any | None = ..., creationflags: int = ..., restore_signals: bool = ..., start_new_session: bool = ..., pass_fds: Collection[int] = ..., *, text: bool | None = ..., encoding: str, errors: str | None = ..., user: str | int | None = ..., group: str | int | None = ..., extra_groups: Iterable[str | int] | None = ..., umask: int = ..., pipesize: int = ..., process_group: int | None = ...) -> Popen[str]
+redagent_platform/human_simulation/compiler.py:0: error: Argument 1 to "CompiledCampaignPlan" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/human_simulation/compiler.py:0: error: Argument 1 to "CompiledCampaignPlan" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/human_simulation/compiler.py:0: error: Argument 1 to "CompiledCampaignPlan" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/human_simulation/repository.py:0: error: Unsupported operand types for >= ("datetime" and "object")  [operator]
+redagent_platform/identity/bff.py:0: error: Argument "access_token" to "validate_id_token" has incompatible type "object"; expected "str | None"  [arg-type]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: "Result[Any]" has no attribute "rowcount"  [attr-defined]
+redagent_platform/identity/repository.py:0: error: Argument "request" to "_complete_mutation" of "IdentityRepository" has incompatible type "dict[str, int | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/identity/repository.py:0: error: Argument "request" to "_complete_mutation" of "IdentityRepository" has incompatible type "dict[str, str | int | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/identity/repository.py:0: error: Argument "request" to "_complete_mutation" of "IdentityRepository" has incompatible type "dict[str, str | int | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/identity/repository.py:0: error: Argument 3 to "_idempotency_replay" of "IdentityRepository" has incompatible type "dict[str, int | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/identity/repository.py:0: error: Argument 3 to "_idempotency_replay" of "IdentityRepository" has incompatible type "dict[str, str | int | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/identity/repository.py:0: error: Argument 3 to "_idempotency_replay" of "IdentityRepository" has incompatible type "dict[str, str | int | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/identity/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/identity/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/identity/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/identity/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/identity/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/identity/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/identity/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/identity/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/identity/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/identity/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/identity/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/identity/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/identity/tokens.py:0: error: Argument "tenant_id" to "ValidatedIdentityClaims" has incompatible type "Any | None"; expected "str"  [arg-type]
+redagent_platform/identity/tokens.py:0: error: Argument 1 to "import_key_set" of "KeySet" has incompatible type "dict[str, object]"; expected "KeySetSerialization"  [arg-type]
+redagent_platform/identity_saas/emulator.py:0: error: Dict entry 0 has incompatible type "str": "tuple[dict[str, str]]"; expected "str": "tuple[dict[str, object], ...]"  [dict-item]
+redagent_platform/identity_saas/http_transport.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/identity_saas/http_transport.py:0: note: Possible overload variants:
+redagent_platform/identity_saas/http_transport.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/identity_saas/http_transport.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/identity_saas/repository.py:0: error: No overload variant of "asdict" matches argument type "object"  [call-overload]
+redagent_platform/identity_saas/repository.py:0: error: Unsupported operand types for >= ("datetime" and "object")  [operator]
+redagent_platform/identity_saas/repository.py:0: note: Error code "call-overload" not covered by "type: ignore[arg-type]" comment
+redagent_platform/identity_saas/repository.py:0: note: Possible overload variants:
+redagent_platform/identity_saas/repository.py:0: note: def [_T] asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, Any]]], _T]) -> _T
+redagent_platform/identity_saas/repository.py:0: note: def asdict(obj: DataclassInstance) -> dict[str, Any]
+redagent_platform/issue_connectors.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/issue_connectors.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/issue_connectors.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/issue_connectors.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/issue_connectors.py:0: note: Error code "attr-defined" not covered by "type: ignore[index]" comment
+redagent_platform/lab_service/contracts.py:0: error: No overload variant of "asdict" matches argument type "object"  [call-overload]
+redagent_platform/lab_service/contracts.py:0: note: Possible overload variants:
+redagent_platform/lab_service/contracts.py:0: note: def [_T] asdict(obj: DataclassInstance, *, dict_factory: Callable[[list[tuple[str, Any]]], _T]) -> _T
+redagent_platform/lab_service/contracts.py:0: note: def asdict(obj: DataclassInstance) -> dict[str, Any]
+redagent_platform/lab_service/qualification.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/lab_service/qualification.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/lab_service/qualification.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/lab_service/qualification.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/lab_service/qualification.py:0: note: Possible overload variants:
+redagent_platform/lab_service/qualification.py:0: note: Possible overload variants:
+redagent_platform/lab_service/qualification.py:0: note: Possible overload variants:
+redagent_platform/lab_service/qualification.py:0: note: Possible overload variants:
+redagent_platform/lab_service/qualification.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/lab_service/qualification.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/lab_service/qualification.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/lab_service/qualification.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/lab_service/qualification.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/lab_service/qualification.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/lab_service/qualification.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/lab_service/qualification.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/local_stack.py:0: error: Argument "validator" to "_atomic_write_runtime_text" has incompatible type "Callable[[Path], OidcProviderConfig]"; expected "Callable[[Path], None] | None"  [arg-type]
+redagent_platform/local_stack.py:0: error: Argument 2 to "replace" of "LocalStackConfig" has incompatible type "**dict[str, int]"; expected "Path"  [arg-type]
+redagent_platform/local_stack.py:0: error: Argument 2 to "replace" of "LocalStackConfig" has incompatible type "**dict[str, int]"; expected "bool"  [arg-type]
+redagent_platform/local_stack.py:0: error: Argument 2 to "replace" of "LocalStackConfig" has incompatible type "**dict[str, int]"; expected "str"  [arg-type]
+redagent_platform/local_stack.py:0: error: Argument 2 to "replace" of "LocalStackConfig" has incompatible type "**dict[str, int]"; expected "tuple[LockedImage, ...]"  [arg-type]
+redagent_platform/local_stack.py:0: error: Incompatible return value type (got "tuple[int, ...]", expected "tuple[int, int, int]")  [return-value]
+redagent_platform/mcp_broker/qualification.py:0: error: Argument 1 to "WorkbenchProposal" has incompatible type "**dict[str, object]"; expected "Mapping[str, object]"  [arg-type]
+redagent_platform/mcp_broker/qualification.py:0: error: Argument 1 to "WorkbenchProposal" has incompatible type "**dict[str, object]"; expected "datetime"  [arg-type]
+redagent_platform/mcp_broker/qualification.py:0: error: Argument 1 to "WorkbenchProposal" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/mcp_broker/qualification.py:0: error: Argument 1 to "WorkbenchProposal" has incompatible type "**dict[str, object]"; expected "str | None"  [arg-type]
+redagent_platform/mcp_broker/qualification.py:0: error: Argument 1 to "WorkbenchProposal" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/mcp_broker/qualification.py:0: error: Argument 1 to "WorkbenchProposal" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/mcp_broker/repository.py:0: error: Argument 3 to "_immutable" of "McpWorkbenchRepository" has incompatible type "dict[str, datetime | str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/mcp_broker/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/mcp_broker/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/mcp_broker/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/mcp_broker/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/mcp_broker/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/mcp_broker/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/mcp_broker/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/mcp_broker/repository.py:0: note: Possible overload variants:
+redagent_platform/mcp_broker/repository.py:0: note: Possible overload variants:
+redagent_platform/mcp_broker/repository.py:0: note: Possible overload variants:
+redagent_platform/mcp_broker/repository.py:0: note: Possible overload variants:
+redagent_platform/mcp_broker/repository.py:0: note: Possible overload variants:
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/mcp_broker/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/network_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/network_service/repository.py:0: note: Possible overload variants:
+redagent_platform/network_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/network_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/nuclei_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/nuclei_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/nuclei_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/nuclei_service/promotion.py:0: error: Library stubs not installed for "yaml"  [import-untyped]
+redagent_platform/nuclei_service/promotion.py:0: note: (or run "mypy --install-types" to install all missing stub packages)
+redagent_platform/nuclei_service/promotion.py:0: note: Hint: "python3 -m pip install types-PyYAML"
+redagent_platform/nuclei_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/nuclei_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/nuclei_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/nuclei_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/nuclei_service/repository.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/nuclei_service/repository.py:0: note: Possible overload variants:
+redagent_platform/nuclei_service/repository.py:0: note: Possible overload variants:
+redagent_platform/nuclei_service/repository.py:0: note: Possible overload variants:
+redagent_platform/nuclei_service/repository.py:0: note: Possible overload variants:
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/nuclei_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/orchestration/worker.py:0: error: "object" has no attribute "run"  [attr-defined]
+redagent_platform/orchestration/worker.py:0: error: "object" has no attribute "run"  [attr-defined]
+redagent_platform/orchestration/workflow.py:0: error: Incompatible types in "await" (actual type "None", expected type "Awaitable[Any]")  [misc]
+redagent_platform/orchestration/workflow.py:0: error: Incompatible types in "await" (actual type "None", expected type "Awaitable[Any]")  [misc]
+redagent_platform/orchestration/workflow.py:0: error: Incompatible types in assignment (expression has type "ActivityHandle[Any]", variable has type "None")  [assignment]
+redagent_platform/orchestration/workflow.py:0: error: Incompatible types in assignment (expression has type "ActivityHandle[Any]", variable has type "None")  [assignment]
+redagent_platform/persistence/repository.py:0: error: Argument "request" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, Collection[str]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "request" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, Sequence[Collection[str]]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "request" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, dict[str, object] | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "request" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "request" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "request" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "resource" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, int | Collection[str] | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "resource" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, int | Sequence[Collection[str]] | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument "resource" to "_record_mutation" of "ControlPlaneRepository" has incompatible type "dict[str, int | dict[str, object] | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument 3 to "_idempotency_replay" of "ControlPlaneRepository" has incompatible type "dict[str, Collection[str]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument 3 to "_idempotency_replay" of "ControlPlaneRepository" has incompatible type "dict[str, Sequence[Collection[str]]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument 3 to "_idempotency_replay" of "ControlPlaneRepository" has incompatible type "dict[str, dict[str, object] | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument 3 to "_idempotency_replay" of "ControlPlaneRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument 3 to "_idempotency_replay" of "ControlPlaneRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: Argument 3 to "_idempotency_replay" of "ControlPlaneRepository" has incompatible type "dict[str, str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/persistence/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/persistence/repository.py:0: note: Possible overload variants:
+redagent_platform/persistence/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/persistence/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/purple_runtime/compiler.py:0: error: Argument 1 to "CompiledAbilityPlan" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
+redagent_platform/purple_runtime/compiler.py:0: error: Argument 1 to "CompiledAbilityPlan" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/purple_runtime/compiler.py:0: error: Argument 1 to "CompiledAbilityPlan" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/purple_runtime/repository.py:0: error: Unsupported operand types for >= ("datetime" and "object")  [operator]
+redagent_platform/redaction.py:0: error: Incompatible return value type (got "tuple[object, RedactionResult]", expected "tuple[dict[str, object], RedactionResult]")  [return-value]
+redagent_platform/redaction_quality_gate.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, Sequence[str]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/redaction_quality_gate.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, bool | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/redaction_quality_gate.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, bool | tuple[dict[str, object], ...] | str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/redaction_quality_gate.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/redaction_quality_gate.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/redaction_quality_gate.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/redaction_quality_gate.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/redaction_quality_gate.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/redaction_quality_gate.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/release_gate.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, Sequence[Collection[str]]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/release_gate.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/release_gate.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/report_quality_gate.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, tuple[str, ...] | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/report_quality_gate.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/report_quality_gate.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/reporting.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/reporting.py:0: error: "object" has no attribute "__iter__"; maybe "__dir__" or "__str__"? (not iterable)  [attr-defined]
+redagent_platform/reporting.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, tuple[dict[str, object], ...] | dict[str, object] | str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/reporting.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, tuple[dict[str, str], ...]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/reporting.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/reporting.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/reporting.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/reporting.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/reporting.py:0: note: Error code "attr-defined" not covered by "type: ignore[index]" comment
+redagent_platform/reporting.py:0: note: Error code "attr-defined" not covered by "type: ignore[index]" comment
+redagent_platform/runner_execution.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/runner_execution.py:0: note: Possible overload variants:
+redagent_platform/runner_execution.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/runner_execution.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/runner_service/campaign_dispatch.py:0: error: Incompatible types in assignment (expression has type "str", variable has type "int")  [assignment]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: "object" has no attribute "scalar"  [attr-defined]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_lifecycle.py:0: error: Argument "metadata_values" to "record_lifecycle_event" of "RunnerRepository" has incompatible type "dict[str, str] | dict[str, bool]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/runner_service/campaign_result.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/runner_service/campaign_result.py:0: error: "object" has no attribute "execute"  [attr-defined]
+redagent_platform/runner_service/campaign_result.py:0: error: "object" has no attribute "ingest"  [attr-defined]
+redagent_platform/runner_service/campaign_result.py:0: error: "object" has no attribute "scalar"  [attr-defined]
+redagent_platform/runner_service/campaign_result.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_result.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_result.py:0: error: "object" not callable  [operator]
+redagent_platform/runner_service/campaign_result.py:0: error: Argument 1 to "tuple" has incompatible type "object"; expected "Iterable[str]"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument "key_id" to "SignedJobManifestV2" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument "manifest_sha256" to "SignedJobManifestV2" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument "signature" to "SignedJobManifestV2" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument 2 to "JobManifestDraftV2" has incompatible type "**dict[str, object]"; expected "int | None"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument 2 to "JobManifestDraftV2" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument 2 to "JobManifestDraftV2" has incompatible type "**dict[str, object]"; expected "str | None"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument 2 to "JobManifestDraftV2" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument 2 to "_bounded_int" has incompatible type "int | None"; expected "int"  [arg-type]
+redagent_platform/runner_service/contracts.py:0: error: Argument 2 to "_sha256" has incompatible type "str | None"; expected "str"  [arg-type]
+redagent_platform/runner_service/dispatch.py:0: error: Incompatible types in assignment (expression has type "int", variable has type "str")  [assignment]
+redagent_platform/runner_service/dispatch.py:0: error: Unsupported operand types for < ("str" and "int")  [operator]
+redagent_platform/runner_service/persistent_backend.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/runner_service/persistent_backend.py:0: note: Possible overload variants:
+redagent_platform/runner_service/persistent_backend.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/runner_service/persistent_backend.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/runner_service/repository.py:0: error: Incompatible return value type (got "dict[str, int | datetime | bool | str | None]", expected "dict[str, object]")  [return-value]
+redagent_platform/runner_service/repository.py:0: error: Incompatible return value type (got "dict[str, int | datetime | dict[str, object] | str | None]", expected "dict[str, object]")  [return-value]
+redagent_platform/runner_service/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/runner_service/repository.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/runner_service/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/runner_service/repository.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/runner_service/repository.py:0: note: Perhaps you need a type annotation for "row"? Suggestion: "dict[str, object]"
+redagent_platform/runner_service/repository.py:0: note: Perhaps you need a type annotation for "row"? Suggestion: "dict[str, object]"
+redagent_platform/scanner_normalization.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, Sequence[str]]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/scanner_normalization.py:0: error: Argument 1 to "_canonical_sha256" has incompatible type "dict[str, tuple[str, ...] | str]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/scanner_normalization.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/scanner_normalization.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/scanner_normalization.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/scanner_normalization.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/scope_roe_ledger.py:0: error: Argument 1 to "_require_timezone" has incompatible type "str"; expected "datetime"  [arg-type]
+redagent_platform/scope_roe_ledger.py:0: error: Incompatible types in assignment (expression has type "datetime", variable has type "str")  [assignment]
+redagent_platform/secret_service/broker.py:0: error: Item "None" of "Any | None" has no attribute "enforce_secret"  [union-attr]
+redagent_platform/secret_service/broker.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/secret_service/broker.py:0: note: Possible overload variants:
+redagent_platform/secret_service/broker.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/secret_service/broker.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/secret_service/contracts.py:0: error: Argument 1 of "__reduce_ex__" is incompatible with supertype "builtins.object"; supertype defines the argument type as "SupportsIndex"  [override]
+redagent_platform/secret_service/contracts.py:0: error: Argument 1 of "__reduce_ex__" is incompatible with supertype "builtins.object"; supertype defines the argument type as "SupportsIndex"  [override]
+redagent_platform/secret_service/contracts.py:0: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+redagent_platform/secret_service/contracts.py:0: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#incompatible-overrides
+redagent_platform/secret_service/contracts.py:0: note: This violates the Liskov substitution principle
+redagent_platform/secret_service/contracts.py:0: note: This violates the Liskov substitution principle
+redagent_platform/secret_service/providers.py:0: error: Incompatible return value type (got "tuple[int, ...]", expected "tuple[int, int, int]")  [return-value]
+redagent_platform/secret_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/secret_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/secret_service/repository.py:0: error: No overload variant of "int" matches argument type "object"  [call-overload]
+redagent_platform/secret_service/repository.py:0: error: Unsupported operand types for - ("object" and "timedelta")  [operator]
+redagent_platform/secret_service/repository.py:0: error: Unsupported operand types for >= ("datetime" and "timedelta")  [operator]
+redagent_platform/secret_service/repository.py:0: note: Possible overload variants:
+redagent_platform/secret_service/repository.py:0: note: Possible overload variants:
+redagent_platform/secret_service/repository.py:0: note: Possible overload variants:
+redagent_platform/secret_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/secret_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/secret_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
+redagent_platform/secret_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/secret_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/secret_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
+redagent_platform/skill_invocation.py:0: error: Argument "command_log_path" to "SkillInvocationArtifacts" has incompatible type "str | None"; expected "str"  [arg-type]
+redagent_platform/skill_invocation.py:0: error: Argument "evidence_dir" to "SkillInvocationArtifacts" has incompatible type "str | None"; expected "str"  [arg-type]
+redagent_platform/skill_invocation.py:0: error: Argument "report_path" to "SkillInvocationArtifacts" has incompatible type "str | None"; expected "str"  [arg-type]
+redagent_platform/skill_invocation.py:0: error: Dict entry 0 has incompatible type "str": "str | None"; expected "str": "str"  [dict-item]
+redagent_platform/skill_invocation.py:0: error: Dict entry 1 has incompatible type "str": "str | None"; expected "str": "str"  [dict-item]
+redagent_platform/skill_invocation.py:0: error: Dict entry 2 has incompatible type "str": "str | None"; expected "str": "str"  [dict-item]
+redagent_platform/skill_invocation.py:0: error: Dict entry 3 has incompatible type "str": "str | None"; expected "str": "str"  [dict-item]
+redagent_platform/skill_validation.py:0: error: Incompatible types in assignment (expression has type "tuple[str, str, str, str, str, str]", variable has type "tuple[str, str, str, str, str]")  [assignment]
+redagent_platform/telemetry_service/operations.py:0: error: Argument 1 to "_timeline" of "IncidentRepository" has incompatible type "dict[str, int | datetime | bool | str | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/telemetry_service/operations.py:0: error: Argument 2 to "_open_alert" of "SloRepository" has incompatible type "dict[str, datetime | str | int | None]"; expected "dict[str, object]"  [arg-type]
+redagent_platform/telemetry_service/operations.py:0: error: Incompatible return value type (got "dict[str, datetime | str | int | None]", expected "dict[str, object]")  [return-value]
+redagent_platform/telemetry_service/operations.py:0: error: Incompatible return value type (got "dict[str, int | datetime | bool | str | None]", expected "dict[str, object]")  [return-value]
+redagent_platform/telemetry_service/operations.py:0: error: Item "None" of "Comparison | None" has no attribute "value"  [union-attr]
+redagent_platform/telemetry_service/operations.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/telemetry_service/operations.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/telemetry_service/operations.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/telemetry_service/operations.py:0: note: "dict" is invariant -- see https://mypy.readthedocs.io/en/stable/common_issues.html#variance
+redagent_platform/telemetry_service/operations.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/telemetry_service/operations.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/telemetry_service/operations.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/telemetry_service/operations.py:0: note: Consider using "Mapping" instead, which is covariant in the value type
+redagent_platform/telemetry_service/operations.py:0: note: Perhaps you need a type annotation for "result"? Suggestion: "dict[str, object]"
+redagent_platform/telemetry_service/operations.py:0: note: Perhaps you need a type annotation for "row"? Suggestion: "dict[str, object]"
+redagent_platform/validation/classifier.py:0: error: Argument 2 to "GateDecision" has incompatible type "**dict[str, object]"; expected "int"  [arg-type]
+redagent_platform/validation/classifier.py:0: error: Argument 2 to "GateDecision" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
+redagent_platform/validation/classifier.py:0: error: Argument 2 to "GateDecision" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/validation/classifier.py:0: error: Argument 2 to "decide" has incompatible type "tuple[str | None, ...]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/validation/classifier.py:0: error: Argument 2 to "decide" has incompatible type "tuple[str | None, ...]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/validation/classifier.py:0: error: Argument 2 to "decide" has incompatible type "tuple[str | None, ...]"; expected "tuple[str, ...]"  [arg-type]
+redagent_platform/validation/classifier.py:0: error: Value of type variable "SupportsRichComparisonT" of "sorted" cannot be "str | None"  [type-var]
+redagent_platform/validation/classifier.py:0: error: Value of type variable "SupportsRichComparisonT" of "sorted" cannot be "str | None"  [type-var]
+redagent_platform/validation/classifier.py:0: note: Error code "type-var" not covered by "type: ignore[arg-type]" comment
+redagent_platform/validation/stages.py:0: error: "Popen[bytes]" has no attribute "_handle"  [attr-defined]
+redagent_platform/validation/stages.py:0: error: Module has no attribute "SIGKILL"; maybe "SIGILL"?  [attr-defined]
+redagent_platform/validation/stages.py:0: error: Module has no attribute "killpg"  [attr-defined]
+redagent_platform/validation/stages.py:0: error: Module has no attribute "killpg"  [attr-defined]
+redagent_platform/validation/stages.py:0: error: Module has no attribute "killpg"  [attr-defined]
+redagent_platform/zap_runtime.py:0: error: Argument "alert" to "append_zap_passive_evidence" has incompatible type "ZapActiveAlert"; expected "ZapPassiveAlert"  [arg-type]
+redagent_platform/zap_runtime.py:0: error: Argument "alert" to "normalize_zap_alert_to_finding" has incompatible type "ZapActiveAlert"; expected "ZapPassiveAlert"  [arg-type]
+redagent_platform/zap_runtime.py:0: error: Incompatible types in assignment (expression has type "ZapPassiveAlert", variable has type "ZapActiveAlert")  [assignment]
+redagent_platform/zap_runtime.py:0: error: Incompatible types in assignment (expression has type "ZapPassiveEvidenceResult", variable has type "ZapActiveEvidenceResult")  [assignment]
+redagent_platform/zap_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/zap_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/zap_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: "object" has no attribute "get"  [attr-defined]
+redagent_platform/zap_service/promotion.py:0: error: Argument 1 to "fromisoformat" of "date" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/zap_service/promotion.py:0: error: Argument 1 to "fromisoformat" of "date" has incompatible type "object"; expected "str"  [arg-type]
+redagent_platform/zap_service/promotion.py:0: error: Value of type "object" is not indexable  [index]
+redagent_platform/zap_service/repository.py:0: error: Value of type "object" is not indexable  [index]

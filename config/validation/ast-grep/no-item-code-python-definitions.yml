@@ -1,0 +1,18 @@
+id: no-item-code-python-definitions
+language: Python
+severity: error
+message: Product class and function names must use domain language, not roadmap item codes.
+rule:
+  any:
+    - pattern: |-
+        class $NAME:
+          $$$BODY
+    - pattern: |-
+        def $NAME($$$ARGS):
+          $$$BODY
+    - pattern: |-
+        async def $NAME($$$ARGS):
+          $$$BODY
+constraints:
+  NAME:
+    regex: (?i).*r\d{3}.*

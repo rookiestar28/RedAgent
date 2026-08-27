@@ -7,7 +7,7 @@ import json
 
 from redagent_platform.campaign_service.relay import (
     OutboxDeliveryState,
-    R123WorkflowRelay,
+    CampaignWorkflowRelay,
     RelayDeliveryResult,
     RelayFailure,
     WorkflowAlreadyStarted,
@@ -80,7 +80,7 @@ def test_relay_rechecks_current_authority_before_temporal_start() -> None:
     gateway = Gateway(start_result=WorkflowStartReceipt(workflow_run_id="run-r123"))
 
     result = asyncio.run(
-        R123WorkflowRelay(
+        CampaignWorkflowRelay(
             resolver=CampaignContextResolver(provider), repository=repository, gateway=gateway
         ).deliver(_claim(), now=NOW)
     )
@@ -98,7 +98,7 @@ def test_relay_starts_exact_request_and_acknowledges_exact_claim() -> None:
     gateway = Gateway(start_result=WorkflowStartReceipt(workflow_run_id="run-r123"))
 
     result = asyncio.run(
-        R123WorkflowRelay(
+        CampaignWorkflowRelay(
             resolver=CampaignContextResolver(provider), repository=repository, gateway=gateway
         ).deliver(_claim(), now=NOW)
     )
@@ -128,7 +128,7 @@ def test_relay_reconciles_duplicate_start_only_on_exact_digest_match() -> None:
         ),
     )
     exact = asyncio.run(
-        R123WorkflowRelay(
+        CampaignWorkflowRelay(
             resolver=CampaignContextResolver(Provider(_snapshot())),
             repository=exact_repository,
             gateway=exact_gateway,
@@ -147,7 +147,7 @@ def test_relay_reconciles_duplicate_start_only_on_exact_digest_match() -> None:
         ),
     )
     mismatch = asyncio.run(
-        R123WorkflowRelay(
+        CampaignWorkflowRelay(
             resolver=CampaignContextResolver(Provider(_snapshot())),
             repository=mismatch_repository,
             gateway=mismatch_gateway,
@@ -163,7 +163,7 @@ def test_relay_classifies_definite_unavailability_as_bounded_retry() -> None:
     gateway = Gateway(start_result=WorkflowStartUnavailable("temporal_unavailable"))
 
     result = asyncio.run(
-        R123WorkflowRelay(
+        CampaignWorkflowRelay(
             resolver=CampaignContextResolver(Provider(_snapshot())),
             repository=repository,
             gateway=gateway,
@@ -230,7 +230,7 @@ def _snapshot() -> CanonicalAuthoritySnapshot:
         quota_reference="quota-r123",
         quota_available=True,
         runner_id="runner-r123",
-        runner_workload_identity="spiffe://redagent.test/runner/compat_123",
+        runner_workload_identity="spiffe://redagent.test/runner/r123",
         runner_ready=True,
         reservation_id="reservation-r123",
         lease_id="lease-r123",

@@ -6,36 +6,17 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ActivityListResponse,
-    ApiError,
-    AsyncSession,
-    ContextResponse,
+from fastapi import (
     Depends,
-    EngagementCreateRequest,
-    EngagementListResponse,
-    EngagementMutationResponse,
-    EngagementResponse,
-    EngagementUpdateRequest,
-    IdentityRepository,
-    JitGrantApprovalRequest,
-    JitGrantCreateRequest,
-    JitGrantListResponse,
-    JitGrantMutationResponse,
-    JitGrantReviewRequest,
-    JitGrantRevokeRequest,
-    MembershipListResponse,
-    PaginationQuery,
     Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
     RequestGuard,
-    RoeApprovalRequest,
-    RoeVersionCreateRequest,
-    RoeVersionListResponse,
-    RoeVersionMutationResponse,
     SecurityContext,
-    TargetCreateRequest,
-    TargetListResponse,
-    TargetMutationResponse,
+)
+from redagent_platform.api.router_primitives import (
     _idempotency,
     _list_response,
     _match_roe_reference,
@@ -43,8 +24,33 @@ from redagent_platform.api._route_support import (
     _now,
     _probe_limit,
     _repository,
-    status,
 )
+from redagent_platform.api.schemas.access import (
+    ActivityListResponse,
+    ContextResponse,
+    EngagementCreateRequest,
+    EngagementListResponse,
+    EngagementMutationResponse,
+    EngagementResponse,
+    EngagementUpdateRequest,
+    JitGrantApprovalRequest,
+    JitGrantCreateRequest,
+    JitGrantListResponse,
+    JitGrantMutationResponse,
+    JitGrantReviewRequest,
+    JitGrantRevokeRequest,
+    MembershipListResponse,
+    RoeApprovalRequest,
+    RoeVersionCreateRequest,
+    RoeVersionListResponse,
+    RoeVersionMutationResponse,
+    TargetCreateRequest,
+    TargetListResponse,
+    TargetMutationResponse,
+)
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.identity.repository import IdentityRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 
 def _identity_repository(session: AsyncSession, guard: RequestGuard) -> IdentityRepository:
     return IdentityRepository(

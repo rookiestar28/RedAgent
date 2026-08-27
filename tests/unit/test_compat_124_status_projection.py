@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from redagent_platform.campaign_service.status import (
     _public_finding,
     _recovery_guidance,
-    _r124_attention_sort_key,
+    _campaign_core_attention_sort_key,
 )
 
 
@@ -43,6 +43,6 @@ def test_r124_attention_order_is_newest_first_then_stable_binding() -> None:
         {"occurred_at": datetime(2026, 8, 24, 14, 0, tzinfo=timezone.utc), "binding": "c"},
     ]
 
-    assert [item["binding"] for item in sorted(items, key=_r124_attention_sort_key)] == [
+    assert [item["binding"] for item in sorted(items, key=_campaign_core_attention_sort_key)] == [
         "a", "b", "c"
     ]

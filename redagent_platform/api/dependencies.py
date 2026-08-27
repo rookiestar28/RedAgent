@@ -5,27 +5,32 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    AsyncIterator,
-    AsyncSession,
-    AuthorizationDecision,
-    AuthorizationHook,
-    Depends,
-    EvidenceService,
-    Header,
-    OperatorShellContextData,
-    Request,
-    RequestGuard,
-    SQLAlchemyError,
-    SecurityContext,
-    _now,
-    _valid_context_value,
-    asynccontextmanager,
+from contextlib import asynccontextmanager
+from datetime import (
     datetime,
-    inspect,
     timezone,
 )
+from fastapi import (
+    Depends,
+    Header,
+    Request,
+)
+import inspect
+from redagent_platform.api.contracts import (
+    ApiError,
+    AuthorizationDecision,
+    AuthorizationHook,
+    RequestGuard,
+    SecurityContext,
+    _valid_context_value,
+)
+from redagent_platform.api.router_primitives import _now
+from redagent_platform.api.schemas.access import OperatorShellContextData
+from redagent_platform.evidence_service.service import EvidenceService
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import AsyncIterator
+
 
 @dataclass(frozen=True)
 class ApiDependencies:

@@ -50,3 +50,17 @@ repos:
           # Kubernetes secretName is a metadata reference, never the referenced value.
           - "--exclude-lines"
           - '(?i)secretName'
+  - repo: local
+    hooks:
+      - id: item-code-module-names
+        name: reject item-coded product module filenames
+        entry: python scripts/item_code_identifiers.py
+        language: system
+        pass_filenames: false
+      - id: item-code-python-definitions
+        name: reject item-coded product class and function definitions
+        entry: ast-grep scan --config sgconfig.yml redagent_platform
+        language: node
+        additional_dependencies:
+          - "@ast-grep/cli@0.45.0"
+        pass_filenames: false

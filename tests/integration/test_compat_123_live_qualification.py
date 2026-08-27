@@ -9,16 +9,16 @@ from uuid import uuid4
 import pytest
 
 from redagent_platform.campaign_service.registry import closed_execution_registry
-from redagent_platform.nuclei_service.compat_123_adapter import NucleiR123Adapter
-from redagent_platform.nuclei_service.compat_123_transport import NucleiDockerTransport
-from redagent_platform.runner_service.compat_123_dispatch import (
+from redagent_platform.nuclei_service.campaign_adapter import NucleiCampaignAdapter
+from redagent_platform.nuclei_service.campaign_transport import NucleiDockerTransport
+from redagent_platform.runner_service.campaign_dispatch import (
     AdapterTerminalReceipt,
-    ClosedR123Dispatcher,
-    R123AdapterRequest,
+    ClosedCampaignDispatcher,
+    CampaignAdapterRequest,
 )
-from redagent_platform.runner_service.compat_123_result import AdapterResultMaterialV1
-from redagent_platform.zap_service.compat_123_adapter import ZapR123Adapter
-from redagent_platform.zap_service.compat_123_transport import ZapDockerTransport
+from redagent_platform.runner_service.campaign_result import AdapterResultMaterialV1
+from redagent_platform.zap_service.campaign_adapter import ZapCampaignAdapter
+from redagent_platform.zap_service.campaign_transport import ZapDockerTransport
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,7 +48,7 @@ class _QualificationResultWriter:
 
     async def lookup(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         *,
         cleanup_receipt_id: str,
     ) -> AdapterTerminalReceipt | None:
@@ -56,9 +56,9 @@ class _QualificationResultWriter:
         return None
 
 
-def _request(capability_key: str, *, suffix: str) -> R123AdapterRequest:
+def _request(capability_key: str, *, suffix: str) -> CampaignAdapterRequest:
     binding = closed_execution_registry()[capability_key]
-    return R123AdapterRequest(
+    return CampaignAdapterRequest(
         tenant_id="r123-live-qualification",
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
@@ -79,7 +79,7 @@ def _request(capability_key: str, *, suffix: str) -> R123AdapterRequest:
 
 @pytest.mark.skipif(
     not LIVE,
-    reason="requires explicit owned-loopback compat_123 live qualification authority",
+    reason="requires explicit owned-loopback R123 live qualification authority",
 )
 def test_r123_real_closed_dispatcher_executes_both_current_owned_loopback_profiles() -> None:
     asyncio.run(_scenario())
@@ -88,9 +88,9 @@ def test_r123_real_closed_dispatcher_executes_both_current_owned_loopback_profil
 async def _scenario() -> None:
     zap_writer = _QualificationResultWriter()
     nuclei_writer = _QualificationResultWriter()
-    dispatcher = ClosedR123Dispatcher((
-        ZapR123Adapter(ZapDockerTransport(ROOT), zap_writer),
-        NucleiR123Adapter(NucleiDockerTransport(ROOT), nuclei_writer),
+    dispatcher = ClosedCampaignDispatcher((
+        ZapCampaignAdapter(ZapDockerTransport(ROOT), zap_writer),
+        NucleiCampaignAdapter(NucleiDockerTransport(ROOT), nuclei_writer),
     ))
     unique = uuid4().hex[:12]
 

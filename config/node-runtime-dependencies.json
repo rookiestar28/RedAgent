@@ -1,9 +1,10 @@
 {
   "schema_version": "1.0",
-  "review_date": "2026-07-17",
+  "review_date": "2026-08-27",
   "source": "https://registry.npmjs.org/<package>/<version>",
   "review_policy": "Every direct dependency must be exactly pinned, present in package-lock.json, license-reviewed, and have zero npm-audit advisories at review time.",
   "packages": [
+    {"name": "@ast-grep/cli", "version": "0.45.0", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
     {"name": "@axe-core/playwright", "version": "4.12.1", "license": "MPL-2.0", "known_vulnerabilities": 0, "status": "reviewed"},
     {"name": "@eslint/js", "version": "9.39.4", "license": "MIT", "known_vulnerabilities": 0, "status": "reviewed"},
     {"name": "@playwright/test", "version": "1.61.1", "license": "Apache-2.0", "known_vulnerabilities": 0, "status": "reviewed"},

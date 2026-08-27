@@ -44,7 +44,7 @@ from redagent_platform.campaign_service.resolver import (
     ResolutionRequest,
 )
 from redagent_platform.campaign_service.registry import closed_execution_registry
-from redagent_platform.campaign_service.repository import r124_principal_is_active
+from redagent_platform.campaign_service.repository import campaign_core_principal_is_active
 from redagent_platform.campaign_service.service import (
     CampaignAuthorizationMaterial,
     CampaignPlanningFacts,
@@ -80,7 +80,7 @@ _EXPECTED_IMAGES = frozenset({
 })
 
 
-def local_r123_promotion_readiness(
+def local_campaign_promotion_readiness(
     workspace: Path,
     *,
     now: datetime,
@@ -102,39 +102,39 @@ def local_r123_promotion_readiness(
 
 
 def _verify_current_zap(root: Path, *, now: datetime):
-    planning = root / "runtime-assets" / "attestations"
+    attestations = root / "runtime-assets" / "attestations"
     return verify_current_zap_promotion(
         promotion_bytes=(
-            planning / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json"
+            attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json"
         ).read_bytes(),
         bundle_bytes=(
-            planning / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.sigstore.json"
+            attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.sigstore.json"
         ).read_bytes(),
         public_key_bytes=(
-            planning / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.pub"
+            attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.pub"
         ).read_bytes(),
         runtime_lock_bytes=(root / "config/r104-zap-runtime-v2.json").read_bytes(),
         qualification_bytes=(
-            planning / "260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
+            attestations / "260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
         ).read_bytes(),
         now=now,
     )
 
 
 def _verify_current_nuclei(root: Path, *, now: datetime):
-    planning = root / "runtime-assets" / "attestations"
+    attestations = root / "runtime-assets" / "attestations"
     qualification = (
-        planning / "260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+        attestations / "260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
     ).read_bytes()
     artifact, signature_sha256 = verify_current_nuclei_artifact_promotion(
         promotion_bytes=(
-            planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json"
+            attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json"
         ).read_bytes(),
         signature_bundle_bytes=(
-            planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json"
+            attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json"
         ).read_bytes(),
         public_key_bytes=(
-            planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub"
+            attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub"
         ).read_bytes(),
         runtime_lock_bytes=(root / "config/r105-nuclei-runtime-v2.json").read_bytes(),
         qualification_bytes=qualification,
@@ -143,10 +143,10 @@ def _verify_current_nuclei(root: Path, *, now: datetime):
     bundle = verify_current_nuclei_bundle_promotion(
         manifest_bytes=(root / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
         signature_bundle_bytes=(
-            planning / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json"
+            attestations / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json"
         ).read_bytes(),
         public_key_bytes=(
-            planning / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub"
+            attestations / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub"
         ).read_bytes(),
         template_bytes=(
             root / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml"
@@ -158,7 +158,7 @@ def _verify_current_nuclei(root: Path, *, now: datetime):
     return artifact, signature_sha256, bundle
 
 
-class LocalR123PlanningFactsOwner:
+class LocalCampaignPlanningFactsOwner:
     """Build the initial compat_119 facts only from the exact signed first-slice artifacts."""
 
     def __init__(self, workspace: Path) -> None:
@@ -248,7 +248,7 @@ class LocalR123PlanningFactsOwner:
         return CampaignPlanningFacts(snapshot, r119_authority, projections)
 
 
-class PolicyBoundR123AuthorizationOwner:
+class PolicyBoundCampaignAuthorizationOwner:
     """Sign one deterministic Tier-1 envelope bound to the current policy decision."""
 
     def __init__(
@@ -923,7 +923,7 @@ def _identity_row_exact(row: object) -> bool:
 async def _read_base_authority(session: object, request: ResolutionRequest, now: datetime):
     engagements = metadata.tables["engagements"]
     targets = metadata.tables["targets"]
-    if not await r124_principal_is_active(
+    if not await campaign_core_principal_is_active(
         session,
         tenant_id=request.tenant_id,
         principal_id=request.principal_id,

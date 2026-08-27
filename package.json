@@ -29,6 +29,7 @@
     "test:all": "npm run check:api && npm run typecheck && npm run lint && npm run test:unit && npm run build && npm test"
   },
   "devDependencies": {
+    "@ast-grep/cli": "0.45.0",
     "@axe-core/playwright": "4.12.1",
     "@eslint/js": "9.39.4",
     "@playwright/test": "1.61.1",

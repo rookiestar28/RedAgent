@@ -11,9 +11,9 @@ from sqlalchemy import and_, select
 
 from redagent_platform.persistence.models import metadata
 from redagent_platform.runner_service.identity import PeerCertificateIdentity
-from redagent_platform.runner_service.compat_123_dispatch import (
+from redagent_platform.runner_service.campaign_dispatch import (
     AdapterTerminalReceipt,
-    R123AdapterRequest,
+    CampaignAdapterRequest,
 )
 from redagent_platform.runner_service.repository import (
     RunnerRepository,
@@ -56,7 +56,7 @@ class PostgresRunnerLifecycleOwner:
 
     async def begin(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         *,
         occurred_at: datetime,
     ) -> PostgresRunnerLifecycleHandle:
@@ -124,7 +124,7 @@ class PostgresRunnerLifecycleOwner:
 
     async def complete(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         handle: PostgresRunnerLifecycleHandle,
         receipt: AdapterTerminalReceipt,
         *,
@@ -190,7 +190,7 @@ class PostgresRunnerLifecycleOwner:
 
     async def ambiguity(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         handle: PostgresRunnerLifecycleHandle,
         *,
         failure_code: str,
@@ -220,7 +220,7 @@ class PostgresRunnerLifecycleOwner:
         _clear(handle.lease_token)
 
 
-async def _manifest_runtime_row(session: object, request: R123AdapterRequest):
+async def _manifest_runtime_row(session: object, request: CampaignAdapterRequest):
     manifests = metadata.tables["runner_job_manifests"]
     registrations = metadata.tables["runner_registrations"]
     classes = metadata.tables["runner_classes"]
@@ -292,7 +292,7 @@ async def _evidence_sha256(
 
 
 def _validate_handle(
-    request: R123AdapterRequest,
+    request: CampaignAdapterRequest,
     handle: PostgresRunnerLifecycleHandle,
 ) -> None:
     if not isinstance(handle, PostgresRunnerLifecycleHandle) or (

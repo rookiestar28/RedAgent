@@ -124,7 +124,7 @@ class DeploymentHardeningValidation:
 REQUIRED_STORAGE_COMPONENTS: frozenset[StorageComponent] = frozenset(StorageComponent)
 
 
-def build_r032_private_topology() -> HardenedDeploymentTopology:
+def build_private_topology() -> HardenedDeploymentTopology:
     return HardenedDeploymentTopology(
         topology_id="R032-private-production-topology",
         exposure=DeploymentExposure.PRIVATE_ONLY,

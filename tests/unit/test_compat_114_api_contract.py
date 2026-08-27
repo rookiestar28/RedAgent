@@ -9,7 +9,7 @@ def _schema(name: str):
         from redagent_platform.api import schemas
         return getattr(schemas, name)
     except (ImportError, AttributeError):
-        pytest.fail(f"compat_114 RED: strict API schema {name} is not implemented")
+        pytest.fail(f"R114 RED: strict API schema {name} is not implemented")
 
 
 def test_workbench_and_mcp_routes_are_registered_once() -> None:
@@ -62,7 +62,7 @@ def test_dashboard_schema_projects_only_typed_fixture_binding_options() -> None:
     schema = _schema("WorkbenchDashboardData")
     binding = {
         "binding_id": "binding-r114-fixture", "campaign_id": "campaign-r114",
-        "campaign_label": "compat_114 synthetic campaign", "plan_id": "plan-r114-stored",
+        "campaign_label": "R114 synthetic campaign", "plan_id": "plan-r114-stored",
         "plan_label": "Stored fixture plan", "successor_plan_id": "plan-r114-successor",
         "successor_plan_label": "Revised fixture plan", "target_id": "target-r114-owned",
         "target_label": "Owned synthetic target", "tool_fqn": "redagent.r114-mcp-fixture.propose.v1",
@@ -76,15 +76,15 @@ def test_dashboard_schema_projects_only_typed_fixture_binding_options() -> None:
 
 def test_fixture_binding_rejects_each_caller_selected_resource_drift() -> None:
     from redagent_platform.api.app import (
-        _r114_fixture_draft_binding,
-        _r114_matches_fixture_draft_binding,
-        _r114_matches_fixture_successor_plan,
+        _fixture_draft_binding,
+        _matches_fixture_draft_binding,
+        _matches_fixture_successor_plan,
     )
 
-    binding = _r114_fixture_draft_binding()
+    binding = _fixture_draft_binding()
     selected = {name: str(binding[name]) for name in ("campaign_id", "plan_id", "target_id", "tool_fqn")}
-    assert _r114_matches_fixture_draft_binding(**selected)
+    assert _matches_fixture_draft_binding(**selected)
     for name in selected:
-        assert not _r114_matches_fixture_draft_binding(**(selected | {name: f"caller-selected-{name}"}))
-    assert _r114_matches_fixture_successor_plan(str(binding["successor_plan_id"]))
-    assert not _r114_matches_fixture_successor_plan("caller-selected-plan")
+        assert not _matches_fixture_draft_binding(**(selected | {name: f"caller-selected-{name}"}))
+    assert _matches_fixture_successor_plan(str(binding["successor_plan_id"]))
+    assert not _matches_fixture_successor_plan("caller-selected-plan")

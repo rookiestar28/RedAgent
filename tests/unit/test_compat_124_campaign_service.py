@@ -7,10 +7,10 @@ import pytest
 
 from redagent_platform.campaign_service.service import (
     IdempotencyConflict,
-    R124AuthorizedResource,
-    R124CampaignCoreService,
-    R124CreateDisabled,
-    R124EtagConflict,
+    CampaignCoreAuthorizedResource,
+    CampaignCoreService,
+    CampaignCoreCreateDisabled,
+    CampaignCoreEtagConflict,
 )
 
 
@@ -20,7 +20,7 @@ NOW = datetime(2026, 8, 24, 12, 0, tzinfo=timezone.utc)
 class Options:
     def __init__(self) -> None:
         self.engagements = (
-            R124AuthorizedResource(
+            CampaignCoreAuthorizedResource(
                 resource_id="engagement-internal-1",
                 label="Owned loopback engagement",
                 revision="7",
@@ -28,7 +28,7 @@ class Options:
                 eligible=True,
                 unavailable_reason=None,
             ),
-            R124AuthorizedResource(
+            CampaignCoreAuthorizedResource(
                 resource_id="engagement-internal-stale",
                 label="Expired engagement",
                 revision="2",
@@ -38,7 +38,7 @@ class Options:
             ),
         )
         self.targets = (
-            R124AuthorizedResource(
+            CampaignCoreAuthorizedResource(
                 resource_id="target-internal-1",
                 label="Owned HTTP fixture",
                 revision="11",
@@ -106,7 +106,7 @@ class Recovery:
     async def recover(self, **values):
         self.calls.append(values)
         if values["expected_revision"] != 4:
-            raise R124EtagConflict("r124_etag_conflict")
+            raise CampaignCoreEtagConflict("r124_etag_conflict")
         return type("Commit", (), {
             "state": "manual_review_required",
             "revision": values["expected_revision"] + 1,
@@ -115,7 +115,7 @@ class Recovery:
 
 
 def test_option_bindings_are_stable_non_identifying_and_ineligibility_is_visible() -> None:
-    service = R124CampaignCoreService(Options(), Starter())
+    service = CampaignCoreService(Options(), Starter())
 
     first = asyncio.run(service.list_engagement_options(
         tenant_id="tenant-r124", principal_id="operator-r124", limit=50,
@@ -137,7 +137,7 @@ def test_option_bindings_are_stable_non_identifying_and_ineligibility_is_visible
 
 def test_start_resolves_bindings_server_side_and_preserves_transport_idempotency() -> None:
     starter = Starter()
-    service = R124CampaignCoreService(Options(), starter)
+    service = CampaignCoreService(Options(), starter)
     engagements = asyncio.run(service.list_engagement_options(
         tenant_id="tenant-r124", principal_id="operator-r124", limit=50,
         cursor=None, now=NOW,
@@ -188,7 +188,7 @@ def test_start_resolves_bindings_server_side_and_preserves_transport_idempotency
 
 def test_stale_forged_wrong_parent_and_arbitrary_objective_fail_before_start() -> None:
     starter = Starter()
-    service = R124CampaignCoreService(Options(), starter)
+    service = CampaignCoreService(Options(), starter)
     engagements = asyncio.run(service.list_engagement_options(
         tenant_id="tenant-r124", principal_id="operator-r124", limit=50,
         cursor=None, now=NOW,
@@ -230,7 +230,7 @@ def test_stale_forged_wrong_parent_and_arbitrary_objective_fail_before_start() -
 def test_projection_and_recovery_delegate_to_canonical_owners_with_etag() -> None:
     presentation = Presentation()
     recovery = Recovery()
-    service = R124CampaignCoreService(
+    service = CampaignCoreService(
         Options(), Starter(), presentation=presentation, recovery=recovery
     )
 
@@ -274,7 +274,7 @@ def test_projection_and_recovery_delegate_to_canonical_owners_with_etag() -> Non
         "replayed": False,
     }
 
-    with pytest.raises(R124EtagConflict, match="r124_etag_conflict"):
+    with pytest.raises(CampaignCoreEtagConflict, match="r124_etag_conflict"):
         asyncio.run(service.recover_campaign(
             action="revoke", reason="Revoke stale campaign authority now",
             tenant_id="tenant-r124", principal_id="operator-r124",
@@ -287,12 +287,12 @@ def test_projection_and_recovery_delegate_to_canonical_owners_with_etag() -> Non
 
 def test_feature_rollback_disables_create_without_disabling_recovery() -> None:
     recovery = Recovery()
-    service = R124CampaignCoreService(
+    service = CampaignCoreService(
         Options(), Starter(), presentation=Presentation(), recovery=recovery,
         create_enabled=False,
     )
 
-    with pytest.raises(R124CreateDisabled, match="r124_campaign_create_disabled"):
+    with pytest.raises(CampaignCoreCreateDisabled, match="r124_campaign_create_disabled"):
         asyncio.run(service.start_campaign(
             object(), tenant_id="tenant-r124", principal_id="operator-r124",
             idempotency_key="transport-create-key", now=NOW,
@@ -324,7 +324,7 @@ def test_start_replay_precedes_mutable_options_and_create_feature_flag() -> None
         "aggregate_sequence": 3,
         "replayed": True,
     })()
-    service = R124CampaignCoreService(
+    service = CampaignCoreService(
         UnavailableOptions(), starter, create_enabled=False
     )
     intent = type("Intent", (), {
@@ -360,7 +360,7 @@ def test_start_replay_rejects_same_key_with_different_original_intent() -> None:
             raise IdempotencyConflict("idempotency_key_request_mismatch")
 
     starter = ConflictingStarter()
-    service = R124CampaignCoreService(Options(), starter)
+    service = CampaignCoreService(Options(), starter)
 
     with pytest.raises(IdempotencyConflict, match="idempotency_key_request_mismatch"):
         asyncio.run(service.start_campaign(

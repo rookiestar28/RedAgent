@@ -71,7 +71,7 @@ def _issue(
 
 
 def _ca(
-    common_name: str = "RedAgent compat_100 test CA",
+    common_name: str = "RedAgent R100 test CA",
     *,
     not_before: datetime = NOW - timedelta(minutes=5),
     not_after: datetime = NOW + timedelta(days=1),
@@ -268,7 +268,7 @@ def _handshake(server_context: ssl.SSLContext, client_context: ssl.SSLContext) -
             with connection, server_context.wrap_socket(connection, server_side=True) as secured:
                 received.append(secured.getpeercert(binary_form=True) or b"")
                 secured.sendall(b"ok")
-        except BaseException as exc:  # transport evidence is returned to the asserting thread
+        except BaseException as exc:  # transport evidence is returned to the asserting thread  # noqa: BLE001
             errors.append(exc)
         finally:
             listener.close()
@@ -280,7 +280,7 @@ def _handshake(server_context: ssl.SSLContext, client_context: ssl.SSLContext) -
         with socket.create_connection(("127.0.0.1", port), timeout=3) as connection:
             with client_context.wrap_socket(connection, server_hostname="localhost") as secured:
                 response = secured.recv(2)
-    except BaseException as exc:
+    except BaseException as exc:  # noqa: BLE001
         errors.append(exc)
     thread.join(timeout=3)
     return (received[0] if received else response), errors

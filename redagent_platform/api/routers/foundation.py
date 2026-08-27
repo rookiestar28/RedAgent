@@ -6,12 +6,10 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    Request,
-    SQLAlchemyError,
-    text,
-)
+from fastapi import Request
+from redagent_platform.api.contracts import ApiError
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 def register_foundation_routes(app: APIRouter, dependencies: ApiDependencies) -> None:
 

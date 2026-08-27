@@ -157,7 +157,7 @@ class IdentityRuntime:
                 response = RedirectResponse(location, status_code=302)
                 _set_login_cookie(response, self._protect_context(tenant_id, transaction_id))
                 return response
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return _error(503, "identity_provider_unavailable")
 
         @app.get("/auth/callback", operation_id="identity_callback")
@@ -267,7 +267,7 @@ class IdentityRuntime:
                 )
                 response.delete_cookie(LOGIN_COOKIE, path="/", secure=True, httponly=True, samesite="lax")
                 return response
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return _error(400, "oidc_callback_rejected")
 
         @app.get("/auth/session", operation_id="identity_session")
@@ -292,7 +292,7 @@ class IdentityRuntime:
                 return _error(401, "session_invalid")
             try:
                 self.enforce_csrf(request, identity)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return _error(403, "csrf_rejected")
             now = self._now()
             raw_cookie = request.cookies.get(SESSION_COOKIE, "")
@@ -317,7 +317,7 @@ class IdentityRuntime:
                             "post_logout_redirect_uri": self.config.post_logout_redirect_uri,
                         }
                     )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
             response = RedirectResponse(location, status_code=303)
             response.delete_cookie(SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="lax")
@@ -364,7 +364,7 @@ class IdentityRuntime:
                         occurred_at=self._now(),
                     )
                 return Response(status_code=204)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return _error(400, "logout_token_rejected")
 
         @app.get("/auth/frontchannel-logout/{tenant_id}", operation_id="identity_frontchannel_logout")
@@ -385,7 +385,7 @@ class IdentityRuntime:
                         occurred_at=self._now(),
                     )
                 return Response(status_code=204)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return _error(400, "frontchannel_logout_rejected")
 
     async def resolve_request(self, request: Request) -> ResolvedRequestIdentity | None:
@@ -409,7 +409,7 @@ class IdentityRuntime:
                 return None
             permissions = frozenset().union(*(ROLE_PERMISSIONS[role] for role in principal.roles))
             return ResolvedRequestIdentity(principal=principal, permissions=permissions)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     async def _resolve_service_request(self, request: Request) -> ResolvedRequestIdentity | None:
@@ -445,7 +445,7 @@ class IdentityRuntime:
                 return None
             permissions = frozenset().union(*(ROLE_PERMISSIONS[role] for role in principal.roles))
             return ResolvedRequestIdentity(principal=principal, permissions=permissions)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None
 
     def service_secret_hash(self, *, tenant_id: str, client_id: str, secret: str) -> str:

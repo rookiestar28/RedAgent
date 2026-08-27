@@ -6,30 +6,38 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
+from datetime import timedelta
+from fastapi import (
     Depends,
-    IdentityAuthorization,
-    IdentityRepositoryConflict,
+    Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _match_roe_reference,
+    _now,
+)
+from redagent_platform.api.schemas.identity_saas import (
     IdentitySaasCancelRequest,
     IdentitySaasCompileRequest,
     IdentitySaasDashboardResponse,
     IdentitySaasPlanResponse,
     IdentitySaasProfileListResponse,
-    IdentitySaasRepository,
     IdentitySaasRunCreateRequest,
     IdentitySaasRunResponse,
-    Request,
-    RequestGuard,
-    _match_roe_reference,
-    _now,
-    compile_identity_plan,
-    identity_emulator_profiles,
-    metadata,
-    select,
-    status,
-    timedelta,
 )
+from redagent_platform.identity_saas.compiler import compile_identity_plan
+from redagent_platform.identity_saas.contracts import IdentityAuthorization
+from redagent_platform.identity_saas.profiles import emulator_profiles as identity_emulator_profiles
+from redagent_platform.identity_saas.repository import (
+    IdentityRepositoryConflict,
+    IdentitySaasRepository,
+)
+from redagent_platform.persistence.models import metadata
+from sqlalchemy import select
 
 def _public_identity_profile(profile) -> dict[str, object]:
     return {

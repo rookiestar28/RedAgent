@@ -1,0 +1,71 @@
+{
+  "schema_version": "redagent.detection-correlation-corpus/v1",
+  "cases": [
+    {
+      "case_id": "confirmed-medium-in-window",
+      "correlation_key": "run-a:zap-invocation",
+      "attack_technique_id": "T1595.002",
+      "disposition": "confirmed",
+      "confidence": "medium",
+      "age_seconds": 300,
+      "expected_correlated": true,
+      "expected_qualified_count": 1,
+      "expected_exclusion": null
+    },
+    {
+      "case_id": "unconfirmed-is-not-trusted",
+      "correlation_key": "run-a:zap-invocation",
+      "attack_technique_id": "T1595.002",
+      "disposition": "unconfirmed",
+      "confidence": "high",
+      "age_seconds": 30,
+      "expected_correlated": false,
+      "expected_qualified_count": 0,
+      "expected_exclusion": "unconfirmed"
+    },
+    {
+      "case_id": "low-confidence-is-not-trusted",
+      "correlation_key": "run-a:zap-invocation",
+      "attack_technique_id": "T1595.002",
+      "disposition": "confirmed",
+      "confidence": "low",
+      "age_seconds": 30,
+      "expected_correlated": false,
+      "expected_qualified_count": 0,
+      "expected_exclusion": "confidence_below_medium"
+    },
+    {
+      "case_id": "expired-is-not-trusted",
+      "correlation_key": "run-a:zap-invocation",
+      "attack_technique_id": "T1595.002",
+      "disposition": "confirmed",
+      "confidence": "high",
+      "age_seconds": 301,
+      "expected_correlated": false,
+      "expected_qualified_count": 0,
+      "expected_exclusion": "outside_timespan"
+    },
+    {
+      "case_id": "just-under-boundary-is-trusted",
+      "correlation_key": "run-a:zap-invocation",
+      "attack_technique_id": "T1595.002",
+      "disposition": "confirmed",
+      "confidence": "medium",
+      "age_seconds": 299.999999,
+      "expected_correlated": true,
+      "expected_qualified_count": 1,
+      "expected_exclusion": null
+    },
+    {
+      "case_id": "just-over-boundary-is-not-trusted",
+      "correlation_key": "run-a:zap-invocation",
+      "attack_technique_id": "T1595.002",
+      "disposition": "confirmed",
+      "confidence": "medium",
+      "age_seconds": 300.000001,
+      "expected_correlated": false,
+      "expected_qualified_count": 0,
+      "expected_exclusion": "outside_timespan"
+    }
+  ]
+}

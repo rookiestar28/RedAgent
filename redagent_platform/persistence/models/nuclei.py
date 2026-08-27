@@ -1,0 +1,276 @@
+"""SQLAlchemy table registrations for the nuclei domain."""
+
+from __future__ import annotations
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    String,
+    Table,
+    UniqueConstraint,
+)
+
+from ._base import _owned_columns, metadata
+
+
+Table(
+    "nuclei_engine_artifacts",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("engine_id", String(100), nullable=False),
+    Column("engine_version", String(32), nullable=False),
+    Column("image_digest", String(71), nullable=False),
+    Column("signature_sha256", String(64), nullable=False),
+    Column("provenance_sha256", String(64), nullable=False),
+    Column("sbom_sha256", String(64), nullable=False),
+    Column("vulnerability_review", String(64), nullable=False),
+    Column("artifact_state", String(32), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "engine_id", "image_digest", name="uq_nuclei_engine_tenant_digest"),
+)
+
+Table(
+    "nuclei_target_attestations",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("attestation_id", String(100), nullable=False),
+    Column("target_id", String(100), nullable=False),
+    Column("target_source_sha256", String(64), nullable=False),
+    Column("target_image_id", String(71), nullable=False),
+    Column("network_id", String(100), nullable=False),
+    Column("container_name", String(100), nullable=False),
+    Column("address_sha256", String(64), nullable=False),
+    Column("endpoint", String(300), nullable=False),
+    Column("allowed_paths", JSON, nullable=False),
+    Column("attestation_sha256", String(64), nullable=False),
+    Column("non_production", Boolean, nullable=False),
+    Column("attestation_state", String(32), nullable=False),
+    Column("issued_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "attestation_id", name="uq_nuclei_target_tenant_attestation"),
+    UniqueConstraint("tenant_id", "target_id", "attestation_sha256", name="uq_nuclei_target_tenant_digest"),
+)
+
+Table(
+    "nuclei_bundle_revisions",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("bundle_id", String(100), nullable=False),
+    Column("bundle_revision", Integer, nullable=False),
+    Column("bundle_sha256", String(64), nullable=False),
+    Column("signature_sha256", String(64), nullable=False),
+    Column("engine_version", String(32), nullable=False),
+    Column("payload_file_count", Integer, nullable=False),
+    Column("bundle_state", String(32), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "bundle_id", "bundle_revision", name="uq_nuclei_bundle_tenant_revision"),
+)
+
+Table(
+    "nuclei_bundle_files",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("bundle_record_id", String(64), ForeignKey("nuclei_bundle_revisions.id"), nullable=False),
+    Column("relative_path", String(300), nullable=False),
+    Column("file_sha256", String(64), nullable=False),
+    Column("size_bytes", BigInteger, nullable=False),
+    Column("file_kind", String(32), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "bundle_record_id", "relative_path", name="uq_nuclei_bundle_file_tenant_path"),
+)
+
+Table(
+    "nuclei_template_revisions",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("bundle_record_id", String(64), ForeignKey("nuclei_bundle_revisions.id"), nullable=False),
+    Column("template_id", String(100), nullable=False),
+    Column("template_sha256", String(64), nullable=False),
+    Column("protocol", String(32), nullable=False),
+    Column("severity", String(32), nullable=False),
+    Column("methods", JSON, nullable=False),
+    Column("paths", JSON, nullable=False),
+    Column("tags", JSON, nullable=False),
+    Column("matcher_names", JSON, nullable=False),
+    Column("template_state", String(32), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "bundle_record_id", "template_id", name="uq_nuclei_template_tenant_id"),
+)
+
+Table(
+    "nuclei_bundle_reviews",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("bundle_record_id", String(64), ForeignKey("nuclei_bundle_revisions.id"), nullable=False),
+    Column("review_id", String(100), nullable=False),
+    Column("author_user_id", String(64), nullable=False),
+    Column("reviewer_user_id", String(64), nullable=False),
+    Column("review_state", String(32), nullable=False),
+    Column("review_sha256", String(64), nullable=False),
+    *_owned_columns(),
+    CheckConstraint("author_user_id <> reviewer_user_id", name="ck_nuclei_bundle_review_sod"),
+    UniqueConstraint("tenant_id", "review_id", name="uq_nuclei_review_tenant_id"),
+)
+
+Table(
+    "nuclei_bundle_promotions",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("bundle_record_id", String(64), ForeignKey("nuclei_bundle_revisions.id"), nullable=False),
+    Column("promotion_id", String(100), nullable=False),
+    Column("promotion_sha256", String(64), nullable=False),
+    Column("signature_sha256", String(64), nullable=False),
+    Column("promotion_state", String(32), nullable=False),
+    Column("promoted_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "promotion_id", name="uq_nuclei_promotion_tenant_id"),
+)
+
+Table(
+    "nuclei_profile_revisions",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("profile_id", String(100), nullable=False),
+    Column("profile_revision", Integer, nullable=False),
+    Column("engine_record_id", String(64), ForeignKey("nuclei_engine_artifacts.id"), nullable=False),
+    Column("bundle_record_id", String(64), ForeignKey("nuclei_bundle_revisions.id"), nullable=False),
+    Column("profile_sha256", String(64), nullable=False),
+    Column("request_limit", Integer, nullable=False),
+    Column("request_rate_per_second", Integer, nullable=False),
+    Column("concurrency_limit", Integer, nullable=False),
+    Column("timeout_seconds", Integer, nullable=False),
+    Column("response_bytes_limit", BigInteger, nullable=False),
+    Column("result_limit", Integer, nullable=False),
+    Column("profile_state", String(32), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "profile_id", "profile_revision", name="uq_nuclei_profile_tenant_revision"),
+)
+
+Table(
+    "nuclei_compiled_plans",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("profile_record_id", String(64), ForeignKey("nuclei_profile_revisions.id"), nullable=False),
+    Column("plan_id", String(100), nullable=False),
+    Column("target_id", String(100), nullable=False),
+    Column("target_attestation_sha256", String(64), nullable=False),
+    Column("policy_decision_id", String(100), nullable=False),
+    Column("roe_version_id", String(64), nullable=False),
+    Column("plan_sha256", String(64), nullable=False),
+    Column("scope_sha256", String(64), nullable=False),
+    Column("compiled_plan", JSON, nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "plan_id", name="uq_nuclei_plan_tenant_id"),
+)
+
+Table(
+    "nuclei_runs",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("plan_record_id", String(64), ForeignKey("nuclei_compiled_plans.id"), nullable=False),
+    Column("run_id", String(100), nullable=False),
+    Column("job_id", String(100), nullable=False),
+    Column("runner_id", String(100), nullable=False),
+    Column("run_state", String(32), nullable=False),
+    Column("progress_percent", Integer, nullable=False),
+    Column("request_count", Integer, nullable=False),
+    Column("response_bytes", BigInteger, nullable=False),
+    Column("result_count", Integer, nullable=False),
+    Column("reason_code", String(100), nullable=False),
+    Column("started_at", DateTime(timezone=True)),
+    Column("completed_at", DateTime(timezone=True)),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "run_id", name="uq_nuclei_run_tenant_id"),
+)
+
+Table(
+    "nuclei_gateway_decisions",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("run_record_id", String(64), ForeignKey("nuclei_runs.id"), nullable=False),
+    Column("decision_id", String(100), nullable=False),
+    Column("method", String(16), nullable=False),
+    Column("path_sha256", String(64), nullable=False),
+    Column("destination_sha256", String(64), nullable=False),
+    Column("allowed", Boolean, nullable=False),
+    Column("reason_code", String(100), nullable=False),
+    Column("request_count", Integer, nullable=False),
+    Column("response_bytes", BigInteger, nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "decision_id", name="uq_nuclei_gateway_tenant_id"),
+)
+
+Table(
+    "nuclei_normalized_results",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("run_record_id", String(64), ForeignKey("nuclei_runs.id"), nullable=False),
+    Column("result_id", String(100), nullable=False),
+    Column("template_id", String(100), nullable=False),
+    Column("matcher_name", String(100), nullable=False),
+    Column("severity", String(32), nullable=False),
+    Column("affected_resource", String(300), nullable=False),
+    Column("fingerprint", String(64), nullable=False),
+    Column("source_sha256", String(64), nullable=False),
+    Column("evidence_instance_id", String(100), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "run_record_id", "fingerprint", name="uq_nuclei_result_tenant_fingerprint"),
+)
+
+Table(
+    "nuclei_result_rejections",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("run_record_id", String(64), ForeignKey("nuclei_runs.id"), nullable=False),
+    Column("rejection_id", String(100), nullable=False),
+    Column("reason_code", String(100), nullable=False),
+    Column("source_sha256", String(64), nullable=False),
+    Column("size_bytes", BigInteger, nullable=False),
+    Column("occurred_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "rejection_id", name="uq_nuclei_rejection_tenant_id"),
+)
+
+Table(
+    "nuclei_cancellation_receipts",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("run_record_id", String(64), ForeignKey("nuclei_runs.id"), nullable=False),
+    Column("receipt_id", String(100), nullable=False),
+    Column("native_stop_attempted", Boolean, nullable=False),
+    Column("native_stop_acknowledged", Boolean, nullable=False),
+    Column("lease_revoked", Boolean, nullable=False),
+    Column("evidence_finalized", Boolean, nullable=False),
+    Column("forced_termination", Boolean, nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "receipt_id", name="uq_nuclei_cancel_tenant_id"),
+)
+
+Table(
+    "nuclei_cleanup_receipts",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("run_record_id", String(64), ForeignKey("nuclei_runs.id"), nullable=False),
+    Column("receipt_id", String(100), nullable=False),
+    Column("container_count", Integer, nullable=False),
+    Column("network_count", Integer, nullable=False),
+    Column("home_count", Integer, nullable=False),
+    Column("key_count", Integer, nullable=False),
+    Column("residual_resource_count", Integer, nullable=False),
+    Column("cleanup_complete", Boolean, nullable=False),
+    Column("inventory_sha256", String(64), nullable=False),
+    Column("completed_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    UniqueConstraint("tenant_id", "receipt_id", name="uq_nuclei_cleanup_tenant_id"),
+)

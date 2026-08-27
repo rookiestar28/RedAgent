@@ -6,40 +6,54 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiDifferentialAuthorization,
+from datetime import (
+    datetime,
+    timedelta,
+)
+from fastapi import (
+    Depends,
+    Request,
+    status,
+)
+from pathlib import Path
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _match_roe_reference,
+    _now,
+    _orchestration,
+)
+from redagent_platform.api.schemas.api_differential import (
     ApiDifferentialCancelRequest,
     ApiDifferentialCompileRequest,
     ApiDifferentialDashboardResponse,
     ApiDifferentialPlanResponse,
-    ApiDifferentialProfileId,
     ApiDifferentialProfileListResponse,
-    ApiDifferentialRepository,
-    ApiDifferentialRepositoryConflict,
     ApiDifferentialRunCreateRequest,
     ApiDifferentialRunResponse,
-    ApiDifferentialTargetBinding,
-    ApiError,
-    CONTRACT_SCHEMA_VERSION,
-    Depends,
-    EXPECTED_WHEEL_SHA256,
-    EmergencyStopSignal,
-    IdentityState,
-    Path,
-    Request,
-    RequestGuard,
-    _match_roe_reference,
-    _now,
-    _orchestration,
-    certified_api_differential_profiles,
-    compile_differential_plan,
-    datetime,
-    metadata,
-    select,
-    status,
-    timedelta,
-    verify_api_differential_promotion,
 )
+from redagent_platform.api_differential_service.artifact import EXPECTED_WHEEL_SHA256
+from redagent_platform.api_differential_service.compiler import compile_differential_plan
+from redagent_platform.api_differential_service.contracts import (
+    ApiDifferentialAuthorization,
+    ApiDifferentialProfileId,
+    ApiDifferentialTargetBinding,
+    IdentityState,
+    certified_profiles as certified_api_differential_profiles,
+)
+from redagent_platform.api_differential_service.promotion import verify_api_differential_promotion
+from redagent_platform.api_differential_service.repository import (
+    ApiDifferentialRepository,
+    ApiDifferentialRepositoryConflict,
+)
+from redagent_platform.orchestration.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    EmergencyStopSignal,
+)
+from redagent_platform.persistence.models import metadata
+from sqlalchemy import select
 
 # IMPORTANT: router modules are one level below api; promotion assets remain workspace-relative.
 def _public_api_differential_profile_static(profile, snapshot) -> dict[str, object]:
@@ -90,7 +104,7 @@ def _public_api_differential_run(row: dict[str, object], plan_id: str) -> dict[s
     }
 
 
-def _require_r106_promotion(now: datetime):
+def _require_api_differential_promotion(now: datetime):
     try:
         return verify_api_differential_promotion(Path(__file__).resolve().parents[3], now=now)
     except (OSError, ValueError) as exc:
@@ -112,7 +126,7 @@ def register_api_differential_routes(app: APIRouter, dependencies: ApiDependenci
         guard: RequestGuard = Depends(require_guard("job:read", safety_preserving=True)),
     ) -> dict:
         del guard
-        _, snapshot, _, _ = _require_r106_promotion(_now())
+        _, snapshot, _, _ = _require_api_differential_promotion(_now())
         return {"data": [
             _public_api_differential_profile_static(profile, snapshot)
             for profile in certified_api_differential_profiles().values()
@@ -131,7 +145,7 @@ def register_api_differential_routes(app: APIRouter, dependencies: ApiDependenci
     ) -> dict:
         now = _now()
         _match_roe_reference(guard, payload.roe_version_id)
-        _, snapshot, _, _ = _require_r106_promotion(now)
+        _, snapshot, _, _ = _require_api_differential_promotion(now)
         profile_id = ApiDifferentialProfileId(payload.profile_id)
         authorization = ApiDifferentialAuthorization(
             tenant_id=guard.security.tenant_id, policy_decision_id=payload.policy_decision_id,
@@ -284,7 +298,7 @@ def register_api_differential_routes(app: APIRouter, dependencies: ApiDependenci
         request: Request,
         guard: RequestGuard = Depends(require_guard("audit:read", safety_preserving=True)),
     ) -> dict:
-        _, snapshot, _, _ = _require_r106_promotion(_now())
+        _, snapshot, _, _ = _require_api_differential_promotion(_now())
         async with session_scope(request) as session:
             data = await ApiDifferentialRepository(
                 session, tenant_id=guard.security.tenant_id,

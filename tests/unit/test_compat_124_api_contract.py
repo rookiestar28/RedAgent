@@ -5,8 +5,8 @@ import asyncio
 import httpx
 
 from redagent_platform.api.app import create_app
-from redagent_platform.campaign_service.service import R124CreateDisabled, R124EtagConflict
-from redagent_platform.campaign_service.status import R123CampaignStatusNotFound
+from redagent_platform.campaign_service.service import CampaignCoreCreateDisabled, CampaignCoreEtagConflict
+from redagent_platform.campaign_service.status import CampaignStatusNotFound
 
 
 AUTH = {
@@ -57,19 +57,19 @@ class CampaignCoreService:
 class CampaignCoreFailureService(CampaignCoreService):
     async def start_campaign(self, intent, **values):
         del intent, values
-        raise R124CreateDisabled("r124_campaign_create_disabled")
+        raise CampaignCoreCreateDisabled("r124_campaign_create_disabled")
 
     async def recover_campaign(self, **values):
         del values
-        raise R124EtagConflict("r124_etag_conflict")
+        raise CampaignCoreEtagConflict("r124_etag_conflict")
 
     async def read_campaign(self, **values):
         del values
-        raise R123CampaignStatusNotFound("r124_campaign_not_found")
+        raise CampaignStatusNotFound("r124_campaign_not_found")
 
     async def inspect_campaign(self, **values):
         del values
-        raise R123CampaignStatusNotFound("r124_campaign_not_found")
+        raise CampaignStatusNotFound("r124_campaign_not_found")
 
 def test_r124_openapi_exposes_only_the_frozen_campaign_core_surface() -> None:
     schema = create_app(test_issuer_enabled=True).openapi()

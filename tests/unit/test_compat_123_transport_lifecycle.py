@@ -11,19 +11,19 @@ import time
 
 import pytest
 
-from redagent_platform.nuclei_service.compat_123_adapter import (
+from redagent_platform.nuclei_service.campaign_adapter import (
     NucleiFixedInvocation,
     NucleiRuntimeReceipt,
 )
-from redagent_platform.nuclei_service.compat_123_transport import (
+from redagent_platform.nuclei_service.campaign_transport import (
     NucleiDockerTransport,
     nuclei_docker_resources,
 )
-from redagent_platform.zap_service.compat_123_adapter import (
+from redagent_platform.zap_service.campaign_adapter import (
     ZapFixedInvocation,
     ZapRuntimeReceipt,
 )
-from redagent_platform.zap_service.compat_123_transport import (
+from redagent_platform.zap_service.campaign_transport import (
     ZapDockerTransport,
     zap_docker_resources,
 )

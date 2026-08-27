@@ -26,8 +26,8 @@ from redagent_platform.campaign_service.execution import (
 )
 from redagent_platform.campaign_service.repository import (
     EffectReservationCommand,
-    R123CampaignRepository,
-    R123RecordConflict,
+    CampaignRepository,
+    CampaignRecordConflict,
 )
 from redagent_platform.campaign_service.registry import (
     ExecutionReadinessFacts,
@@ -42,10 +42,10 @@ from redagent_platform.campaign_service.resolver import (
 from redagent_platform.campaign_service.service import (
     EffectDispatchCommand,
     EffectReconciliationCommand,
-    R124EtagConflict,
+    CampaignCoreEtagConflict,
     binding_from_campaign_context,
 )
-from redagent_platform.runner_service.compat_123_dispatch import R123AdapterRequest
+from redagent_platform.runner_service.campaign_dispatch import CampaignAdapterRequest
 from redagent_platform.containment_service.contracts import (
     ControlScope,
     ControlScopeKind,
@@ -55,9 +55,9 @@ from redagent_platform.containment_service.contracts import (
 from redagent_platform.containment_service.repository import ContainmentRepository
 from redagent_platform.orchestration.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    R123ContainActivityCommand,
-    R123DispatchActivityCommand,
-    R123ReconcileActivityCommand,
+    ClosedLoopContainActivityCommand,
+    ClosedLoopDispatchActivityCommand,
+    ClosedLoopReconcileActivityCommand,
 )
 from redagent_platform.persistence.models import metadata
 from redagent_platform.persistence.repository import IdempotencyConflict
@@ -246,7 +246,7 @@ class PostgresCampaignActivityStateOwner:
 
     async def read_reconcile(
         self,
-        command: R123ReconcileActivityCommand,
+        command: ClosedLoopReconcileActivityCommand,
         *,
         now: datetime,
         correlation_id: str,
@@ -279,7 +279,7 @@ class PostgresCampaignActivityStateOwner:
             or effect["effect_intent_payload"] != intent_payload
             or effect["envelope_sha256"] != common.envelope_sha256
         ):
-            raise R123RecordConflict("campaign_effect_intent_binding_mismatch")
+            raise CampaignRecordConflict("campaign_effect_intent_binding_mismatch")
         authority_current, infrastructure_available = await self._safety_gate.check(
             tenant_id=common.tenant_id,
             principal_id=common.principal_id,
@@ -310,7 +310,7 @@ class PostgresCampaignActivityStateOwner:
             command.revision,
             command.revision + 1 if replay_revision is not None else command.revision,
         }:
-            raise R123RecordConflict("campaign_reconcile_revision_conflict")
+            raise CampaignRecordConflict("campaign_reconcile_revision_conflict")
         return ReconcileMaterial(
             tenant_id=common.tenant_id,
             campaign_id=common.campaign_id,
@@ -361,9 +361,9 @@ class PostgresCampaignActivityStateOwner:
                 )
             ).scalars().all()
         if len(rows) != 1 or not isinstance(rows[0], str):
-            raise R123RecordConflict("campaign_effect_manifest_v2_ambiguous")
+            raise CampaignRecordConflict("campaign_effect_manifest_v2_ambiguous")
         command = _effect_dispatch_command(common, effect, binding)
-        request = R123AdapterRequest(
+        request = CampaignAdapterRequest(
             tenant_id=command.tenant_id,
             capability_id=command.binding.capability_id,
             capability_revision=command.binding.capability_revision,
@@ -390,7 +390,7 @@ class PostgresCampaignActivityStateOwner:
             or not isinstance(runner_id, str)
             or not isinstance(workload_identity, str)
         ):
-            raise R123RecordConflict("campaign_effect_reconciliation_binding_invalid")
+            raise CampaignRecordConflict("campaign_effect_reconciliation_binding_invalid")
         return EffectReconciliationCommand(
             effect_command=command,
             request=request,
@@ -402,7 +402,7 @@ class PostgresCampaignActivityStateOwner:
 
     async def commit_reconcile(
         self,
-        command: R123ReconcileActivityCommand,
+        command: ClosedLoopReconcileActivityCommand,
         material: ReconcileMaterial,
         decision: ReconcileResultV1,
         *,
@@ -461,7 +461,7 @@ class PostgresCampaignActivityStateOwner:
 
     async def read_dispatch(
         self,
-        command: R123DispatchActivityCommand,
+        command: ClosedLoopDispatchActivityCommand,
         *,
         now: datetime,
         correlation_id: str,
@@ -470,7 +470,7 @@ class PostgresCampaignActivityStateOwner:
             common = await _read_common(session, command.tenant_id, command.campaign_id)
             effect = await _read_effect(session, common, effect_id=command.effect_id)
             if effect is None:
-                raise R123RecordConflict("campaign_dispatch_effect_not_found")
+                raise CampaignRecordConflict("campaign_dispatch_effect_not_found")
             replay = await _read_checkpoint_replay(
                 session,
                 tenant_id=command.tenant_id,
@@ -503,12 +503,12 @@ class PostgresCampaignActivityStateOwner:
         if common.aggregate_sequence != (
             material.committed_revision or command.expected_revision
         ):
-            raise R123RecordConflict("campaign_dispatch_revision_conflict")
+            raise CampaignRecordConflict("campaign_dispatch_revision_conflict")
         return material
 
     async def commit_dispatch(
         self,
-        command: R123DispatchActivityCommand,
+        command: ClosedLoopDispatchActivityCommand,
         material: DispatchMaterial,
         *,
         state: str,
@@ -556,7 +556,7 @@ class PostgresCampaignActivityStateOwner:
 
     async def contain(
         self,
-        command: R123ContainActivityCommand,
+        command: ClosedLoopContainActivityCommand,
         *,
         now: datetime,
         correlation_id: str,
@@ -572,7 +572,7 @@ class PostgresCampaignActivityStateOwner:
     async def contain_in_session(
         self,
         session: object,
-        command: R123ContainActivityCommand,
+        command: ClosedLoopContainActivityCommand,
         *,
         now: datetime,
         correlation_id: str,
@@ -598,7 +598,7 @@ class PostgresCampaignActivityStateOwner:
             common.strategy_revision_id != command.strategy_revision_id
             or common.aggregate_sequence != command.expected_revision
         ):
-            raise R123RecordConflict("campaign_containment_binding_conflict")
+            raise CampaignRecordConflict("campaign_containment_binding_conflict")
         state, reason = await self._containment_owner.contain(
             tenant_id=common.tenant_id,
             campaign_id=common.campaign_id,
@@ -721,7 +721,7 @@ class PostgresCampaignActivityStateOwner:
                                 require_retest=False,
                             )
                         trusted_result_complete = True
-                    except R123RecordConflict:
+                    except CampaignRecordConflict:
                         trusted_result_complete = False
                     try:
                         async with self._sessions() as session, session.begin():
@@ -737,9 +737,9 @@ class PostgresCampaignActivityStateOwner:
                                 cleanup_receipt_id=cleanup_receipt_id,
                             )
                         terminal_result_complete = True
-                    except R123RecordConflict:
+                    except CampaignRecordConflict:
                         terminal_result_complete = False
-                except R123RecordConflict:
+                except CampaignRecordConflict:
                     # Missing owner truth is an observed incomplete obligation, not success.
                     base_result_complete = False
         return NodeObservedV1(
@@ -763,7 +763,7 @@ class PostgresCampaignActivityStateOwner:
 
     async def _is_reconcile_replay(
         self,
-        command: R123ReconcileActivityCommand,
+        command: ClosedLoopReconcileActivityCommand,
         *,
         node_id: str,
         effect_id: str,
@@ -793,13 +793,13 @@ class PostgresCampaignActivityStateOwner:
 
 
 @dataclass(frozen=True, slots=True)
-class R124RecoveryCommit:
+class CampaignCoreRecoveryCommit:
     state: str
     revision: int
     replayed: bool
 
 
-class PostgresR124CampaignRecoveryOwner:
+class PostgresCampaignCoreRecoveryOwner:
     """Persist compat_124 idempotency around the canonical campaign containment transition."""
 
     def __init__(
@@ -823,15 +823,15 @@ class PostgresR124CampaignRecoveryOwner:
         request_sha256: str,
         now: datetime,
         correlation_id: str,
-    ) -> R124RecoveryCommit:
+    ) -> CampaignCoreRecoveryCommit:
         operation = "campaign.r124.recovery"
         async with self._sessions() as session, session.begin():
             await _tenant_context(session, tenant_id)
             await session.execute(
                 text("SELECT pg_advisory_xact_lock(:lock_key)"),
-                {"lock_key": _r124_recovery_lock(tenant_id, idempotency_key)},
+                {"lock_key": _campaign_core_recovery_lock(tenant_id, idempotency_key)},
             )
-            replay = await _r124_recovery_replay(
+            replay = await _campaign_core_recovery_replay(
                 session,
                 tenant_id=tenant_id,
                 operation=operation,
@@ -842,8 +842,8 @@ class PostgresR124CampaignRecoveryOwner:
                 return replay
             common = await _read_common(session, tenant_id, campaign_id)
             if common.aggregate_sequence != expected_revision:
-                raise R124EtagConflict("r124_etag_conflict")
-            command = R123ContainActivityCommand(
+                raise CampaignCoreEtagConflict("r124_etag_conflict")
+            command = ClosedLoopContainActivityCommand(
                 schema_version=CONTRACT_SCHEMA_VERSION,
                 tenant_id=tenant_id,
                 campaign_id=campaign_id,
@@ -861,10 +861,10 @@ class PostgresR124CampaignRecoveryOwner:
                     now=now,
                     correlation_id=correlation_id,
                 )
-            except R123RecordConflict as exc:
-                raise R124EtagConflict("r124_etag_conflict") from exc
+            except CampaignRecordConflict as exc:
+                raise CampaignCoreEtagConflict("r124_etag_conflict") from exc
 
-            result = R124RecoveryCommit(
+            result = CampaignCoreRecoveryCommit(
                 state=committed.state,
                 revision=committed.revision,
                 replayed=False,
@@ -889,14 +889,14 @@ class PostgresR124CampaignRecoveryOwner:
         return result
 
 
-async def _r124_recovery_replay(
+async def _campaign_core_recovery_replay(
     session: object,
     *,
     tenant_id: str,
     operation: str,
     idempotency_key: str,
     request_sha256: str,
-) -> R124RecoveryCommit | None:
+) -> CampaignCoreRecoveryCommit | None:
     records = metadata.tables["idempotency_records"]
     prior = (
         await session.execute(
@@ -918,10 +918,10 @@ async def _r124_recovery_replay(
     revision = body.get("revision")
     if not isinstance(state, str) or isinstance(revision, bool) or not isinstance(revision, int):
         raise ValueError("r124_recovery_replay_invalid")
-    return R124RecoveryCommit(state=state, revision=revision, replayed=True)
+    return CampaignCoreRecoveryCommit(state=state, revision=revision, replayed=True)
 
 
-def _r124_recovery_lock(tenant_id: str, idempotency_key: str) -> int:
+def _campaign_core_recovery_lock(tenant_id: str, idempotency_key: str) -> int:
     digest = hashlib.sha256(
         f"{tenant_id}\x1fcampaign.r124.recovery\x1f{idempotency_key}".encode()
     ).digest()
@@ -957,7 +957,7 @@ async def _read_common(session, tenant_id: str, campaign_id: str) -> _Common:
         )
     ).mappings().one_or_none()
     if row is None:
-        raise R123RecordConflict("campaign_activity_state_not_found")
+        raise CampaignRecordConflict("campaign_activity_state_not_found")
     start_payload = await session.scalar(
         select(outbox.c.payload).where(
             outbox.c.tenant_id == tenant_id,
@@ -967,12 +967,12 @@ async def _read_common(session, tenant_id: str, campaign_id: str) -> _Common:
         )
     )
     if not isinstance(start_payload, dict):
-        raise R123RecordConflict("campaign_activity_start_lineage_not_found")
+        raise CampaignRecordConflict("campaign_activity_start_lineage_not_found")
     if (
         start_payload.get("principal_id") != row["created_by_user_id"]
         or start_payload.get("engagement_id") != row["engagement_id"]
     ):
-        raise R123RecordConflict("campaign_activity_start_lineage_mismatch")
+        raise CampaignRecordConflict("campaign_activity_start_lineage_mismatch")
     return _Common(
         tenant_id=tenant_id,
         campaign_id=str(row["campaign_id"]),
@@ -1000,7 +1000,7 @@ async def _validate_common_reconcile(session, common: _Common, command) -> None:
         or common.workflow_request_sha256 != command.workflow_request_sha256
         or common.status == "completed"
     ):
-        raise R123RecordConflict("campaign_reconcile_binding_conflict")
+        raise CampaignRecordConflict("campaign_reconcile_binding_conflict")
 
 
 async def _read_effect(session, common: _Common, *, effect_id: str | None = None):
@@ -1024,9 +1024,9 @@ async def _read_effect_rows(
         query = query.where(effects.c.effect_id == effect_id)
     rows = (await session.execute(query.order_by(effects.c.outbox_sequence))).mappings().all()
     if len(rows) > 1 and effect_id is not None:
-        raise R123RecordConflict("campaign_dispatch_effect_inventory_invalid")
+        raise CampaignRecordConflict("campaign_dispatch_effect_inventory_invalid")
     if len(rows) > 2:
-        raise R123RecordConflict("campaign_effect_depth_exceeded")
+        raise CampaignRecordConflict("campaign_effect_depth_exceeded")
     return rows
 
 
@@ -1054,19 +1054,19 @@ async def _read_checkpoint_replay(
         payload.get("source_revision") != source_revision
         or payload.get("checkpoint_kind") != checkpoint_kind
     ):
-        raise R123RecordConflict("campaign_activity_checkpoint_replay_conflict")
+        raise CampaignRecordConflict("campaign_activity_checkpoint_replay_conflict")
     return payload
 
 
 def _selected_action(plan: dict[str, object], effect) -> dict[str, object]:
     primary = plan.get("primary")
     if not isinstance(primary, dict):
-        raise R123RecordConflict("campaign_plan_primary_invalid")
+        raise CampaignRecordConflict("campaign_plan_primary_invalid")
     if effect is None or _effect_capability_id(effect) == primary.get("capability_id"):
         return primary
     successor = plan.get("successor")
     if not isinstance(successor, dict) or not isinstance(successor.get("action"), dict):
-        raise R123RecordConflict("campaign_plan_effect_binding_invalid")
+        raise CampaignRecordConflict("campaign_plan_effect_binding_invalid")
     return successor["action"]
 
 
@@ -1077,7 +1077,7 @@ async def _current_action_and_effect(
     effects = await _read_effect_rows(session, common)
     primary = common.plan_payload.get("primary")
     if not isinstance(primary, dict):
-        raise R123RecordConflict("campaign_plan_primary_invalid")
+        raise CampaignRecordConflict("campaign_plan_primary_invalid")
     primary_effect = next(
         (
             row
@@ -1167,16 +1167,16 @@ def _action_for_node(common: _Common, node_id: str) -> dict[str, object]:
             common, capability_id
         )[0] == node_id:
             return action
-    raise R123RecordConflict("campaign_plan_node_binding_invalid")
+    raise CampaignRecordConflict("campaign_plan_node_binding_invalid")
 
 
 def _effect_capability_id(effect) -> str:
     value = effect["effect_intent_payload"].get("capability_id")
     if not isinstance(value, str) or "@" not in value:
-        raise R123RecordConflict("campaign_effect_capability_invalid")
+        raise CampaignRecordConflict("campaign_effect_capability_invalid")
     capability_id, revision = value.rsplit("@", 1)
     if revision != "2":
-        raise R123RecordConflict("campaign_effect_capability_revision_invalid")
+        raise CampaignRecordConflict("campaign_effect_capability_revision_invalid")
     return capability_id
 
 
@@ -1245,14 +1245,14 @@ def _effect_depth(plan: dict[str, object], capability_id: str) -> int:
 def _plan_depth(plan: dict[str, object]) -> int:
     value = plan.get("depth")
     if isinstance(value, bool) or not isinstance(value, int) or value not in {1, 2}:
-        raise R123RecordConflict("campaign_plan_depth_invalid")
+        raise CampaignRecordConflict("campaign_plan_depth_invalid")
     return value
 
 
 def _required_text(value: dict[str, object], key: str) -> str:
     item = value.get(key)
     if not isinstance(item, str) or not item:
-        raise R123RecordConflict(f"campaign_plan_{key}_invalid")
+        raise CampaignRecordConflict(f"campaign_plan_{key}_invalid")
     return item
 
 
@@ -1284,7 +1284,7 @@ def _canonical_sha256(value: object) -> str:
 
 
 def _repo(session, *, tenant_id: str, actor_user_id: str, correlation_id: str):
-    return R123CampaignRepository(
+    return CampaignRepository(
         session,
         tenant_id=tenant_id,
         actor_user_id=actor_user_id,

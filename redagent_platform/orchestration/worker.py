@@ -23,7 +23,7 @@ from redagent_platform.orchestration.gateway import (
 from redagent_platform.orchestration.workflow import (
     CampaignLifecycleWorkflow,
     JobLifecycleWorkflow,
-    R123ClosedLoopWorkflow,
+    ClosedLoopWorkflow,
 )
 from redagent_platform.persistence.database import async_engine_options, load_database_settings
 from redagent_platform.campaign_service.registry import (
@@ -113,7 +113,7 @@ def build_workflow_worker(
     return Worker(
         client,
         task_queue=settings.task_queue,
-        workflows=[JobLifecycleWorkflow, CampaignLifecycleWorkflow, R123ClosedLoopWorkflow],
+        workflows=[JobLifecycleWorkflow, CampaignLifecycleWorkflow, ClosedLoopWorkflow],
         activities=[
             activities.admit_job,
             activities.apply_command,
@@ -121,9 +121,9 @@ def build_workflow_worker(
             activities.admit_campaign,
             activities.dispatch_synthetic_job,
             activities.contain_synthetic_job,
-            activities.reconcile_r123_level,
-            activities.dispatch_r123_effect,
-            activities.contain_r123,
+            activities.reconcile_closed_loop_level,
+            activities.dispatch_closed_loop_effect,
+            activities.contain_campaign,
         ],
         max_concurrent_workflow_tasks=registration.max_concurrent_workflow_tasks,
         max_concurrent_activities=registration.max_concurrent_activities,

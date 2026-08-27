@@ -6,9 +6,22 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
+from datetime import datetime
+from fastapi import (
     Depends,
+    Request,
+    status,
+)
+from pathlib import Path
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _idempotency,
+    _now,
+)
+from redagent_platform.api.schemas.finding_operations import (
     FindingOperationsDashboardResponse,
     FindingOperationsDeliveryRequest,
     FindingOperationsDeliveryResponse,
@@ -20,13 +33,6 @@ from redagent_platform.api._route_support import (
     FindingOperationsReportRequest,
     FindingOperationsReportResponse,
     FindingOperationsReviewRequest,
-    Path,
-    Request,
-    RequestGuard,
-    _idempotency,
-    _now,
-    datetime,
-    status,
 )
 
 # IMPORTANT: router modules are one level below api; promotion assets remain workspace-relative.
@@ -63,7 +69,7 @@ def _public_finding_delivery(row: dict[str, object], profile_id: str, report_id:
             "next_attempt_at", "version")}
 
 
-def _require_r115_promotion(now: datetime):
+def _require_finding_operations_promotion(now: datetime):
     from redagent_platform.finding_operations.promotion import verify_finding_operations_promotion
 
     try:
@@ -87,7 +93,7 @@ def register_finding_operations_routes(app: APIRouter, dependencies: ApiDependen
     ) -> dict:
         from redagent_platform.finding_operations.repository import FindingOperationsRepository
 
-        _require_r115_promotion(_now())
+        _require_finding_operations_promotion(_now())
         async with session_scope(request) as session:
             data = await FindingOperationsRepository(
                 session, tenant_id=guard.security.tenant_id, actor_user_id=guard.security.subject,
@@ -122,7 +128,7 @@ def register_finding_operations_routes(app: APIRouter, dependencies: ApiDependen
         from redagent_platform.finding_operations.repository import FindingOperationsRepository
 
         now = _now()
-        _require_r115_promotion(now)
+        _require_finding_operations_promotion(now)
         record = FindingOccurrenceInput(
             source_record_id=payload.source_record_id, tool="r115-fixture", tool_version="1.0.0",
             rule_id="fixture-missing-hsts", rule_version="r115-closed-v1",
@@ -155,7 +161,7 @@ def register_finding_operations_routes(app: APIRouter, dependencies: ApiDependen
     ) -> dict:
         from redagent_platform.finding_operations.repository import FindingOperationsRepository
 
-        _require_r115_promotion(_now())
+        _require_finding_operations_promotion(_now())
         try:
             async with session_scope(request) as session:
                 row = await FindingOperationsRepository(
@@ -179,7 +185,7 @@ def register_finding_operations_routes(app: APIRouter, dependencies: ApiDependen
         from redagent_platform.finding_operations.repository import FindingOperationsRepository
 
         now = _now()
-        _require_r115_promotion(now)
+        _require_finding_operations_promotion(now)
         try:
             async with session_scope(request) as session:
                 row = await FindingOperationsRepository(
@@ -210,7 +216,7 @@ def register_finding_operations_routes(app: APIRouter, dependencies: ApiDependen
         from redagent_platform.finding_operations.repository import FindingOperationsRepository
 
         now = _now()
-        _require_r115_promotion(now)
+        _require_finding_operations_promotion(now)
         try:
             async with session_scope(request) as session:
                 repository = FindingOperationsRepository(
@@ -238,7 +244,7 @@ def register_finding_operations_routes(app: APIRouter, dependencies: ApiDependen
     ) -> dict:
         from redagent_platform.finding_operations.repository import FindingOperationsRepository
 
-        _require_r115_promotion(_now())
+        _require_finding_operations_promotion(_now())
         try:
             async with session_scope(request) as session:
                 row = await FindingOperationsRepository(

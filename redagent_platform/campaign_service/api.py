@@ -11,24 +11,36 @@ from pydantic import BaseModel, ConfigDict, Field
 from redagent_platform.campaign_service.qualification import (
     OwnedLoopbackQualificationIntentV1,
     QualificationStartReceiptV1,
-    R123QualificationService,
-    R123StatusService,
+    CampaignQualificationService,
+    CampaignStatusService,
 )
 from redagent_platform.campaign_service.status import (
-    R123CampaignStatusNotFound,
-    R123CampaignStatusOwner,
-    R123CampaignStatusV1,
-    R124PrincipalInactive,
+    CampaignStatusNotFound,
+    CampaignStatusOwner,
+    CampaignStatusV1,
+    CampaignCorePrincipalInactive,
 )
-from redagent_platform.campaign_service.service import R124CreateDisabled, R124EtagConflict
+from redagent_platform.campaign_service.service import CampaignCoreCreateDisabled, CampaignCoreEtagConflict
 from redagent_platform.persistence.repository import IdempotencyConflict
+
+
+CAMPAIGN_CORE_ENGAGEMENT_OPTIONS_OPERATION_ID = "list_r124_engagement_options"
+CAMPAIGN_CORE_TARGET_OPTIONS_OPERATION_ID = "list_r124_target_options"
+CAMPAIGN_CORE_RISK_PROFILE_OPTIONS_OPERATION_ID = "list_r124_risk_profile_options"
+CAMPAIGN_CORE_START_OPERATION_ID = "start_r124_campaign"
+CAMPAIGN_CORE_LIST_OPERATION_ID = "list_r124_campaigns"
+CAMPAIGN_CORE_GET_OPERATION_ID = "get_r124_campaign"
+CAMPAIGN_CORE_INSPECT_OPERATION_ID = "inspect_r124_campaign"
+CAMPAIGN_CORE_ATTENTION_OPERATION_ID = "list_r124_attention"
+CAMPAIGN_CORE_STOP_OPERATION_ID = "stop_r124_campaign"
+CAMPAIGN_CORE_REVOKE_OPERATION_ID = "revoke_r124_campaign"
 
 
 class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
-class R123QualificationRequest(_StrictModel):
+class CampaignQualificationRequest(_StrictModel):
     fixture_id: Literal["owned-loopback-http-first-slice"]
     objective_kind: Literal["http_posture", "security_header_assertion"]
     header_code: Literal["x-content-type-options"] | None = None
@@ -36,29 +48,29 @@ class R123QualificationRequest(_StrictModel):
     risk_profile: Literal["tier1_passive"]
 
 
-class R123QualificationData(_StrictModel):
+class CampaignQualificationData(_StrictModel):
     schema_version: Literal["redagent.r123-qualification-start-receipt/v1"]
     campaign_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$")
     aggregate_sequence: Literal[1]
     status: Literal["dispatch_pending"]
 
 
-class R123QualificationResponse(_StrictModel):
-    data: R123QualificationData
+class CampaignQualificationResponse(_StrictModel):
+    data: CampaignQualificationData
 
 
-class R123StatusData(_StrictModel):
+class CampaignReadinessStatusData(_StrictModel):
     ready: bool
     execution_enabled: bool
     reason: str = Field(min_length=1, max_length=100)
     capability_ids: tuple[str, ...] = Field(max_length=2)
 
 
-class R123StatusResponse(_StrictModel):
-    data: R123StatusData
+class CampaignReadinessStatusResponse(_StrictModel):
+    data: CampaignReadinessStatusData
 
 
-class R123CampaignEffectStatusData(_StrictModel):
+class CampaignEffectStatusData(_StrictModel):
     capability_id: str = Field(min_length=1, max_length=101)
     state: str = Field(min_length=1, max_length=32)
     reconciliation_state: str = Field(min_length=1, max_length=32)
@@ -66,7 +78,7 @@ class R123CampaignEffectStatusData(_StrictModel):
     cleanup_complete: bool
 
 
-class R123CampaignStatusData(_StrictModel):
+class CampaignStatusData(_StrictModel):
     schema_version: Literal["redagent.r123-campaign-status/v1"]
     campaign_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$")
     status: str = Field(min_length=1, max_length=32)
@@ -75,26 +87,26 @@ class R123CampaignStatusData(_StrictModel):
     attention_reason: str | None = Field(default=None, max_length=100)
     workflow_delivery_state: str = Field(min_length=1, max_length=32)
     workflow_reconciliation_state: str = Field(min_length=1, max_length=100)
-    effects: tuple[R123CampaignEffectStatusData, ...] = Field(max_length=2)
+    effects: tuple[CampaignEffectStatusData, ...] = Field(max_length=2)
     terminal_receipt_present: bool
 
 
-class R123CampaignStatusResponse(_StrictModel):
-    data: R123CampaignStatusData
+class CampaignStatusResponse(_StrictModel):
+    data: CampaignStatusData
 
 
-class R124CampaignStartRequest(_StrictModel):
+class CampaignCoreStartRequest(_StrictModel):
     engagement_binding: str = Field(min_length=1, max_length=100)
     target_binding: str = Field(min_length=1, max_length=100)
     objective: str = Field(min_length=1, max_length=300)
     risk_profile: str = Field(min_length=1, max_length=100)
 
 
-class R124RecoveryRequest(_StrictModel):
+class CampaignCoreRecoveryRequest(_StrictModel):
     reason: str = Field(min_length=10, max_length=500)
 
 
-class R124OptionData(_StrictModel):
+class CampaignCoreOptionData(_StrictModel):
     binding: str = Field(min_length=1, max_length=100)
     label: str = Field(min_length=1, max_length=200)
     revision: str = Field(min_length=1, max_length=100)
@@ -103,25 +115,25 @@ class R124OptionData(_StrictModel):
     unavailable_reason: str | None = Field(default=None, max_length=200)
 
 
-class R124PageData(_StrictModel):
+class CampaignCorePageData(_StrictModel):
     limit: int = Field(ge=1, le=50)
     next_cursor: str | None = Field(default=None, max_length=200)
 
 
-class R124EngagementOptionPageResponse(_StrictModel):
-    data: tuple[R124OptionData, ...] = Field(max_length=50)
-    page: R124PageData
+class CampaignCoreEngagementOptionPageResponse(_StrictModel):
+    data: tuple[CampaignCoreOptionData, ...] = Field(max_length=50)
+    page: CampaignCorePageData
 
 
-class R124TargetOptionPageResponse(R124EngagementOptionPageResponse):
+class CampaignCoreTargetOptionPageResponse(CampaignCoreEngagementOptionPageResponse):
     pass
 
 
-class R124RiskProfileOptionPageResponse(R124EngagementOptionPageResponse):
+class CampaignCoreRiskProfileOptionPageResponse(CampaignCoreEngagementOptionPageResponse):
     pass
 
 
-class R124CampaignMutationData(_StrictModel):
+class CampaignCoreMutationData(_StrictModel):
     campaign_id: str = Field(min_length=1, max_length=64)
     status: str = Field(min_length=1, max_length=32)
     aggregate_sequence: int = Field(ge=1)
@@ -129,11 +141,11 @@ class R124CampaignMutationData(_StrictModel):
     replayed: bool
 
 
-class R124CampaignMutationResponse(_StrictModel):
-    data: R124CampaignMutationData
+class CampaignCoreMutationResponse(_StrictModel):
+    data: CampaignCoreMutationData
 
 
-class R124CampaignSummaryData(_StrictModel):
+class CampaignCoreSummaryData(_StrictModel):
     campaign_id: str = Field(min_length=1, max_length=64)
     label: str = Field(min_length=1, max_length=200)
     status: str = Field(min_length=1, max_length=32)
@@ -142,35 +154,35 @@ class R124CampaignSummaryData(_StrictModel):
     aggregate_sequence: int = Field(ge=1)
 
 
-class R124CampaignSummaryPageResponse(_StrictModel):
-    data: tuple[R124CampaignSummaryData, ...] = Field(max_length=50)
-    page: R124PageData
+class CampaignCoreSummaryPageResponse(_StrictModel):
+    data: tuple[CampaignCoreSummaryData, ...] = Field(max_length=50)
+    page: CampaignCorePageData
 
 
-class R124AuthorityData(_StrictModel):
+class CampaignCoreAuthorityData(_StrictModel):
     state: str = Field(min_length=1, max_length=64)
     attention_reason: str | None = Field(default=None, max_length=100)
 
 
-class R124ContextData(_StrictModel):
+class CampaignCoreContextData(_StrictModel):
     schema_version: str = Field(alias="schema", min_length=1, max_length=100)
     coverage: str = Field(min_length=1, max_length=100)
     freshness: str = Field(min_length=1, max_length=100)
 
 
-class R124CandidateData(_StrictModel):
+class CampaignCoreCandidateData(_StrictModel):
     label: str = Field(min_length=1, max_length=200)
     eligible: bool
     reason: str = Field(min_length=1, max_length=200)
 
 
-class R124DecisionData(_StrictModel):
+class CampaignCoreDecisionData(_StrictModel):
     outcome: str = Field(min_length=1, max_length=64)
     reason: str = Field(min_length=1, max_length=200)
-    candidates: tuple[R124CandidateData, ...] = Field(max_length=2)
+    candidates: tuple[CampaignCoreCandidateData, ...] = Field(max_length=2)
 
 
-class R124PlanData(_StrictModel):
+class CampaignCorePlanData(_StrictModel):
     primary: str = Field(min_length=1, max_length=200)
     successor: str | None = Field(default=None, max_length=200)
     successor_condition: str | None = Field(default=None, max_length=100)
@@ -182,7 +194,7 @@ class R124PlanData(_StrictModel):
     approval: str = Field(min_length=1, max_length=100)
 
 
-class R124EffectData(_StrictModel):
+class CampaignCoreEffectData(_StrictModel):
     capability: str = Field(min_length=1, max_length=200)
     state: str = Field(min_length=1, max_length=64)
     reconciliation: str = Field(min_length=1, max_length=64)
@@ -191,48 +203,48 @@ class R124EffectData(_StrictModel):
     failure: str | None = Field(default=None, max_length=100)
 
 
-class R124RetestData(_StrictModel):
+class CampaignCoreRetestData(_StrictModel):
     coverage: str | None = Field(default=None, max_length=100)
     result: str | None = Field(default=None, max_length=100)
 
 
-class R124FindingData(_StrictModel):
+class CampaignCoreFindingData(_StrictModel):
     title: str = Field(min_length=1, max_length=500)
     severity: str = Field(min_length=1, max_length=32)
     disposition: str = Field(min_length=1, max_length=64)
     owner: str | None = Field(default=None, max_length=200)
     state: str = Field(min_length=1, max_length=64)
     residual_risk: str = Field(min_length=1, max_length=100)
-    retest: R124RetestData
+    retest: CampaignCoreRetestData
 
 
-class R124RecoveryData(_StrictModel):
+class CampaignCoreRecoveryData(_StrictModel):
     stop_visible: bool
     revoke_visible: bool
     cleanup_required: bool
     guidance: str = Field(min_length=1, max_length=300)
 
 
-class R124CampaignAggregateData(_StrictModel):
+class CampaignCoreAggregateData(_StrictModel):
     campaign_id: str = Field(min_length=1, max_length=64)
     label: str = Field(min_length=1, max_length=200)
     status: str = Field(min_length=1, max_length=64)
     aggregate_sequence: int = Field(ge=1)
     etag: str = Field(min_length=3, max_length=100)
-    authority: R124AuthorityData
-    context: R124ContextData
-    decision: R124DecisionData
-    plan: R124PlanData
-    effects: tuple[R124EffectData, ...] = Field(max_length=2)
-    findings: tuple[R124FindingData, ...] = Field(max_length=100)
-    recovery: R124RecoveryData
+    authority: CampaignCoreAuthorityData
+    context: CampaignCoreContextData
+    decision: CampaignCoreDecisionData
+    plan: CampaignCorePlanData
+    effects: tuple[CampaignCoreEffectData, ...] = Field(max_length=2)
+    findings: tuple[CampaignCoreFindingData, ...] = Field(max_length=100)
+    recovery: CampaignCoreRecoveryData
 
 
-class R124CampaignAggregateResponse(_StrictModel):
-    data: R124CampaignAggregateData
+class CampaignCoreAggregateResponse(_StrictModel):
+    data: CampaignCoreAggregateData
 
 
-class R124CampaignInspectorData(_StrictModel):
+class CampaignCoreInspectorData(_StrictModel):
     campaign_id: str = Field(min_length=1, max_length=64)
     engagement_id: str = Field(min_length=1, max_length=64)
     roe_version_id: str = Field(min_length=1, max_length=64)
@@ -247,11 +259,11 @@ class R124CampaignInspectorData(_StrictModel):
     terminal_receipt_sha256: str | None = Field(default=None, min_length=64, max_length=64)
 
 
-class R124CampaignInspectorResponse(_StrictModel):
-    data: R124CampaignInspectorData
+class CampaignCoreInspectorResponse(_StrictModel):
+    data: CampaignCoreInspectorData
 
 
-class R124AttentionData(_StrictModel):
+class CampaignCoreAttentionData(_StrictModel):
     binding: str = Field(min_length=1, max_length=100)
     campaign_label: str = Field(min_length=1, max_length=200)
     category: str = Field(min_length=1, max_length=64)
@@ -260,12 +272,12 @@ class R124AttentionData(_StrictModel):
     occurred_at: datetime
 
 
-class R124AttentionPageResponse(_StrictModel):
-    data: tuple[R124AttentionData, ...] = Field(max_length=50)
-    page: R124PageData
+class CampaignCoreAttentionPageResponse(_StrictModel):
+    data: tuple[CampaignCoreAttentionData, ...] = Field(max_length=50)
+    page: CampaignCorePageData
 
 
-def build_r123_router(
+def build_campaign_router(
     *,
     require_guard: Callable[..., object],
     api_error: Callable[[int, str, str], Exception],
@@ -280,17 +292,17 @@ def build_r123_router(
     @selected_router.get(
         "/api/v1/internal/r123/status",
         operation_id="get_r123_internal_status",
-        response_model=R123StatusResponse,
+        response_model=CampaignReadinessStatusResponse,
     )
     async def get_status(
         request: Request,
         guard=Depends(require_guard("campaign:read", safety_preserving=True)),
-    ) -> R123StatusResponse:
+    ) -> CampaignReadinessStatusResponse:
         del guard
-        service: R123StatusService = request.app.state.r123_status_service
+        service: CampaignStatusService = request.app.state.r123_status_service
         projected = await service.read(now=clock())
-        return R123StatusResponse(
-            data=R123StatusData(
+        return CampaignReadinessStatusResponse(
+            data=CampaignReadinessStatusData(
                 ready=projected.ready,
                 execution_enabled=projected.execution_enabled,
                 reason=projected.reason,
@@ -301,7 +313,7 @@ def build_r123_router(
     @selected_router.get(
         "/api/v1/internal/r123/campaigns/{campaign_id}/status",
         operation_id="get_r123_campaign_status",
-        response_model=R123CampaignStatusResponse,
+        response_model=CampaignStatusResponse,
     )
     async def get_campaign_status(
         request: Request,
@@ -311,8 +323,8 @@ def build_r123_router(
             pattern=r"^[A-Za-z0-9._:-]+$",
         ),
         guard=Depends(require_guard("campaign:read", safety_preserving=True)),
-    ) -> R123CampaignStatusResponse:
-        owner: R123CampaignStatusOwner | None = (
+    ) -> CampaignStatusResponse:
+        owner: CampaignStatusOwner | None = (
             request.app.state.r123_campaign_status_owner
         )
         if owner is None:
@@ -326,16 +338,16 @@ def build_r123_router(
                 tenant_id=guard.security.tenant_id,
                 campaign_id=campaign_id,
             )
-        except R123CampaignStatusNotFound as exc:
+        except CampaignStatusNotFound as exc:
             raise api_error(
                 404,
                 "r123_campaign_not_found",
                 "The R123 campaign was not found.",
             ) from exc
-        if not isinstance(projected, R123CampaignStatusV1):
+        if not isinstance(projected, CampaignStatusV1):
             raise ValueError("r123_campaign_status_projection_invalid")
-        return R123CampaignStatusResponse(
-            data=R123CampaignStatusData(
+        return CampaignStatusResponse(
+            data=CampaignStatusData(
                 schema_version=projected.schema_version,
                 campaign_id=projected.campaign_id,
                 status=projected.status,
@@ -345,7 +357,7 @@ def build_r123_router(
                 workflow_delivery_state=projected.workflow_delivery_state,
                 workflow_reconciliation_state=projected.workflow_reconciliation_state,
                 effects=tuple(
-                    R123CampaignEffectStatusData(
+                    CampaignEffectStatusData(
                         capability_id=item.capability_id,
                         state=item.state,
                         reconciliation_state=item.reconciliation_state,
@@ -361,15 +373,15 @@ def build_r123_router(
     @selected_router.post(
         "/api/v1/internal/r123/qualification",
         operation_id="start_r123_owned_loopback_qualification",
-        response_model=R123QualificationResponse,
+        response_model=CampaignQualificationResponse,
         status_code=status.HTTP_202_ACCEPTED,
     )
     async def start_qualification(
-        payload: R123QualificationRequest,
+        payload: CampaignQualificationRequest,
         request: Request,
         guard=Depends(require_guard("campaign:create", mutation=True)),
-    ) -> R123QualificationResponse:
-        service: R123QualificationService | None = (
+    ) -> CampaignQualificationResponse:
+        service: CampaignQualificationService | None = (
             request.app.state.r123_qualification_service
         )
         if service is None:
@@ -386,8 +398,8 @@ def build_r123_router(
         )
         if not isinstance(receipt, QualificationStartReceiptV1):
             raise ValueError("r123_qualification_start_receipt_invalid")
-        return R123QualificationResponse(
-            data=R123QualificationData(**{
+        return CampaignQualificationResponse(
+            data=CampaignQualificationData(**{
                 "schema_version": receipt.schema_version,
                 "campaign_id": receipt.campaign_id,
                 "aggregate_sequence": receipt.aggregate_sequence,
@@ -407,10 +419,11 @@ def build_r123_router(
 
     @selected_router.get(
         "/api/v1/campaign-core/options/engagements",
-        operation_id="list_r124_engagement_options",
-        response_model=R124EngagementOptionPageResponse,
+        operation_id=CAMPAIGN_CORE_ENGAGEMENT_OPTIONS_OPERATION_ID,
+        name=CAMPAIGN_CORE_ENGAGEMENT_OPTIONS_OPERATION_ID,
+        response_model=CampaignCoreEngagementOptionPageResponse,
     )
-    async def list_r124_engagement_options(
+    async def list_campaign_core_engagement_options(
         request: Request,
         limit: int = Query(default=50, ge=1, le=50),
         cursor: str | None = Query(default=None, max_length=200),
@@ -426,10 +439,11 @@ def build_r123_router(
 
     @selected_router.get(
         "/api/v1/campaign-core/options/targets",
-        operation_id="list_r124_target_options",
-        response_model=R124TargetOptionPageResponse,
+        operation_id=CAMPAIGN_CORE_TARGET_OPTIONS_OPERATION_ID,
+        name=CAMPAIGN_CORE_TARGET_OPTIONS_OPERATION_ID,
+        response_model=CampaignCoreTargetOptionPageResponse,
     )
-    async def list_r124_target_options(
+    async def list_campaign_core_target_options(
         request: Request,
         engagement_binding: str = Query(min_length=1, max_length=100),
         limit: int = Query(default=50, ge=1, le=50),
@@ -447,10 +461,11 @@ def build_r123_router(
 
     @selected_router.get(
         "/api/v1/campaign-core/options/risk-profiles",
-        operation_id="list_r124_risk_profile_options",
-        response_model=R124RiskProfileOptionPageResponse,
+        operation_id=CAMPAIGN_CORE_RISK_PROFILE_OPTIONS_OPERATION_ID,
+        name=CAMPAIGN_CORE_RISK_PROFILE_OPTIONS_OPERATION_ID,
+        response_model=CampaignCoreRiskProfileOptionPageResponse,
     )
-    async def list_r124_risk_profile_options(
+    async def list_campaign_core_risk_profile_options(
         request: Request,
         engagement_binding: str = Query(min_length=1, max_length=100),
         target_binding: str = Query(min_length=1, max_length=100),
@@ -470,12 +485,13 @@ def build_r123_router(
 
     @selected_router.post(
         "/api/v1/campaign-core/campaigns",
-        operation_id="start_r124_campaign",
-        response_model=R124CampaignMutationResponse,
+        operation_id=CAMPAIGN_CORE_START_OPERATION_ID,
+        name=CAMPAIGN_CORE_START_OPERATION_ID,
+        response_model=CampaignCoreMutationResponse,
         status_code=status.HTTP_202_ACCEPTED,
     )
-    async def start_r124_campaign(
-        payload: R124CampaignStartRequest,
+    async def start_campaign_core_campaign(
+        payload: CampaignCoreStartRequest,
         request: Request,
         guard=Depends(require_guard("campaign:create", mutation=True)),
     ) -> object:
@@ -493,7 +509,7 @@ def build_r123_router(
                 "idempotency_conflict",
                 "The idempotency key was already used for a different campaign request.",
             ) from exc
-        except R124CreateDisabled as exc:
+        except CampaignCoreCreateDisabled as exc:
             raise api_error(
                 503,
                 "campaign_create_disabled",
@@ -502,10 +518,11 @@ def build_r123_router(
 
     @selected_router.get(
         "/api/v1/campaign-core/campaigns",
-        operation_id="list_r124_campaigns",
-        response_model=R124CampaignSummaryPageResponse,
+        operation_id=CAMPAIGN_CORE_LIST_OPERATION_ID,
+        name=CAMPAIGN_CORE_LIST_OPERATION_ID,
+        response_model=CampaignCoreSummaryPageResponse,
     )
-    async def list_r124_campaigns(
+    async def list_campaign_core_campaigns(
         request: Request,
         limit: int = Query(default=50, ge=1, le=50),
         cursor: str | None = Query(default=None, max_length=200),
@@ -519,15 +536,16 @@ def build_r123_router(
                 cursor=cursor,
                 now=clock(),
             )
-        except R124PrincipalInactive as exc:
+        except CampaignCorePrincipalInactive as exc:
             raise api_error(403, "principal_inactive", "Current principal is inactive.") from exc
 
     @selected_router.get(
         "/api/v1/campaign-core/campaigns/{campaign_id}",
-        operation_id="get_r124_campaign",
-        response_model=R124CampaignAggregateResponse,
+        operation_id=CAMPAIGN_CORE_GET_OPERATION_ID,
+        name=CAMPAIGN_CORE_GET_OPERATION_ID,
+        response_model=CampaignCoreAggregateResponse,
     )
-    async def get_r124_campaign(
+    async def get_campaign_core_campaign(
         request: Request,
         campaign_id: str = Path(min_length=1, max_length=64),
         guard=Depends(require_guard("campaign:read")),
@@ -539,17 +557,18 @@ def build_r123_router(
                 campaign_id=campaign_id,
                 now=clock(),
             )
-        except R123CampaignStatusNotFound as exc:
+        except CampaignStatusNotFound as exc:
             raise api_error(404, "campaign_not_found", "Campaign was not found.") from exc
-        except R124PrincipalInactive as exc:
+        except CampaignCorePrincipalInactive as exc:
             raise api_error(403, "principal_inactive", "Current principal is inactive.") from exc
 
     @selected_router.get(
         "/api/v1/campaign-core/campaigns/{campaign_id}/inspector",
-        operation_id="inspect_r124_campaign",
-        response_model=R124CampaignInspectorResponse,
+        operation_id=CAMPAIGN_CORE_INSPECT_OPERATION_ID,
+        name=CAMPAIGN_CORE_INSPECT_OPERATION_ID,
+        response_model=CampaignCoreInspectorResponse,
     )
-    async def inspect_r124_campaign(
+    async def inspect_campaign_core_campaign(
         request: Request,
         campaign_id: str = Path(min_length=1, max_length=64),
         guard=Depends(require_guard("campaign:inspect")),
@@ -561,17 +580,18 @@ def build_r123_router(
                 campaign_id=campaign_id,
                 now=clock(),
             )
-        except R123CampaignStatusNotFound as exc:
+        except CampaignStatusNotFound as exc:
             raise api_error(404, "campaign_not_found", "Campaign was not found.") from exc
-        except R124PrincipalInactive as exc:
+        except CampaignCorePrincipalInactive as exc:
             raise api_error(403, "principal_inactive", "Current principal is inactive.") from exc
 
     @selected_router.get(
         "/api/v1/campaign-core/attention",
-        operation_id="list_r124_attention",
-        response_model=R124AttentionPageResponse,
+        operation_id=CAMPAIGN_CORE_ATTENTION_OPERATION_ID,
+        name=CAMPAIGN_CORE_ATTENTION_OPERATION_ID,
+        response_model=CampaignCoreAttentionPageResponse,
     )
-    async def list_r124_attention(
+    async def list_campaign_core_attention(
         request: Request,
         limit: int = Query(default=50, ge=1, le=50),
         cursor: str | None = Query(default=None, max_length=200),
@@ -585,13 +605,13 @@ def build_r123_router(
                 cursor=cursor,
                 now=clock(),
             )
-        except R124PrincipalInactive as exc:
+        except CampaignCorePrincipalInactive as exc:
             raise api_error(403, "principal_inactive", "Current principal is inactive.") from exc
 
     async def recover_campaign(
         *,
         action: Literal["stop", "revoke"],
-        payload: R124RecoveryRequest,
+        payload: CampaignCoreRecoveryRequest,
         request: Request,
         campaign_id: str,
         if_match: str,
@@ -608,7 +628,7 @@ def build_r123_router(
                 idempotency_key=guard.idempotency_key,
                 now=clock(),
             )
-        except R124EtagConflict as exc:
+        except CampaignCoreEtagConflict as exc:
             raise api_error(
                 409,
                 "etag_conflict",
@@ -623,12 +643,13 @@ def build_r123_router(
 
     @selected_router.post(
         "/api/v1/campaign-core/campaigns/{campaign_id}/stop",
-        operation_id="stop_r124_campaign",
-        response_model=R124CampaignMutationResponse,
+        operation_id=CAMPAIGN_CORE_STOP_OPERATION_ID,
+        name=CAMPAIGN_CORE_STOP_OPERATION_ID,
+        response_model=CampaignCoreMutationResponse,
         status_code=status.HTTP_202_ACCEPTED,
     )
-    async def stop_r124_campaign(
-        payload: R124RecoveryRequest,
+    async def stop_campaign_core_campaign(
+        payload: CampaignCoreRecoveryRequest,
         request: Request,
         campaign_id: str = Path(min_length=1, max_length=64),
         if_match: str = Header(min_length=3, max_length=100, alias="If-Match"),
@@ -641,12 +662,13 @@ def build_r123_router(
 
     @selected_router.post(
         "/api/v1/campaign-core/campaigns/{campaign_id}/revoke",
-        operation_id="revoke_r124_campaign",
-        response_model=R124CampaignMutationResponse,
+        operation_id=CAMPAIGN_CORE_REVOKE_OPERATION_ID,
+        name=CAMPAIGN_CORE_REVOKE_OPERATION_ID,
+        response_model=CampaignCoreMutationResponse,
         status_code=status.HTTP_202_ACCEPTED,
     )
-    async def revoke_r124_campaign(
-        payload: R124RecoveryRequest,
+    async def revoke_campaign_core_campaign(
+        payload: CampaignCoreRecoveryRequest,
         request: Request,
         campaign_id: str = Path(min_length=1, max_length=64),
         if_match: str = Header(min_length=3, max_length=100, alias="If-Match"),

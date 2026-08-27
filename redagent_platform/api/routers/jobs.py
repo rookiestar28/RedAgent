@@ -6,33 +6,18 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CONTRACT_SCHEMA_VERSION,
-    CommandAction,
-    ContainmentRepository,
-    ContainmentRepositoryConflict,
-    ControlScope,
-    ControlScopeKind,
+from fastapi import (
     Depends,
-    EmergencyStopSignal,
     Header,
-    JobCommandResponse,
-    JobCreateRequest,
-    JobEmergencyStopRequest,
-    JobLifecycleCommandRequest,
-    JobListResponse,
-    JobMutationResponse,
-    JobResponse,
-    JobStopResponse,
-    JobWorkflowInput,
-    MutationResult,
-    OperatorCommand,
-    PaginationQuery,
     Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
     RequestGuard,
     SecurityContext,
-    StopRequest,
+)
+from redagent_platform.api.router_primitives import (
     _idempotency,
     _list_response,
     _match_roe_reference,
@@ -41,9 +26,36 @@ from redagent_platform.api._route_support import (
     _orchestration,
     _probe_limit,
     _repository,
-    deterministic_job_workflow_id,
-    status,
 )
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.api.schemas.jobs import (
+    JobCommandResponse,
+    JobCreateRequest,
+    JobEmergencyStopRequest,
+    JobLifecycleCommandRequest,
+    JobListResponse,
+    JobMutationResponse,
+    JobResponse,
+    JobStopResponse,
+)
+from redagent_platform.containment_service.contracts import (
+    ControlScope,
+    ControlScopeKind,
+    StopRequest,
+)
+from redagent_platform.containment_service.repository import (
+    ContainmentRepository,
+    ContainmentRepositoryConflict,
+)
+from redagent_platform.orchestration.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    CommandAction,
+    EmergencyStopSignal,
+    JobWorkflowInput,
+    OperatorCommand,
+    deterministic_job_workflow_id,
+)
+from redagent_platform.persistence.repository import MutationResult
 
 def register_job_list_routes(app: APIRouter, dependencies: ApiDependencies) -> None:
     require_guard = dependencies.require_guard

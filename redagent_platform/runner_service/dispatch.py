@@ -170,7 +170,7 @@ class SyntheticRunnerDispatcher:
         except RunnerExecutionFailed as exc:
             execution_receipt = exc.receipt
             failure_code = str(exc)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             failure_code = (
                 "runner_policy_denied" if "policy" in str(exc)
                 else str(exc) if str(exc).startswith("runner_")
@@ -189,7 +189,7 @@ class SyntheticRunnerDispatcher:
                         await self._backend.revoke_secret(
                             prepared, occurred_at=occurred_at, correlation_id=correlation_id,
                         )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     failure_code = "runner_secret_revoke_unconfirmed"
 
         if prepared is None:

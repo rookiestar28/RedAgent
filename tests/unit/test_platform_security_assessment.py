@@ -9,14 +9,14 @@ from redagent_platform.platform_security_assessment import (
     FindingDispositionStatus,
     PlatformControlCategory,
     PlatformControlCheck,
-    build_r031_baseline_assessment,
+    build_platform_security_baseline_assessment,
     release_blocking_findings,
     validate_platform_security_assessment,
 )
 
 
 def test_r031_baseline_assessment_is_accepted():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
 
     validation = validate_platform_security_assessment(assessment)
 
@@ -25,7 +25,7 @@ def test_r031_baseline_assessment_is_accepted():
 
 
 def test_asvs_informed_assessment_covers_required_domains():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
 
     domains = {entry.domain for entry in assessment.asvs_assessments}
 
@@ -34,7 +34,7 @@ def test_asvs_informed_assessment_covers_required_domains():
 
 
 def test_required_security_control_categories_are_represented():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
 
     categories = {check.category for check in assessment.control_checks}
 
@@ -42,7 +42,7 @@ def test_required_security_control_categories_are_represented():
 
 
 def test_missing_runner_boundary_control_fails_closed():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
     without_runner = tuple(
         check for check in assessment.control_checks if check.category is not PlatformControlCategory.RUNNER_BOUNDARY
     )
@@ -55,7 +55,7 @@ def test_missing_runner_boundary_control_fails_closed():
 
 
 def test_failed_dependency_control_blocks_assessment():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
     failed_dependency = PlatformControlCheck(
         category=PlatformControlCategory.DEPENDENCY,
         name="dependency_gate",
@@ -72,7 +72,7 @@ def test_failed_dependency_control_blocks_assessment():
 
 
 def test_missing_asvs_domain_blocks_assessment():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
     missing_api = tuple(entry for entry in assessment.asvs_assessments if entry.domain is not ASVSDomain.API)
     changed = _replace_assessment(assessment, asvs_assessments=missing_api)
 
@@ -83,7 +83,7 @@ def test_missing_asvs_domain_blocks_assessment():
 
 
 def test_failed_asvs_control_blocks_assessment():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
     failed_control = ASVSAssessment(
         control_id="ASVS-test",
         domain=ASVSDomain.API,
@@ -115,7 +115,7 @@ def test_critical_and_high_findings_must_be_fixed_or_risk_accepted():
 
 
 def test_release_blocker_requires_owner_rationale_and_evidence():
-    assessment = build_r031_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
+    assessment = build_platform_security_baseline_assessment(assessed_at=datetime(2026, 7, 8, 12, 0, tzinfo=timezone.utc))
     incomplete = FindingDisposition(
         finding_id="R031-CRIT-incomplete",
         severity=Severity.CRITICAL,

@@ -6,17 +6,17 @@ import pytest
 
 from redagent_platform.orchestration.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    R123CampaignSnapshot,
-    R123CampaignWorkflowInput,
-    R123ReconcileActivityResult,
-    deterministic_r123_campaign_workflow_id,
-    r123_workflow_request_sha256,
+    ClosedLoopCampaignSnapshot,
+    ClosedLoopCampaignWorkflowInput,
+    ClosedLoopReconcileActivityResult,
+    deterministic_closed_loop_campaign_workflow_id,
+    closed_loop_workflow_request_sha256,
 )
 from redagent_platform.orchestration.worker import worker_registration
-from redagent_platform.orchestration.workflow import r123_activity_retry_policy
+from redagent_platform.orchestration.workflow import closed_loop_activity_retry_policy
 
 
-def _request(**overrides: object) -> R123CampaignWorkflowInput:
+def _request(**overrides: object) -> ClosedLoopCampaignWorkflowInput:
     values: dict[str, object] = {
         "schema_version": CONTRACT_SCHEMA_VERSION,
         "tenant_id": "tenant-r123",
@@ -28,7 +28,7 @@ def _request(**overrides: object) -> R123CampaignWorkflowInput:
         "max_activity_attempts": 3,
     }
     values.update(overrides)
-    return R123CampaignWorkflowInput(**values)  # type: ignore[arg-type]
+    return ClosedLoopCampaignWorkflowInput(**values)  # type: ignore[arg-type]
 
 
 def test_r123_workflow_input_is_metadata_only_versioned_and_bounded() -> None:
@@ -45,8 +45,8 @@ def test_r123_workflow_input_is_metadata_only_versioned_and_bounded() -> None:
         "max_activity_attempts",
     }
     assert all(field.type not in (dict, object) for field in fields(request))
-    assert r123_workflow_request_sha256(request) == r123_workflow_request_sha256(request)
-    assert r123_workflow_request_sha256(request) != r123_workflow_request_sha256(
+    assert closed_loop_workflow_request_sha256(request) == closed_loop_workflow_request_sha256(request)
+    assert closed_loop_workflow_request_sha256(request) != closed_loop_workflow_request_sha256(
         replace(request, envelope_sha256="2" * 64)
     )
 
@@ -69,9 +69,9 @@ def test_r123_workflow_input_rejects_unbounded_or_unbound_values(
 
 
 def test_r123_deterministic_workflow_id_is_stable_non_disclosing_and_distinct_from_r096() -> None:
-    first = deterministic_r123_campaign_workflow_id("tenant-r123", "campaign-r123")
-    second = deterministic_r123_campaign_workflow_id("tenant-r123", "campaign-r123")
-    other = deterministic_r123_campaign_workflow_id("tenant-r124", "campaign-r123")
+    first = deterministic_closed_loop_campaign_workflow_id("tenant-r123", "campaign-r123")
+    second = deterministic_closed_loop_campaign_workflow_id("tenant-r123", "campaign-r123")
+    other = deterministic_closed_loop_campaign_workflow_id("tenant-r124", "campaign-r123")
 
     assert first == second
     assert first != other
@@ -100,7 +100,7 @@ def test_r123_reconcile_result_has_closed_six_outcomes_and_terminal_shape() -> N
         "contained",
         "terminal_failure",
     ):
-        result = R123ReconcileActivityResult(
+        result = ClosedLoopReconcileActivityResult(
             **base,
             outcome=outcome,
             terminal=outcome in {"settled", "blocked", "contained", "terminal_failure"},
@@ -109,11 +109,11 @@ def test_r123_reconcile_result_has_closed_six_outcomes_and_terminal_shape() -> N
         assert result.outcome == outcome
 
     with pytest.raises(ValueError, match="r123_reconcile_outcome_invalid"):
-        R123ReconcileActivityResult(
+        ClosedLoopReconcileActivityResult(
             **base, outcome="dispatch_many", terminal=False, retry_delay_seconds=None
         )
     with pytest.raises(ValueError, match="r123_retry_delay_required"):
-        R123ReconcileActivityResult(
+        ClosedLoopReconcileActivityResult(
             **base, outcome="retry_at", terminal=False, retry_delay_seconds=None
         )
 
@@ -142,7 +142,7 @@ def test_worker_registration_adds_r123_without_changing_r096_names() -> None:
 
 
 def test_r123_retry_policy_adds_only_its_versioned_permanent_failures() -> None:
-    policy = r123_activity_retry_policy(3)
+    policy = closed_loop_activity_retry_policy(3)
 
     assert set(policy.non_retryable_error_types or ()) == {
         "AuthorizationDenied",
@@ -157,7 +157,7 @@ def test_r123_retry_policy_adds_only_its_versioned_permanent_failures() -> None:
 
 
 def test_r123_snapshot_never_contains_executable_arguments_or_authority_payloads() -> None:
-    snapshot = R123CampaignSnapshot(
+    snapshot = ClosedLoopCampaignSnapshot(
         schema_version=CONTRACT_SCHEMA_VERSION,
         campaign_id="campaign-r123",
         strategy_revision_id="strategy-r123-v1",

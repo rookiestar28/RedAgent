@@ -6,29 +6,39 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CorrelationEventListResponse,
+from fastapi import (
     Depends,
-    IncidentAction,
+    Request,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _list_response,
+    _now,
+    _probe_limit,
+)
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.api.schemas.observability import (
+    CorrelationEventListResponse,
     IncidentActionRequest,
     IncidentListResponse,
-    IncidentRepository,
     IncidentResponse,
     IncidentRunbookListResponse,
     IncidentTimelineResponse,
     ObservabilityDashboardResponse,
+)
+from redagent_platform.telemetry_service.catalog import foundation_runbooks
+from redagent_platform.telemetry_service.incidents import IncidentAction
+from redagent_platform.telemetry_service.operations import (
+    IncidentRepository,
     ObservabilityRepositoryConflict,
-    PaginationQuery,
-    Request,
-    RequestGuard,
     SloRepository,
+)
+from redagent_platform.telemetry_service.repository import (
     TelemetryRepository,
     TelemetryRepositoryConflict,
-    _list_response,
-    _now,
-    _probe_limit,
-    foundation_runbooks,
 )
 
 def _public_incident(row: dict[str, object]) -> dict[str, object]:

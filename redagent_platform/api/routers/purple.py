@@ -6,32 +6,42 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    AbilityApproval,
-    AbilityAuthorization,
-    ApiError,
+from datetime import timedelta
+from fastapi import (
     Depends,
-    LabBinding,
+    Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _match_roe_reference,
+    _now,
+)
+from redagent_platform.api.schemas.purple import (
     PurpleAbilityListResponse,
     PurpleCompileRequest,
     PurpleDashboardResponse,
     PurpleKillRequest,
     PurplePlanResponse,
-    PurpleRepositoryConflict,
     PurpleRunCreateRequest,
     PurpleRunResponse,
-    PurpleRuntimeRepository,
-    Request,
-    RequestGuard,
-    _match_roe_reference,
-    _now,
-    certified_purple_abilities,
-    compile_ability_plan,
-    metadata,
-    select,
-    status,
-    timedelta,
 )
+from redagent_platform.persistence.models import metadata
+from redagent_platform.purple_runtime.catalog import certified_abilities as certified_purple_abilities
+from redagent_platform.purple_runtime.compiler import compile_ability_plan
+from redagent_platform.purple_runtime.contracts import (
+    AbilityApproval,
+    AbilityAuthorization,
+    LabBinding,
+)
+from redagent_platform.purple_runtime.repository import (
+    PurpleRepositoryConflict,
+    PurpleRuntimeRepository,
+)
+from sqlalchemy import select
 
 def _public_purple_ability(ability) -> dict[str, object]:
     return {"ability_id": ability.ability_id, "attack_version": ability.attack_version,

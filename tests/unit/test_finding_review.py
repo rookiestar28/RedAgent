@@ -108,7 +108,7 @@ def policy() -> PolicyGrant:
 
 
 def test_r021_required_finding_states_are_supported() -> None:
-    assert finding_review.r021_statuses_supported()
+    assert finding_review.statuses_supported()
 
 
 def test_review_decision_requires_rationale_and_writes_audit() -> None:

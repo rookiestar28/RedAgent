@@ -11,7 +11,7 @@ import pytest
 from redagent_platform.campaign_service.activity_coordinator import (
     ContainmentCommit,
     DispatchMaterial,
-    R123ActivityCoordinator,
+    CampaignActivityCoordinator,
     ReconcileMaterial,
 )
 from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
@@ -27,12 +27,12 @@ from redagent_platform.campaign_service.service import (
     EffectDispatchCommand,
     EffectReconciliationCommand,
 )
-from redagent_platform.runner_service.compat_123_dispatch import R123AdapterRequest
+from redagent_platform.runner_service.campaign_dispatch import CampaignAdapterRequest
 from redagent_platform.orchestration.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    R123ContainActivityCommand,
-    R123DispatchActivityCommand,
-    R123ReconcileActivityCommand,
+    ClosedLoopContainActivityCommand,
+    ClosedLoopDispatchActivityCommand,
+    ClosedLoopReconcileActivityCommand,
 )
 
 
@@ -137,7 +137,7 @@ def _effect_reconciliation_command() -> EffectReconciliationCommand:
         expected_dispatch_generation=1,
     )
     binding = command.binding
-    request = R123AdapterRequest(
+    request = CampaignAdapterRequest(
         tenant_id=command.tenant_id,
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
@@ -162,7 +162,7 @@ def _effect_reconciliation_command() -> EffectReconciliationCommand:
         request=request,
         request_sha256=request_sha256,
         runner_id="runner-r123",
-        workload_identity="spiffe://redagent/runner/compat_123",
+        workload_identity="spiffe://redagent/runner/r123",
         started_at=NOW,
     )
 
@@ -267,8 +267,8 @@ class EffectCoordinator:
         return {"state": "manual_review_required"}
 
 
-def _reconcile_command() -> R123ReconcileActivityCommand:
-    return R123ReconcileActivityCommand(
+def _reconcile_command() -> ClosedLoopReconcileActivityCommand:
+    return ClosedLoopReconcileActivityCommand(
         CONTRACT_SCHEMA_VERSION,
         "tenant-r123",
         "campaign-r123",
@@ -280,8 +280,8 @@ def _reconcile_command() -> R123ReconcileActivityCommand:
     )
 
 
-def _dispatch_command() -> R123DispatchActivityCommand:
-    return R123DispatchActivityCommand(
+def _dispatch_command() -> ClosedLoopDispatchActivityCommand:
+    return ClosedLoopDispatchActivityCommand(
         CONTRACT_SCHEMA_VERSION,
         "tenant-r123",
         "campaign-r123",
@@ -295,7 +295,7 @@ def _dispatch_command() -> R123DispatchActivityCommand:
 
 def test_reconcile_uses_fresh_owner_material_and_commits_pure_decision() -> None:
     owner = StateOwner()
-    coordinator = R123ActivityCoordinator(owner, EffectCoordinator())
+    coordinator = CampaignActivityCoordinator(owner, EffectCoordinator())
 
     result = asyncio.run(
         coordinator.reconcile(
@@ -336,7 +336,7 @@ def test_reconcile_runs_read_only_effect_lookup_then_rereads_canonical_state() -
         effect_reconciliation=None,
     )
     effect = EffectCoordinator()
-    coordinator = R123ActivityCoordinator(owner, effect)
+    coordinator = CampaignActivityCoordinator(owner, effect)
 
     result = asyncio.run(
         coordinator.reconcile(
@@ -372,7 +372,7 @@ def test_reconcile_honors_scheduled_lookup_backoff_without_early_adapter_read() 
         effect_reconciliation=_effect_reconciliation_command(),
     )
     effect = EffectCoordinator()
-    coordinator = R123ActivityCoordinator(owner, effect)
+    coordinator = CampaignActivityCoordinator(owner, effect)
 
     result = asyncio.run(
         coordinator.reconcile(
@@ -393,7 +393,7 @@ def test_reconcile_honors_scheduled_lookup_backoff_without_early_adapter_read() 
 def test_reconcile_rejects_stale_temporal_binding_before_commit() -> None:
     owner = StateOwner()
     owner.reconcile_material = replace(owner.reconcile_material, envelope_sha256="f" * 64)
-    coordinator = R123ActivityCoordinator(owner, EffectCoordinator())
+    coordinator = CampaignActivityCoordinator(owner, EffectCoordinator())
 
     with pytest.raises(ValueError, match="r123_reconcile_authoritative_binding_mismatch"):
         asyncio.run(
@@ -407,7 +407,7 @@ def test_reconcile_rejects_stale_temporal_binding_before_commit() -> None:
 def test_dispatch_rehydrates_effect_command_and_commits_terminal_receipt_state() -> None:
     owner = StateOwner()
     effect = EffectCoordinator()
-    coordinator = R123ActivityCoordinator(owner, effect)
+    coordinator = CampaignActivityCoordinator(owner, effect)
 
     result = asyncio.run(
         coordinator.dispatch(
@@ -423,7 +423,7 @@ def test_dispatch_rehydrates_effect_command_and_commits_terminal_receipt_state()
 
 def test_dispatch_converts_possible_acceptance_to_durable_ambiguity_without_retry() -> None:
     owner = StateOwner()
-    coordinator = R123ActivityCoordinator(owner, EffectCoordinator(ambiguous=True))
+    coordinator = CampaignActivityCoordinator(owner, EffectCoordinator(ambiguous=True))
 
     result = asyncio.run(
         coordinator.dispatch(
@@ -441,7 +441,7 @@ def test_dispatch_converts_possible_acceptance_to_durable_ambiguity_without_retr
 
 def test_dispatch_uses_state_owner_as_durable_fallback_when_primary_ambiguity_write_fails() -> None:
     owner = StateOwner()
-    coordinator = R123ActivityCoordinator(
+    coordinator = CampaignActivityCoordinator(
         owner, EffectCoordinator(ambiguity_persistence_failed=True)
     )
 
@@ -459,7 +459,7 @@ def test_dispatch_uses_state_owner_as_durable_fallback_when_primary_ambiguity_wr
 
 def test_dispatch_persists_manual_reconciliation_before_preserving_cancellation() -> None:
     owner = StateOwner()
-    coordinator = R123ActivityCoordinator(owner, EffectCoordinator(cancelled=True))
+    coordinator = CampaignActivityCoordinator(owner, EffectCoordinator(cancelled=True))
 
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(coordinator.dispatch(
@@ -480,7 +480,7 @@ def test_dispatch_retry_never_calls_adapter_after_possible_acceptance(effect_sta
         effect_state=effect_state,
     )
     effect = EffectCoordinator()
-    coordinator = R123ActivityCoordinator(owner, effect)
+    coordinator = CampaignActivityCoordinator(owner, effect)
 
     result = asyncio.run(
         coordinator.dispatch(
@@ -506,7 +506,7 @@ def test_dispatch_retry_commits_existing_confirmation_without_adapter_call() -> 
     effect = EffectCoordinator()
 
     result = asyncio.run(
-        R123ActivityCoordinator(owner, effect).dispatch(
+        CampaignActivityCoordinator(owner, effect).dispatch(
             _dispatch_command(), occurred_at=NOW, correlation_id="workflow-run-r123"
         )
     )
@@ -519,8 +519,8 @@ def test_dispatch_retry_commits_existing_confirmation_without_adapter_call() -> 
 
 def test_containment_is_committed_by_owner_and_advances_revision() -> None:
     owner = StateOwner()
-    coordinator = R123ActivityCoordinator(owner, EffectCoordinator())
-    command = R123ContainActivityCommand(
+    coordinator = CampaignActivityCoordinator(owner, EffectCoordinator())
+    command = ClosedLoopContainActivityCommand(
         CONTRACT_SCHEMA_VERSION,
         "tenant-r123",
         "campaign-r123",

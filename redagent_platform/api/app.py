@@ -4,57 +4,82 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    AsyncIterator,
-    AuthorizationHook,
-    ConcurrencyConflict,
-    DatabaseSettings,
-    EvidenceIdempotencyConflict,
-    EvidenceRecordConflict,
+from contextlib import asynccontextmanager
+from fastapi import (
     FastAPI,
-    IdempotencyConflict,
-    IdentityStateConflict,
-    IntegrityError,
-    JSONResponse,
-    OperatorShellContextData,
-    OrchestrationUnavailable,
-    Path,
-    PolicyBoundaryEnforcer,
-    PolicyBoundarySDK,
-    PolicyDecisionConflict,
-    PolicyEnforcementError,
-    R123ApiRuntimeServices,
-    R123ApiServiceFactory,
-    R123CampaignStatusOwner,
-    R123QualificationService,
-    R123StatusService,
-    RecordConflict,
     Request,
-    RequestValidationError,
-    SQLAlchemyError,
-    SecretLeaseConflict,
-    StrategyLoopMode,
-    TemporalOrchestrationGateway,
-    TemporalSettings,
-    TransactionalPolicyDecisionRecorder,
+)
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import inspect
+from pathlib import Path
+from redagent_platform.api.contracts import (
+    ApiError,
+    AuthorizationHook,
+    R123ApiServiceFactory,
+    _valid_context_value,
+)
+from redagent_platform.api.openapi_compatibility import install_legacy_component_name_compatibility
+from redagent_platform.api.router_primitives import _list_response
+from redagent_platform.api.schemas.access import OperatorShellContextData
+from redagent_platform.api.static_assets import (
     _install_static_routes,
     _is_hashed_asset,
-    _list_response,
-    _r114_fixture_draft_binding,
-    _r114_matches_fixture_draft_binding,
-    _r114_matches_fixture_successor_plan,
     _static_root,
-    _valid_context_value,
-    async_engine_options,
-    async_sessionmaker,
-    asynccontextmanager,
-    build_r123_router,
-    connect_temporal,
-    create_async_engine,
-    inspect,
-    uuid4,
 )
+from redagent_platform.api.workbench_fixtures import (
+    _fixture_draft_binding,
+    _matches_fixture_draft_binding,
+    _matches_fixture_successor_plan,
+)
+from redagent_platform.campaign_service.api import build_campaign_router
+from redagent_platform.campaign_service.composition import CampaignApiRuntimeServices
+from redagent_platform.campaign_service.qualification import (
+    CampaignQualificationService,
+    CampaignStatusService,
+)
+from redagent_platform.campaign_service.registry import StrategyLoopMode
+from redagent_platform.campaign_service.status import CampaignStatusOwner
+from redagent_platform.evidence_service.repository import (
+    EvidenceIdempotencyConflict,
+    EvidenceRecordConflict,
+)
+from redagent_platform.identity.repository import IdentityStateConflict
+from redagent_platform.orchestration.config import TemporalSettings
+from redagent_platform.orchestration.gateway import (
+    OrchestrationUnavailable,
+    TemporalOrchestrationGateway,
+    connect_temporal,
+)
+from redagent_platform.persistence.database import (
+    DatabaseSettings,
+    async_engine_options,
+)
+from redagent_platform.persistence.repository import (
+    ConcurrencyConflict,
+    IdempotencyConflict,
+    RecordConflict,
+)
+from redagent_platform.policy_service.boundaries import PolicyBoundarySDK
+from redagent_platform.policy_service.enforcement import (
+    PolicyBoundaryEnforcer,
+    PolicyEnforcementError,
+)
+from redagent_platform.policy_service.repository import (
+    PolicyDecisionConflict,
+    TransactionalPolicyDecisionRecorder,
+)
+from redagent_platform.secret_service.repository import SecretLeaseConflict
+from sqlalchemy.exc import (
+    IntegrityError,
+    SQLAlchemyError,
+)
+from sqlalchemy.ext.asyncio import (
+    async_sessionmaker,
+    create_async_engine,
+)
+from typing import AsyncIterator
+from uuid import uuid4
 from redagent_platform.api.dependencies import build_api_dependencies
 from redagent_platform.api.routers import (
     register_foundation_routes,
@@ -95,9 +120,9 @@ if TYPE_CHECKING:
 __all__ = (
     "create_app",
     "_list_response",
-    "_r114_fixture_draft_binding",
-    "_r114_matches_fixture_draft_binding",
-    "_r114_matches_fixture_successor_plan",
+    "_fixture_draft_binding",
+    "_matches_fixture_draft_binding",
+    "_matches_fixture_successor_plan",
 )
 
 
@@ -117,9 +142,9 @@ def create_app(
     synthetic_secret_enabled: bool = False,
     policy_provider: object | None = None,
     policy_required_revision: str | None = None,
-    r123_qualification_service: R123QualificationService | None = None,
-    r123_status_service: R123StatusService | None = None,
-    r123_campaign_status_owner: R123CampaignStatusOwner | None = None,
+    r123_qualification_service: CampaignQualificationService | None = None,
+    r123_status_service: CampaignStatusService | None = None,
+    r123_campaign_status_owner: CampaignStatusOwner | None = None,
     r123_service_factory: R123ApiServiceFactory | None = None,
     r124_campaign_core_service: object | None = None,
     operator_shell_context: OperatorShellContextData | None = None,
@@ -137,15 +162,14 @@ def create_app(
         raise ValueError("r123_api_runtime_services_ambiguous")
     static_root = _static_root(static_directory)
     resolved_operator_shell_context = operator_shell_context or OperatorShellContextData()
+
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         engine = None
         try:
             if temporal_settings is not None and orchestration_gateway is None:
                 client = await connect_temporal(temporal_settings)
-                application.state.orchestration_gateway = TemporalOrchestrationGateway(
-                    client, temporal_settings
-                )
+                application.state.orchestration_gateway = TemporalOrchestrationGateway(client, temporal_settings)
             if database_settings is not None:
                 engine = create_async_engine(database_settings.url, **async_engine_options(database_settings))
                 application.state.database_engine = engine
@@ -173,14 +197,12 @@ def create_app(
                     if inspect.isawaitable(services):
                         services = await services
                     if (
-                        not isinstance(services, R123ApiRuntimeServices)
-                        or not isinstance(services.qualification_service, R123QualificationService)
-                        or not isinstance(services.status_service, R123StatusService)
+                        not isinstance(services, CampaignApiRuntimeServices)
+                        or not isinstance(services.qualification_service, CampaignQualificationService)
+                        or not isinstance(services.status_service, CampaignStatusService)
                         or services.status_service.mode is not StrategyLoopMode.TWO_CAPABILITY
                         or not callable(getattr(services.campaign_status_owner, "read", None))
-                        or not callable(
-                            getattr(services.campaign_core_service, "start_campaign", None)
-                        )
+                        or not callable(getattr(services.campaign_core_service, "start_campaign", None))
                     ):
                         raise RuntimeError("r123_api_factory_result_invalid")
                     application.state.r123_qualification_service = services.qualification_service
@@ -192,7 +214,7 @@ def create_app(
             if r123_service_factory is not None:
                 application.state.r123_qualification_service = None
                 application.state.r123_campaign_status_owner = None
-                application.state.r123_status_service = R123StatusService(
+                application.state.r123_status_service = CampaignStatusService(
                     StrategyLoopMode.DISABLED,
                     None,
                 )
@@ -222,7 +244,7 @@ def create_app(
     app.state.policy_required = policy_provider is not None
     app.state.r123_qualification_service = r123_qualification_service
     app.state.r123_campaign_status_owner = r123_campaign_status_owner
-    app.state.r123_status_service = r123_status_service or R123StatusService(
+    app.state.r123_status_service = r123_status_service or CampaignStatusService(
         StrategyLoopMode.DISABLED,
         None,
     )
@@ -321,7 +343,8 @@ def create_app(
     async def policy_enforcement_error_handler(request: Request, exc: PolicyEnforcementError) -> JSONResponse:
         denied = str(exc).startswith("policy_boundary_denied:")
         return error_response(
-            request, 403 if denied else 503,
+            request,
+            403 if denied else 503,
             "policy_denied" if denied else "policy_unavailable",
             "The current policy denied this operation." if denied else "Policy enforcement is unavailable.",
         )
@@ -329,24 +352,23 @@ def create_app(
     @app.exception_handler(PolicyDecisionConflict)
     async def policy_conflict_error_handler(request: Request, exc: PolicyDecisionConflict) -> JSONResponse:
         return error_response(
-            request, 409, str(exc), "The policy lifecycle transition cannot be applied.",
+            request,
+            409,
+            str(exc),
+            "The policy lifecycle transition cannot be applied.",
         )
 
     @app.exception_handler(EvidenceIdempotencyConflict)
     async def evidence_idempotency_error_handler(request: Request, exc: EvidenceIdempotencyConflict) -> JSONResponse:
-        return error_response(request, 409, "evidence_idempotency_conflict", "The evidence operation conflicts with an existing request.")
+        return error_response(
+            request, 409, "evidence_idempotency_conflict", "The evidence operation conflicts with an existing request."
+        )
 
     @app.exception_handler(EvidenceRecordConflict)
     async def evidence_record_error_handler(request: Request, exc: EvidenceRecordConflict) -> JSONResponse:
         code = str(exc)
         status_code = 404 if code.endswith("not_found") else 409
         return error_response(request, status_code, code, "The evidence operation cannot be applied.")
-
-    @app.exception_handler(ValueError)
-    async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
-        if str(exc).startswith("invalid_job_transition:"):
-            return error_response(request, 409, "invalid_transition", "The requested state transition is not allowed.")
-        return error_response(request, 400, "invalid_request", "The request is invalid.")
 
     @app.exception_handler(IntegrityError)
     async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
@@ -368,7 +390,7 @@ def create_app(
     )
 
     # IMPORTANT: register on app.router so FastAPI 0.139 preserves path-bearing app.routes.
-    build_r123_router(
+    build_campaign_router(
         require_guard=dependencies.require_guard,
         api_error=ApiError,
         router=app.router,
@@ -407,4 +429,5 @@ def create_app(
         identity_runtime.install(app)
     if static_root is not None:
         _install_static_routes(app, static_root)
+    install_legacy_component_name_compatibility(app)
     return app

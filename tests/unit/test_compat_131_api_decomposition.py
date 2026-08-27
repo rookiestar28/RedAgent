@@ -9,6 +9,7 @@ from typing import Any
 from fastapi.routing import APIRoute
 
 from redagent_platform.api import schemas as api_schemas
+from redagent_platform.api.openapi_compatibility import LEGACY_COMPONENT_NAMES
 from redagent_platform.api.app import create_app
 
 
@@ -80,6 +81,7 @@ def _route_manifest() -> list[dict[str, Any]]:
                 }
             )
         response_model = route.response_model
+        response_model_name = getattr(response_model, "__name__", str(response_model))
         manifest.append(
             {
                 "path": route.path,
@@ -87,7 +89,9 @@ def _route_manifest() -> list[dict[str, Any]]:
                 "operation_id": route.operation_id,
                 "name": route.name,
                 "status_code": route.status_code,
-                "response_model": getattr(response_model, "__name__", str(response_model)),
+                # compat_135 changes Python identities while the fail-closed OpenAPI map preserves
+                # the public response-model contract. No other compat_131 manifest field is normalized.
+                "response_model": LEGACY_COMPONENT_NAMES.get(response_model_name, response_model_name),
                 "dependencies": dependencies,
             }
         )
@@ -111,9 +115,7 @@ def test_r131_app_factory_contains_no_inline_route_body() -> None:
     app_path = WORKSPACE / "redagent_platform" / "api" / "app.py"
     module = ast.parse(app_path.read_text(encoding="utf-8"))
     create_app_node = next(
-        node
-        for node in module.body
-        if isinstance(node, ast.FunctionDef) and node.name == "create_app"
+        node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "create_app"
     )
 
     inline_routes = []
@@ -139,9 +141,7 @@ def test_r131_domain_router_and_schema_packages_own_the_surface() -> None:
     schema_root = api_root / "schemas"
 
     assert router_root.is_dir()
-    assert EXPECTED_ROUTER_MODULES <= {
-        path.name for path in router_root.glob("*.py")
-    }
+    assert EXPECTED_ROUTER_MODULES <= {path.name for path in router_root.glob("*.py")}
     assert schema_root.is_dir()
     assert (schema_root / "__init__.py").is_file()
     assert not (api_root / "schemas.py").exists()
@@ -163,20 +163,23 @@ def test_r131_router_modules_register_only_when_explicitly_called() -> None:
             for node in module.body
             if isinstance(node, ast.Assign | ast.AnnAssign | ast.Expr)
             and any(
-                isinstance(item, ast.Call)
-                and isinstance(item.func, ast.Name)
-                and item.func.id == "APIRouter"
+                isinstance(item, ast.Call) and isinstance(item.func, ast.Name) and item.func.id == "APIRouter"
                 for item in ast.walk(node)
             )
         ]
         assert top_level_router_construction == [], router_path.name
 
-    support_module = ast.parse(
-        (router_root.parent / "_route_support.py").read_text(encoding="utf-8")
+    assert not (router_root.parent / "_route_support.py").exists()
+    owner_modules = (
+        "contracts.py",
+        "router_primitives.py",
+        "static_assets.py",
+        "openapi_compatibility.py",
+        "workbench_fixtures.py",
     )
-    support_functions = {
-        node.name
-        for node in support_module.body
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-    assert not {name for name in support_functions if name.startswith("_public_")}
+    for owner_name in owner_modules:
+        owner_module = ast.parse((router_root.parent / owner_name).read_text(encoding="utf-8"))
+        owner_functions = {
+            node.name for node in owner_module.body if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+        }
+        assert not {name for name in owner_functions if name.startswith("_public_")}, owner_name

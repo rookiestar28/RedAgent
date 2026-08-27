@@ -309,7 +309,7 @@ class CampaignSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
-class R123CampaignWorkflowInput:
+class ClosedLoopCampaignWorkflowInput:
     schema_version: str
     tenant_id: str
     campaign_id: str
@@ -333,7 +333,7 @@ class R123CampaignWorkflowInput:
 
 
 @dataclass(frozen=True, slots=True)
-class R123CampaignSnapshot:
+class ClosedLoopCampaignSnapshot:
     schema_version: str
     campaign_id: str
     strategy_revision_id: str
@@ -348,7 +348,7 @@ class R123CampaignSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
-class R123ReconcileActivityCommand:
+class ClosedLoopReconcileActivityCommand:
     schema_version: str
     tenant_id: str
     campaign_id: str
@@ -371,7 +371,7 @@ class R123ReconcileActivityCommand:
 
 
 @dataclass(frozen=True, slots=True)
-class R123ReconcileActivityResult:
+class ClosedLoopReconcileActivityResult:
     schema_version: str
     campaign_id: str
     strategy_revision_id: str
@@ -427,7 +427,7 @@ class R123ReconcileActivityResult:
 
 
 @dataclass(frozen=True, slots=True)
-class R123DispatchActivityCommand:
+class ClosedLoopDispatchActivityCommand:
     schema_version: str
     tenant_id: str
     campaign_id: str
@@ -453,7 +453,7 @@ class R123DispatchActivityCommand:
 
 
 @dataclass(frozen=True, slots=True)
-class R123DispatchActivityResult:
+class ClosedLoopDispatchActivityResult:
     schema_version: str
     campaign_id: str
     effect_id: str
@@ -474,7 +474,7 @@ class R123DispatchActivityResult:
 
 
 @dataclass(frozen=True, slots=True)
-class R123StopSignal:
+class ClosedLoopStopSignal:
     schema_version: str
     signal_id: str
     actor_user_id: str
@@ -488,7 +488,7 @@ class R123StopSignal:
 
 
 @dataclass(frozen=True, slots=True)
-class R123ContainActivityCommand:
+class ClosedLoopContainActivityCommand:
     schema_version: str
     tenant_id: str
     campaign_id: str
@@ -514,7 +514,7 @@ class R123ContainActivityCommand:
 
 
 @dataclass(frozen=True, slots=True)
-class R123ContainActivityResult:
+class ClosedLoopContainActivityResult:
     schema_version: str
     campaign_id: str
     state: str
@@ -546,14 +546,14 @@ def deterministic_campaign_workflow_id(tenant_id: str, campaign_id: str) -> str:
     return f"redagent-campaign-v1-{digest}"
 
 
-def deterministic_r123_campaign_workflow_id(tenant_id: str, campaign_id: str) -> str:
+def deterministic_closed_loop_campaign_workflow_id(tenant_id: str, campaign_id: str) -> str:
     _identifier("tenant_id", tenant_id)
     _identifier("campaign_id", campaign_id)
     digest = hashlib.sha256(f"r123\0{tenant_id}\0{campaign_id}".encode("utf-8")).hexdigest()[:40]
     return f"redagent-r123-{digest}"
 
 
-def r123_workflow_request_sha256(request: R123CampaignWorkflowInput) -> str:
+def closed_loop_workflow_request_sha256(request: ClosedLoopCampaignWorkflowInput) -> str:
     canonical = json.dumps(asdict(request), sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 

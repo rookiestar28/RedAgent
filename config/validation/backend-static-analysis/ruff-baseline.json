@@ -1,0 +1,2535 @@
+{
+  "schema_version": "1",
+  "tool": "ruff",
+  "tool_version": "0.16.4",
+  "rules": [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "BLE001",
+    "TID251"
+  ],
+  "findings": [
+    {
+      "path": "redagent_platform/api/routers/artifact.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/routers/human_simulation.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/routers/purple.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `application`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `approved`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `approver`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `cidr`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `conformance`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `engagement`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `exception`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `hostname`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `ip`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `local`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `operator`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `production`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `ready`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `rejected`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `reviewer`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `synthetic`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `tenant_admin`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `unavailable`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `unknown`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/access.py",
+      "code": "F821",
+      "message": "Undefined name `url`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/agent.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 5
+    },
+    {
+      "path": "redagent_platform/api/schemas/agent.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 56
+    },
+    {
+      "path": "redagent_platform/api/schemas/agent.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/agent.py",
+      "code": "F821",
+      "message": "Undefined name `exact`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/agent.py",
+      "code": "F821",
+      "message": "Undefined name `only`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/agent.py",
+      "code": "F821",
+      "message": "Undefined name `proposal`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/agent.py",
+      "code": "F821",
+      "message": "Undefined name `r113`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F722",
+      "message": "Syntax error in forward annotation: Unexpected token at the end of an expression",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `api`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `certified`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `differential`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `fixture`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `lab`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `local`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `owned`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/api_differential.py",
+      "code": "F821",
+      "message": "Undefined name `r106`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 20
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `canonical`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `certified`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `fixture`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `lab`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `local`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `mobile_static`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `packaged_artifact`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `r110`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/artifact.py",
+      "code": "F821",
+      "message": "Undefined name `repository_snapshot`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `aws`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `azure`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `certified`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `gcp`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `kubernetes`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `lab`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `local`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/cloud.py",
+      "code": "F821",
+      "message": "Undefined name `r108`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/containment.py",
+      "code": "F722",
+      "message": "Syntax error in forward annotation: Expected an identifier, but found a keyword `global` that cannot be used here",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/containment.py",
+      "code": "F821",
+      "message": "Undefined name `campaign`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/containment.py",
+      "code": "F821",
+      "message": "Undefined name `capability`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/containment.py",
+      "code": "F821",
+      "message": "Undefined name `job`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/containment.py",
+      "code": "F821",
+      "message": "Undefined name `tenant`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `COMPLIANCE`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `GOVERNANCE`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `central`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `confidential`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `export_safe`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `internal`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `json`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `log`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `public`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `raw`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `redacted`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `redaction`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `report_safe`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `restricted`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/evidence.py",
+      "code": "F821",
+      "message": "Undefined name `sanitized`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 43
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F722",
+      "message": "Syntax error in forward annotation: Expected an identifier, but found a keyword `import` that cannot be used here",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `closed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `complete`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `confirmed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `customer`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `delivery`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `deterministic`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `disposition`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `duplicate`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `executive`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `false_positive`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `fixture`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `independent`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `internal`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `mitigated`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `needs_review`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `out_of_scope`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `partial`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `publication`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `r115`",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `report`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `reviewed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `risk_accepted`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `technical`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `ticket`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `unknown`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/finding_operations.py",
+      "code": "F821",
+      "message": "Undefined name `v1`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `confirmed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `critical`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `firm`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `high`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `informational`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `low`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `medium`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `pending`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `restricted`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `sanitized`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/findings.py",
+      "code": "F821",
+      "message": "Undefined name `tentative`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 38
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "F821",
+      "message": "Undefined name `invalid`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "F821",
+      "message": "Undefined name `only`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "F821",
+      "message": "Undefined name `owned`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "F821",
+      "message": "Undefined name `r112`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "F821",
+      "message": "Undefined name `sink`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/human_simulation.py",
+      "code": "F821",
+      "message": "Undefined name `synthetic`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 32
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `GET`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `certified`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `google_workspace`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `lab`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `local`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `microsoft_365`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `okta`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/identity_saas.py",
+      "code": "F821",
+      "message": "Undefined name `r109`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `R101`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `approve`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `cancel`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `cancelled`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `conformance`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `controlled`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `failed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `noop`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `pause`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `resume`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `retry`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `running`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `runtime`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `stop_requested`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `succeeded`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `synthetic`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/jobs.py",
+      "code": "F821",
+      "message": "Undefined name `zap`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F722",
+      "message": "Syntax error in forward annotation: Expected an expression",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `cleaned`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `compensating`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `failed`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `gte`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `lte`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `passed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `pending`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `running`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/lab.py",
+      "code": "F821",
+      "message": "Undefined name `succeeded`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `certified`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `connect`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `discovery`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `fixture`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `lab`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `local`",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `low`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `r107`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `redagent`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `risk`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `stdlib`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/network.py",
+      "code": "F821",
+      "message": "Undefined name `tcp`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `bundle`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `certified`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `fixture`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `header`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `http`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `lab`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `local`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `owned`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/nuclei.py",
+      "code": "F821",
+      "message": "Undefined name `r105`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `acknowledge`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `acknowledged`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `assign`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `close`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `closed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `complete_review`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `contained`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `critical`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `high`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `low`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `mark_contained`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `mark_recovered`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `medium`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `preserve_evidence`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `recovered`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `reviewed`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/observability.py",
+      "code": "F821",
+      "message": "Undefined name `verify_containment`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `api`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `command`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `create`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `evidence`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `job`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `lease`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `secret`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `workflow`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/policy.py",
+      "code": "F821",
+      "message": "Undefined name `write`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 33
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "F722",
+      "message": "Syntax error in forward annotation: Unexpected token at the end of an expression",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "F821",
+      "message": "Undefined name `disposable`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "F821",
+      "message": "Undefined name `lab`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "F821",
+      "message": "Undefined name `owned`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/purple.py",
+      "code": "F821",
+      "message": "Undefined name `r111`",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 4
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 93
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F722",
+      "message": "Syntax error in forward annotation: Expected an identifier, but found a keyword `and` that cannot be used here",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `approval`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `approve_exact`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `confirm`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `deny`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `draft`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `exact`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `invalidates`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `r114`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `review`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `structured`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/workbench.py",
+      "code": "F821",
+      "message": "Undefined name `successor`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/zap.py",
+      "code": "F821",
+      "message": "Undefined name `certified`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/zap.py",
+      "code": "F821",
+      "message": "Undefined name `fixture`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/zap.py",
+      "code": "F821",
+      "message": "Undefined name `owned`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/zap.py",
+      "code": "F821",
+      "message": "Undefined name `r104`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api/schemas/zap.py",
+      "code": "F821",
+      "message": "Undefined name `web`",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/api_differential_service/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 17
+    },
+    {
+      "path": "redagent_platform/api_lab.py",
+      "code": "F401",
+      "message": "`redagent_platform.domain.EvidenceKind` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/analysis.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 12
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/analysis.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 43
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/compiler.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/compiler.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 13
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/contracts.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 8
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 20
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/lifecycle.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 7
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/lifecycle.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 20
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/manifest.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 9
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/manifest.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 11
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/promotion.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 9
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 17
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/repository.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 10
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 32
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/secret_scan.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/secret_scan.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 5
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/vex.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/artifact_pipeline/vex.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 13
+    },
+    {
+      "path": "redagent_platform/campaign_service/activity_store.py",
+      "code": "F401",
+      "message": "`sqlalchemy.and_` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/campaign_service/api.py",
+      "code": "F401",
+      "message": "`fastapi.Response` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/campaign_service/repository.py",
+      "code": "F841",
+      "message": "Local variable `outbox` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F821",
+      "message": "Undefined name `import_records`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F821",
+      "message": "Undefined name `imports`",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F821",
+      "message": "Undefined name `issues`",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F821",
+      "message": "Undefined name `occurrences`",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F821",
+      "message": "Undefined name `retests`",
+      "count": 5
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F841",
+      "message": "Local variable `import_records` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F841",
+      "message": "Local variable `imports` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F841",
+      "message": "Local variable `issues` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F841",
+      "message": "Local variable `occurrences` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/campaign_service/status.py",
+      "code": "F841",
+      "message": "Local variable `retests` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/cloud_connectors/emulator.py",
+      "code": "F401",
+      "message": "`dataclasses.field` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/cloud_connectors/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 5
+    },
+    {
+      "path": "redagent_platform/containment_service/runtime.py",
+      "code": "F841",
+      "message": "Local variable `run` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/emergency_stop.py",
+      "code": "F401",
+      "message": "`redagent_platform.domain.JobStatus` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/emergency_stop.py",
+      "code": "F401",
+      "message": "`redagent_platform.kill_switch.KillSwitchEnforcementResult` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/evidence_service/repository.py",
+      "code": "F841",
+      "message": "Local variable `artifacts` is assigned to but never used",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/finding_operations/lifecycle.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/finding_operations/promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/finding_operations/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 13
+    },
+    {
+      "path": "redagent_platform/human_simulation/compiler.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 17
+    },
+    {
+      "path": "redagent_platform/human_simulation/contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 37
+    },
+    {
+      "path": "redagent_platform/human_simulation/events.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 8
+    },
+    {
+      "path": "redagent_platform/human_simulation/lifecycle.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 18
+    },
+    {
+      "path": "redagent_platform/human_simulation/promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 15
+    },
+    {
+      "path": "redagent_platform/human_simulation/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 19
+    },
+    {
+      "path": "redagent_platform/human_simulation/sink.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 14
+    },
+    {
+      "path": "redagent_platform/human_simulation/testing.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/identity/bff.py",
+      "code": "F401",
+      "message": "`typing.Awaitable` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/identity_saas/collector.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 10
+    },
+    {
+      "path": "redagent_platform/identity_saas/collector.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 29
+    },
+    {
+      "path": "redagent_platform/identity_saas/compiler.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/identity_saas/contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/identity_saas/emulator.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/identity_saas/emulator.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 15
+    },
+    {
+      "path": "redagent_platform/identity_saas/evaluation.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/identity_saas/evaluation.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 14
+    },
+    {
+      "path": "redagent_platform/identity_saas/governance.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 38
+    },
+    {
+      "path": "redagent_platform/identity_saas/http_transport.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 10
+    },
+    {
+      "path": "redagent_platform/identity_saas/http_transport.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/identity_saas/lifecycle.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/identity_saas/lifecycle.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 20
+    },
+    {
+      "path": "redagent_platform/identity_saas/promotion.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 10
+    },
+    {
+      "path": "redagent_platform/identity_saas/promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 14
+    },
+    {
+      "path": "redagent_platform/identity_saas/repository.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 10
+    },
+    {
+      "path": "redagent_platform/identity_saas/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 25
+    },
+    {
+      "path": "redagent_platform/kubernetes_runtime.py",
+      "code": "F401",
+      "message": "`redagent_platform.domain.JobStatus` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/lab_service/contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/lab_service/repository.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 3
+    },
+    {
+      "path": "redagent_platform/lab_service/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 18
+    },
+    {
+      "path": "redagent_platform/lab_service/repository.py",
+      "code": "F401",
+      "message": "`json` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/mcp_broker/promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/mcp_broker/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 7
+    },
+    {
+      "path": "redagent_platform/nuclei_service/campaign_transport.py",
+      "code": "F401",
+      "message": "`redagent_platform.nuclei_service.contracts.NucleiProfileId` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/nuclei_service/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 19
+    },
+    {
+      "path": "redagent_platform/purple_runtime/adapter.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 13
+    },
+    {
+      "path": "redagent_platform/purple_runtime/compiler.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 18
+    },
+    {
+      "path": "redagent_platform/purple_runtime/contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/purple_runtime/lifecycle.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 19
+    },
+    {
+      "path": "redagent_platform/purple_runtime/promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 13
+    },
+    {
+      "path": "redagent_platform/purple_runtime/repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 14
+    },
+    {
+      "path": "redagent_platform/purple_runtime/telemetry.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 6
+    },
+    {
+      "path": "redagent_platform/purple_runtime/testing.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/runner_execution.py",
+      "code": "F401",
+      "message": "`redagent_platform.domain.JobStatus` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/skill_release.py",
+      "code": "F401",
+      "message": "`typing.Any` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/telemetry_service/operations.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "redagent_platform/zap_runtime.py",
+      "code": "F401",
+      "message": "`redagent_platform.domain.TargetType` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/zap_runtime.py",
+      "code": "F401",
+      "message": "`redagent_platform.scope_authorization.ScopeTarget` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "redagent_platform/zap_service/compiler.py",
+      "code": "F401",
+      "message": "`redagent_platform.zap_service.contracts.ApprovalClass` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "scripts/build_agent_skill_release.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/compat_103_backup_restore.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "scripts/compat_103_performance.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 2
+    },
+    {
+      "path": "scripts/compat_103_performance.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 5
+    },
+    {
+      "path": "scripts/compat_104_requalify.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/compat_104_zap.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 3
+    },
+    {
+      "path": "scripts/compat_104_zap_promote.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 2
+    },
+    {
+      "path": "scripts/compat_105_nuclei.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 5
+    },
+    {
+      "path": "scripts/compat_105_requalify.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/compat_106_api_diff.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 3
+    },
+    {
+      "path": "scripts/compat_108_cloud_lab.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 10
+    },
+    {
+      "path": "scripts/compat_109_identity_lab.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 8
+    },
+    {
+      "path": "scripts/compat_109_identity_lab.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 13
+    },
+    {
+      "path": "scripts/compat_109_identity_lab.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 27
+    },
+    {
+      "path": "scripts/compat_109_sign_promotion.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 2
+    },
+    {
+      "path": "scripts/compat_109_sign_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 10
+    },
+    {
+      "path": "scripts/compat_110_artifact_lab.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 4
+    },
+    {
+      "path": "scripts/compat_110_artifact_lab.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 7
+    },
+    {
+      "path": "scripts/compat_110_artifact_lab.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 10
+    },
+    {
+      "path": "scripts/compat_110_sign_promotion.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 2
+    },
+    {
+      "path": "scripts/compat_110_sign_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 12
+    },
+    {
+      "path": "scripts/compat_111_purple_lab.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 4
+    },
+    {
+      "path": "scripts/compat_111_purple_lab.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 5
+    },
+    {
+      "path": "scripts/compat_111_sign_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 4
+    },
+    {
+      "path": "scripts/compat_112_human_sink.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 5
+    },
+    {
+      "path": "scripts/compat_112_human_sink.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 9
+    },
+    {
+      "path": "scripts/compat_112_sign_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 7
+    },
+    {
+      "path": "scripts/compat_113_agent_kernel.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/compat_114_mcp_workbench.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/compat_114_sign_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "scripts/compat_115_sign_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 4
+    },
+    {
+      "path": "scripts/compat_116_deployment_release.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 8
+    },
+    {
+      "path": "scripts/compat_116_sign_promotion.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 2
+    },
+    {
+      "path": "scripts/containment_conformance.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/containment_rehearsal.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 2
+    },
+    {
+      "path": "scripts/install_validation_dependencies.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/openbao_conformance.py",
+      "code": "F401",
+      "message": "`sys` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "scripts/otel_conformance.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 8
+    },
+    {
+      "path": "scripts/redagent_skill_assess.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 2
+    },
+    {
+      "path": "scripts/run_legacy_full_gate.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/run_validation_gate.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 4
+    },
+    {
+      "path": "scripts/runner_conformance.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "scripts/validate_agent_skills.py",
+      "code": "E402",
+      "message": "Module level import not at top of file",
+      "count": 1
+    },
+    {
+      "path": "tests/integration/test_compat_100_cross_boundary_dispatch.py",
+      "code": "F401",
+      "message": "`redagent_platform.orchestration.contracts.CommandAction` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/integration/test_compat_100_cross_boundary_dispatch.py",
+      "code": "F401",
+      "message": "`redagent_platform.orchestration.contracts.OperatorCommand` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/integration/test_compat_109_identity_repository.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 1
+    },
+    {
+      "path": "tests/integration/test_compat_109_identity_repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 4
+    },
+    {
+      "path": "tests/integration/test_compat_110_artifact_repository.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 1
+    },
+    {
+      "path": "tests/integration/test_compat_110_artifact_repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 8
+    },
+    {
+      "path": "tests/integration/test_compat_111_purple_repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 7
+    },
+    {
+      "path": "tests/integration/test_compat_112_human_repository.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 6
+    },
+    {
+      "path": "tests/integration/test_compat_124_campaign_core.py",
+      "code": "F401",
+      "message": "`types.SimpleNamespace` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/integration/test_identity_bff.py",
+      "code": "F401",
+      "message": "`datetime.timedelta` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_099_boundary_sdk.py",
+      "code": "F401",
+      "message": "`datetime.timedelta` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_100_synthetic_dispatcher.py",
+      "code": "F401",
+      "message": "`dataclasses.replace` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_100_temporal_dispatch.py",
+      "code": "F401",
+      "message": "`redagent_platform.orchestration.contracts.JobWorkflowInput` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_103_lab_contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "tests/unit/test_compat_103_lab_contracts.py",
+      "code": "F401",
+      "message": "`dataclasses.replace` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_106_artifact.py",
+      "code": "F401",
+      "message": "`json` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_107_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_108_migration_contract.py",
+      "code": "F541",
+      "message": "f-string without any placeholders",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_108_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 4
+    },
+    {
+      "path": "tests/unit/test_compat_109_promotion.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 2
+    },
+    {
+      "path": "tests/unit/test_compat_109_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 9
+    },
+    {
+      "path": "tests/unit/test_compat_109_provider_runtime.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 7
+    },
+    {
+      "path": "tests/unit/test_compat_110_api_contract.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_110_artifact_pipeline_contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_110_manifest_secret_pipeline.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_110_promotion.py",
+      "code": "E701",
+      "message": "Multiple statements on one line (colon)",
+      "count": 2
+    },
+    {
+      "path": "tests/unit/test_compat_110_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 9
+    },
+    {
+      "path": "tests/unit/test_compat_111_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 6
+    },
+    {
+      "path": "tests/unit/test_compat_112_capability_qualification.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_112_human_simulation_contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_112_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 6
+    },
+    {
+      "path": "tests/unit/test_compat_112_signed_events_lifecycle.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_112_sink_privacy.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_114_mcp_broker_contracts.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "tests/unit/test_compat_114_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 4
+    },
+    {
+      "path": "tests/unit/test_compat_115_collaboration_interchange.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 2
+    },
+    {
+      "path": "tests/unit/test_compat_115_promotion.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 4
+    },
+    {
+      "path": "tests/unit/test_compat_118_validation_stages.py",
+      "code": "F401",
+      "message": "`sys` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_123_campaign_start_service.py",
+      "code": "F401",
+      "message": "`redagent_platform.campaign_service.contracts.StrategyObjectiveKind` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_compat_123_workflow_relay.py",
+      "code": "F401",
+      "message": "`redagent_platform.campaign_service.relay.OutboxDeliveryState` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_deployment_release_distribution.py",
+      "code": "E702",
+      "message": "Multiple statements on one line (semicolon)",
+      "count": 3
+    },
+    {
+      "path": "tests/unit/test_openapi_harness.py",
+      "code": "F401",
+      "message": "`dataclasses.replace` imported but unused",
+      "count": 1
+    },
+    {
+      "path": "tests/unit/test_scope_roe_ledger.py",
+      "code": "F401",
+      "message": "`redagent_platform.scope_authorization.JobScopeRequest` imported but unused",
+      "count": 1
+    }
+  ]
+}

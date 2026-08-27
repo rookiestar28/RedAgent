@@ -53,7 +53,7 @@
       "count": 1,
       "path": ".pre-commit-config.yaml",
       "reason": "compatibility contract identifier",
-      "sha256": "1f637b751732ee9a557c30cce754ee29404486360d1191ec64a548b93fdfc5d6",
+      "sha256": "529c95497a3a320818192f0baa34ea303582362dcc3755dc930a42fc4afde67f",
       "token": "R117"
     },
     {
@@ -352,6 +352,97 @@
     },
     {
       "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "R101"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r104"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r105"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r106"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r107"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r108"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r109"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r110"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r111"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r112"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r113"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r114"
+    },
+    {
+      "count": 1,
+      "path": "config/validation/backend-static-analysis/ruff-baseline.json",
+      "reason": "runtime contract content",
+      "sha256": "9d0103039062d0cf7e108e25457c83b88f099dcd14a6668ec1f959041c1155b6",
+      "token": "r115"
+    },
+    {
+      "count": 1,
       "path": "config/validation/r118-path-mapping.json",
       "reason": "runtime contract content",
       "sha256": "c6806b276391e1537e16587b822872ff1d9d89b90b2fb35bd4ffcd9937c5bc71",
@@ -361,8 +452,8 @@
       "count": 1,
       "path": "config/validation/r118-stage-registry.json",
       "reason": "runtime contract content",
-      "sha256": "83db7781e84ae6a06eb20f7d6de72c2182552f1091dbe81008ac913cb446b5b3",
-      "token": "r118"
+      "sha256": "8791f9671e73f22792e75c7cd64ed559f9123e6a9d4357633800e21a6f2ca8ca",
+      "token": "r134"
     },
     {
       "count": 1,
@@ -1415,6 +1506,20 @@
       "token": "r124"
     },
     {
+      "count": 4,
+      "path": "frontend/src/ui-foundation/representativeStudyGovernance.test.ts",
+      "reason": "compatibility contract identifier",
+      "sha256": "1cbf29e4a347c02a908322e0680dc35bd9d0394cb811b9edcd88012acce9ea12",
+      "token": "R124"
+    },
+    {
+      "count": 3,
+      "path": "frontend/src/ui-foundation/representativeStudyGovernance.ts",
+      "reason": "compatibility contract identifier",
+      "sha256": "4886db7024eab1937b57f6b3a92d18e22d49019031139de66608752c3b81a9a5",
+      "token": "R124"
+    },
+    {
       "count": 1,
       "path": "frontend/src/ui-foundation/uiFoundationBudgetManifest.json",
       "reason": "compatibility contract identifier",
@@ -1828,31 +1933,38 @@
       "token": "r123"
     },
     {
+      "count": 2,
+      "path": "mypy-baseline.txt",
+      "reason": "compatibility contract identifier",
+      "sha256": "221a7b6c0e4ced6b42c00272f570a67f928cb630a70010ba57c872ea65d1ce97",
+      "token": "r123"
+    },
+    {
       "count": 1,
       "path": "package-lock.json",
       "reason": "compatibility contract identifier",
-      "sha256": "bf8dcd2b7f7caf30e717d3fd072544196318319dead9fb906c4e47ae77ccd7e3",
+      "sha256": "46fafb3c6af2fb66fc2bc5d661c2080d0b671c57ef1a2c31e1f8e0fa47593e09",
       "token": "R781"
     },
     {
       "count": 1,
       "path": "package-lock.json",
       "reason": "compatibility contract identifier",
-      "sha256": "bf8dcd2b7f7caf30e717d3fd072544196318319dead9fb906c4e47ae77ccd7e3",
+      "sha256": "46fafb3c6af2fb66fc2bc5d661c2080d0b671c57ef1a2c31e1f8e0fa47593e09",
       "token": "R975"
     },
     {
       "count": 1,
       "path": "package-lock.json",
       "reason": "compatibility contract identifier",
-      "sha256": "bf8dcd2b7f7caf30e717d3fd072544196318319dead9fb906c4e47ae77ccd7e3",
+      "sha256": "46fafb3c6af2fb66fc2bc5d661c2080d0b671c57ef1a2c31e1f8e0fa47593e09",
       "token": "r218"
     },
     {
       "count": 1,
       "path": "package-lock.json",
       "reason": "compatibility contract identifier",
-      "sha256": "bf8dcd2b7f7caf30e717d3fd072544196318319dead9fb906c4e47ae77ccd7e3",
+      "sha256": "46fafb3c6af2fb66fc2bc5d661c2080d0b671c57ef1a2c31e1f8e0fa47593e09",
       "token": "r996"
     },
     {
@@ -1954,178 +2066,164 @@
       "token": "r113"
     },
     {
-      "count": 1,
-      "path": "redagent_platform/api/_route_support.py",
+      "count": 2,
+      "path": "redagent_platform/api/app.py",
       "reason": "compatibility contract identifier",
-      "sha256": "ae33b5fe39808fb786dbcb0596257947a4e9e0dcc0b58d6b2ba7c46d0ca78fed",
-      "token": "R114"
+      "sha256": "85c6425cb8121b67a128fd3fb7642fda2543b7cc6ccba866d45f2194362362de",
+      "token": "R123"
+    },
+    {
+      "count": 29,
+      "path": "redagent_platform/api/app.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "85c6425cb8121b67a128fd3fb7642fda2543b7cc6ccba866d45f2194362362de",
+      "token": "r123"
+    },
+    {
+      "count": 6,
+      "path": "redagent_platform/api/app.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "85c6425cb8121b67a128fd3fb7642fda2543b7cc6ccba866d45f2194362362de",
+      "token": "r124"
+    },
+    {
+      "count": 1,
+      "path": "redagent_platform/api/contracts.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "c9f768615565305c69a8810a33d5ef461a5d31909853f389aa71919cf0a0ec00",
+      "token": "R123"
+    },
+    {
+      "count": 8,
+      "path": "redagent_platform/api/openapi_compatibility.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "e541b286f7c4965df20540d81712de83a17d99c3cdbc1b7bd9a5f09c4a5f3dec",
+      "token": "R123"
+    },
+    {
+      "count": 36,
+      "path": "redagent_platform/api/openapi_compatibility.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "e541b286f7c4965df20540d81712de83a17d99c3cdbc1b7bd9a5f09c4a5f3dec",
+      "token": "R124"
     },
     {
       "count": 10,
-      "path": "redagent_platform/api/_route_support.py",
+      "path": "redagent_platform/api/openapi_compatibility.py",
       "reason": "compatibility contract identifier",
-      "sha256": "ae33b5fe39808fb786dbcb0596257947a4e9e0dcc0b58d6b2ba7c46d0ca78fed",
-      "token": "R123"
-    },
-    {
-      "count": 14,
-      "path": "redagent_platform/api/_route_support.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "ae33b5fe39808fb786dbcb0596257947a4e9e0dcc0b58d6b2ba7c46d0ca78fed",
-      "token": "r114"
-    },
-    {
-      "count": 2,
-      "path": "redagent_platform/api/_route_support.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "ae33b5fe39808fb786dbcb0596257947a4e9e0dcc0b58d6b2ba7c46d0ca78fed",
-      "token": "r123"
-    },
-    {
-      "count": 14,
-      "path": "redagent_platform/api/app.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "6fb11d3bc44a0f9931fe95893895df85759044ff658fca88b6d02d2c524b5c3b",
-      "token": "R123"
-    },
-    {
-      "count": 6,
-      "path": "redagent_platform/api/app.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "6fb11d3bc44a0f9931fe95893895df85759044ff658fca88b6d02d2c524b5c3b",
-      "token": "r114"
-    },
-    {
-      "count": 31,
-      "path": "redagent_platform/api/app.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "6fb11d3bc44a0f9931fe95893895df85759044ff658fca88b6d02d2c524b5c3b",
-      "token": "r123"
-    },
-    {
-      "count": 6,
-      "path": "redagent_platform/api/app.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "6fb11d3bc44a0f9931fe95893895df85759044ff658fca88b6d02d2c524b5c3b",
+      "sha256": "e541b286f7c4965df20540d81712de83a17d99c3cdbc1b7bd9a5f09c4a5f3dec",
       "token": "r124"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/routers/agent.py",
       "reason": "compatibility contract identifier",
-      "sha256": "43ed4bd0788e4a025a02d21294042abed2488a4d4f7ef2b8377889ea71e4e01b",
+      "sha256": "004e823aaca5c8de76587715167de0e4cbfcd0e37196213053b428b1bf3fc149",
       "token": "r099"
     },
     {
-      "count": 5,
+      "count": 2,
       "path": "redagent_platform/api/routers/agent.py",
       "reason": "compatibility contract identifier",
-      "sha256": "43ed4bd0788e4a025a02d21294042abed2488a4d4f7ef2b8377889ea71e4e01b",
+      "sha256": "004e823aaca5c8de76587715167de0e4cbfcd0e37196213053b428b1bf3fc149",
       "token": "r113"
     },
     {
-      "count": 8,
+      "count": 4,
       "path": "redagent_platform/api/routers/api_differential.py",
       "reason": "compatibility contract identifier",
-      "sha256": "654d02ad8f9911e0d22f2cee369be431a5e7ff0158eee3153c042c73c26f7e5a",
+      "sha256": "5a3f080b2eb52cd596ce016363f1b92d9e4738f6e99c6083c421ea543cbd0ce0",
       "token": "r106"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/routers/campaigns.py",
       "reason": "compatibility contract identifier",
-      "sha256": "01a242e66f326c1fe9ba0236f0e5f4650c5da4eeadbc5e9269d433ca9d36d56e",
+      "sha256": "ae43c2b38b71d8d7d9db99fd7f2057095518ece758dd689b227f6ea9b71eb5c5",
       "token": "r096"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/routers/finding_operations.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a0260b3448e326d7b5eea3f708542eb8a0e3c1a6e49ddfe24fdd4cab384b73b9",
+      "sha256": "a50f453d6191dc1a98bb41217b01eed14d292e473c7f8b7f8286291339d08a6a",
       "token": "r099"
     },
     {
-      "count": 11,
+      "count": 4,
       "path": "redagent_platform/api/routers/finding_operations.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a0260b3448e326d7b5eea3f708542eb8a0e3c1a6e49ddfe24fdd4cab384b73b9",
+      "sha256": "a50f453d6191dc1a98bb41217b01eed14d292e473c7f8b7f8286291339d08a6a",
       "token": "r115"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/routers/jobs.py",
       "reason": "compatibility contract identifier",
-      "sha256": "1a60e1ddec313be0fdbbdf66131407d895c92c166ed6553a1a44d0f3bf32e1d9",
+      "sha256": "9fb73f8439f6d09b4b4747a6df45afbc8b8d00405bea51ee69804b941cfdc07f",
       "token": "R101"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/routers/network.py",
       "reason": "compatibility contract identifier",
-      "sha256": "2245261151e4dbfc846246483fec3f52023c8c474ad3aaa2e4bb9c775e5f9cde",
+      "sha256": "5cd05939982a8295b298600f62eaf26bf65739b7685ebcec7ad2836adb5ac896",
       "token": "r107"
     },
     {
       "count": 3,
       "path": "redagent_platform/api/routers/nuclei.py",
       "reason": "compatibility contract identifier",
-      "sha256": "b2c1d5668a4d27b765e4ace3703e9e4e93613c8b2195079e30a16c619b6ffc78",
+      "sha256": "5d6f809c57df98e30372cac792d6a29c6e9e4898d9d30594a6d494967bd6130d",
       "token": "R105"
     },
     {
-      "count": 14,
+      "count": 9,
       "path": "redagent_platform/api/routers/nuclei.py",
       "reason": "compatibility contract identifier",
-      "sha256": "b2c1d5668a4d27b765e4ace3703e9e4e93613c8b2195079e30a16c619b6ffc78",
+      "sha256": "5d6f809c57df98e30372cac792d6a29c6e9e4898d9d30594a6d494967bd6130d",
       "token": "r105"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/routers/workbench.py",
       "reason": "compatibility contract identifier",
-      "sha256": "e8860d70e18b1a353faa40e60ba4a16c5a6383e757fed8b38e267a50a54c5623",
+      "sha256": "c71fcd36fe044655771f87c46e7164ea95b54271019c9dc3655c18236293c322",
       "token": "R114"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/routers/workbench.py",
       "reason": "compatibility contract identifier",
-      "sha256": "e8860d70e18b1a353faa40e60ba4a16c5a6383e757fed8b38e267a50a54c5623",
+      "sha256": "c71fcd36fe044655771f87c46e7164ea95b54271019c9dc3655c18236293c322",
       "token": "r099"
     },
     {
-      "count": 13,
+      "count": 7,
       "path": "redagent_platform/api/routers/workbench.py",
       "reason": "compatibility contract identifier",
-      "sha256": "e8860d70e18b1a353faa40e60ba4a16c5a6383e757fed8b38e267a50a54c5623",
+      "sha256": "c71fcd36fe044655771f87c46e7164ea95b54271019c9dc3655c18236293c322",
       "token": "r114"
     },
     {
       "count": 3,
       "path": "redagent_platform/api/routers/zap.py",
       "reason": "compatibility contract identifier",
-      "sha256": "dfc58259b8c1770addc2b5a96391a45297e82e3c60766d025635e4d5518f9721",
+      "sha256": "7e8d31c249c69f67423eae3dca9fcb2a3d7e24de46fa0a1e3342243a5e5fcd90",
       "token": "r104"
-    },
-    {
-      "count": 8,
-      "path": "redagent_platform/api/runtime.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "a1737f340b6f09b508321c6b8ad40ad82d3c67b69712f531e14b25f57aa55108",
-      "token": "R123"
     },
     {
       "count": 1,
       "path": "redagent_platform/api/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a1737f340b6f09b508321c6b8ad40ad82d3c67b69712f531e14b25f57aa55108",
+      "sha256": "f366f9f293eb10086d04780179f89cbd866dfd8c07920e57976fa402593aebd5",
       "token": "r099"
     },
     {
-      "count": 31,
+      "count": 27,
       "path": "redagent_platform/api/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a1737f340b6f09b508321c6b8ad40ad82d3c67b69712f531e14b25f57aa55108",
+      "sha256": "f366f9f293eb10086d04780179f89cbd866dfd8c07920e57976fa402593aebd5",
       "token": "r123"
     },
     {
@@ -2218,6 +2316,20 @@
       "reason": "compatibility contract identifier",
       "sha256": "ea88ae960d19a53475a7857afcdf4cb86f0d563101615f7f1b6861845120506e",
       "token": "r104"
+    },
+    {
+      "count": 1,
+      "path": "redagent_platform/api/workbench_fixtures.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "10549b942b8d98370231b42ebbb38e19ab0edb41b25e0cd1ebeabf8c5522d8c5",
+      "token": "R114"
+    },
+    {
+      "count": 6,
+      "path": "redagent_platform/api/workbench_fixtures.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "10549b942b8d98370231b42ebbb38e19ab0edb41b25e0cd1ebeabf8c5522d8c5",
+      "token": "r114"
     },
     {
       "count": 2,
@@ -2374,192 +2486,150 @@
       "token": "R119"
     },
     {
-      "count": 26,
-      "path": "redagent_platform/campaign_service/activity_coordinator.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "c0cdf98703742d42e6053043a830e105ef11b4e5e903ba61534b93f8be959580",
-      "token": "R123"
-    },
-    {
       "count": 9,
       "path": "redagent_platform/campaign_service/activity_coordinator.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c0cdf98703742d42e6053043a830e105ef11b4e5e903ba61534b93f8be959580",
+      "sha256": "ec3dcb298869d21795c5953c22e1a9ac50ceea5658c8e9356fe373de7954e90b",
       "token": "r123"
-    },
-    {
-      "count": 42,
-      "path": "redagent_platform/campaign_service/activity_store.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "63403432ede23de38eaf839935e1b61c3af9b933a24e746f2ab03b6e6db9712e",
-      "token": "R123"
-    },
-    {
-      "count": 9,
-      "path": "redagent_platform/campaign_service/activity_store.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "63403432ede23de38eaf839935e1b61c3af9b933a24e746f2ab03b6e6db9712e",
-      "token": "R124"
     },
     {
       "count": 15,
       "path": "redagent_platform/campaign_service/activity_store.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63403432ede23de38eaf839935e1b61c3af9b933a24e746f2ab03b6e6db9712e",
+      "sha256": "183aee00dd2814cb1b4b1c56c4bf181df65b2f62bdb9ba65b49a065984b1f378",
       "token": "r123"
     },
     {
-      "count": 10,
+      "count": 6,
       "path": "redagent_platform/campaign_service/activity_store.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63403432ede23de38eaf839935e1b61c3af9b933a24e746f2ab03b6e6db9712e",
+      "sha256": "183aee00dd2814cb1b4b1c56c4bf181df65b2f62bdb9ba65b49a065984b1f378",
       "token": "r124"
     },
     {
-      "count": 41,
+      "count": 3,
       "path": "redagent_platform/campaign_service/api.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7ecdb0229b63fdfb2a501a0e36d8914e4afa8fd81adfe8b9914cef2cd5df86f5",
+      "sha256": "64c155ac102f817d85526961a34eebcfd5194a9c389128ea62d1507fb51d63bf",
       "token": "R123"
     },
     {
-      "count": 69,
+      "count": 16,
       "path": "redagent_platform/campaign_service/api.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7ecdb0229b63fdfb2a501a0e36d8914e4afa8fd81adfe8b9914cef2cd5df86f5",
-      "token": "R124"
-    },
-    {
-      "count": 17,
-      "path": "redagent_platform/campaign_service/api.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "7ecdb0229b63fdfb2a501a0e36d8914e4afa8fd81adfe8b9914cef2cd5df86f5",
+      "sha256": "64c155ac102f817d85526961a34eebcfd5194a9c389128ea62d1507fb51d63bf",
       "token": "r123"
     },
     {
-      "count": 22,
+      "count": 12,
       "path": "redagent_platform/campaign_service/api.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7ecdb0229b63fdfb2a501a0e36d8914e4afa8fd81adfe8b9914cef2cd5df86f5",
+      "sha256": "64c155ac102f817d85526961a34eebcfd5194a9c389128ea62d1507fb51d63bf",
       "token": "r124"
     },
     {
-      "count": 8,
+      "count": 2,
       "path": "redagent_platform/campaign_service/cli.py",
       "reason": "compatibility contract identifier",
-      "sha256": "5dcf6efa06f69bd21bc0508e494976623444b0d04e637e98740185a9d7c67bfe",
+      "sha256": "ba3e02438ea2bd7e85726d43d8b4222b820ebb32c964950cb5d44957449090ba",
       "token": "R123"
     },
     {
       "count": 23,
       "path": "redagent_platform/campaign_service/cli.py",
       "reason": "compatibility contract identifier",
-      "sha256": "5dcf6efa06f69bd21bc0508e494976623444b0d04e637e98740185a9d7c67bfe",
+      "sha256": "ba3e02438ea2bd7e85726d43d8b4222b820ebb32c964950cb5d44957449090ba",
       "token": "r123"
     },
     {
       "count": 2,
       "path": "redagent_platform/campaign_service/composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
-      "token": "R119"
-    },
-    {
-      "count": 2,
-      "path": "redagent_platform/campaign_service/composition.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
-      "token": "R121"
-    },
-    {
-      "count": 47,
-      "path": "redagent_platform/campaign_service/composition.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
+      "sha256": "da0ccf1d69baac2514435c80c1bb8f32c2c5ac4682ac8f5d7b6bc132f88acba8",
       "token": "R123"
     },
     {
-      "count": 10,
+      "count": 1,
       "path": "redagent_platform/campaign_service/composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
+      "sha256": "da0ccf1d69baac2514435c80c1bb8f32c2c5ac4682ac8f5d7b6bc132f88acba8",
       "token": "R124"
     },
     {
       "count": 1,
       "path": "redagent_platform/campaign_service/composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
+      "sha256": "da0ccf1d69baac2514435c80c1bb8f32c2c5ac4682ac8f5d7b6bc132f88acba8",
       "token": "r104"
     },
     {
       "count": 1,
       "path": "redagent_platform/campaign_service/composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
+      "sha256": "da0ccf1d69baac2514435c80c1bb8f32c2c5ac4682ac8f5d7b6bc132f88acba8",
       "token": "r105"
     },
     {
-      "count": 33,
+      "count": 21,
       "path": "redagent_platform/campaign_service/composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
+      "sha256": "da0ccf1d69baac2514435c80c1bb8f32c2c5ac4682ac8f5d7b6bc132f88acba8",
       "token": "r123"
     },
     {
-      "count": 4,
+      "count": 2,
       "path": "redagent_platform/campaign_service/composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "63524150ee7c666561283703c3d95ae76b35f6a0e21e8c18e9a354fd4ec3e9c3",
+      "sha256": "da0ccf1d69baac2514435c80c1bb8f32c2c5ac4682ac8f5d7b6bc132f88acba8",
       "token": "r124"
     },
     {
       "count": 2,
       "path": "redagent_platform/campaign_service/context.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a767fbc171a89c773b81e42614ead672fdb5baf91599f6100eef6e2d34fff09a",
+      "sha256": "b4e2b888451d487d6a7fc45e10a9962c0df7d43a8c9e6a49d4681c4afebd7add",
       "token": "R105"
     },
     {
       "count": 8,
       "path": "redagent_platform/campaign_service/context.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a767fbc171a89c773b81e42614ead672fdb5baf91599f6100eef6e2d34fff09a",
+      "sha256": "b4e2b888451d487d6a7fc45e10a9962c0df7d43a8c9e6a49d4681c4afebd7add",
       "token": "r104"
     },
     {
       "count": 13,
       "path": "redagent_platform/campaign_service/context.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a767fbc171a89c773b81e42614ead672fdb5baf91599f6100eef6e2d34fff09a",
+      "sha256": "b4e2b888451d487d6a7fc45e10a9962c0df7d43a8c9e6a49d4681c4afebd7add",
       "token": "r105"
     },
     {
-      "count": 101,
+      "count": 100,
       "path": "redagent_platform/campaign_service/context.py",
       "reason": "compatibility contract identifier",
-      "sha256": "a767fbc171a89c773b81e42614ead672fdb5baf91599f6100eef6e2d34fff09a",
+      "sha256": "b4e2b888451d487d6a7fc45e10a9962c0df7d43a8c9e6a49d4681c4afebd7add",
       "token": "r119"
     },
     {
       "count": 7,
       "path": "redagent_platform/campaign_service/contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8df3d681d16cbe57f9f39f467991aca552dc654fa3d77d3042a922d2b23489ee",
+      "sha256": "4f2940e897195ee3f6e164738fc847c67f7dfbe798e253c1a1749474c08ec053",
       "token": "R121"
     },
     {
-      "count": 72,
+      "count": 75,
       "path": "redagent_platform/campaign_service/contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8df3d681d16cbe57f9f39f467991aca552dc654fa3d77d3042a922d2b23489ee",
+      "sha256": "4f2940e897195ee3f6e164738fc847c67f7dfbe798e253c1a1749474c08ec053",
       "token": "r119"
     },
     {
-      "count": 63,
+      "count": 65,
       "path": "redagent_platform/campaign_service/contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8df3d681d16cbe57f9f39f467991aca552dc654fa3d77d3042a922d2b23489ee",
+      "sha256": "4f2940e897195ee3f6e164738fc847c67f7dfbe798e253c1a1749474c08ec053",
       "token": "r121"
     },
     {
@@ -2577,17 +2647,10 @@
       "token": "r123"
     },
     {
-      "count": 4,
-      "path": "redagent_platform/campaign_service/qualification.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "9755c906e07cfeb52bb16a974cb3bf1e333dca6a62b209f692692d51fef71577",
-      "token": "R123"
-    },
-    {
       "count": 25,
       "path": "redagent_platform/campaign_service/qualification.py",
       "reason": "compatibility contract identifier",
-      "sha256": "9755c906e07cfeb52bb16a974cb3bf1e333dca6a62b209f692692d51fef71577",
+      "sha256": "3cd55af5c82e07c0e1fb16121582cf4da676ecc5418354cd656bccb6c3a7d040",
       "token": "r123"
     },
     {
@@ -2615,210 +2678,133 @@
       "count": 1,
       "path": "redagent_platform/campaign_service/relay.py",
       "reason": "compatibility contract identifier",
-      "sha256": "ab0c1e1ff7daad404b72697bc4a7272c0a4b3d7e6589cc09703c418f8ddcdff8",
-      "token": "R123"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/campaign_service/relay.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "ab0c1e1ff7daad404b72697bc4a7272c0a4b3d7e6589cc09703c418f8ddcdff8",
+      "sha256": "50d9a942b223ef6058ac8cdbf4caa5558af8fb667cd49f1faf679de6a2c3e07e",
       "token": "r123"
-    },
-    {
-      "count": 6,
-      "path": "redagent_platform/campaign_service/relay_runtime.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "c095f2e03441fad5461f8ee01c49c47e17bf86df29d6378989103739085cb537",
-      "token": "R123"
     },
     {
       "count": 17,
       "path": "redagent_platform/campaign_service/relay_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c095f2e03441fad5461f8ee01c49c47e17bf86df29d6378989103739085cb537",
+      "sha256": "d49984dc63e7da3e92797f20b0e7b756b2610f33598107b3673a97a62ddf8159",
       "token": "r123"
-    },
-    {
-      "count": 57,
-      "path": "redagent_platform/campaign_service/repository.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "439c5d16388969fd921136d40200787f2a06f49d163ad492e6f9981ffb9c3217",
-      "token": "R123"
-    },
-    {
-      "count": 5,
-      "path": "redagent_platform/campaign_service/repository.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "439c5d16388969fd921136d40200787f2a06f49d163ad492e6f9981ffb9c3217",
-      "token": "R124"
     },
     {
       "count": 20,
       "path": "redagent_platform/campaign_service/repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "439c5d16388969fd921136d40200787f2a06f49d163ad492e6f9981ffb9c3217",
+      "sha256": "0e102f246f7272853cd0f0a6e3903e53d8c118ec6c208e1505bd7ba7db023661",
       "token": "r123"
     },
     {
-      "count": 12,
+      "count": 9,
       "path": "redagent_platform/campaign_service/repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "439c5d16388969fd921136d40200787f2a06f49d163ad492e6f9981ffb9c3217",
+      "sha256": "0e102f246f7272853cd0f0a6e3903e53d8c118ec6c208e1505bd7ba7db023661",
       "token": "r124"
     },
     {
       "count": 4,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "R104"
     },
     {
       "count": 6,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "R105"
     },
     {
-      "count": 3,
+      "count": 1,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "R123"
     },
     {
       "count": 2,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "r103"
     },
     {
       "count": 2,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "r104"
     },
     {
       "count": 6,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "r105"
     },
     {
       "count": 4,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "r119"
     },
     {
-      "count": 35,
+      "count": 34,
       "path": "redagent_platform/campaign_service/runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
+      "sha256": "ccecf9f6cfbf50a07783154479738a000e9af07a40e6337d8a8f78cfbc13532e",
       "token": "r123"
-    },
-    {
-      "count": 2,
-      "path": "redagent_platform/campaign_service/runtime.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "55b3c04e9153a28de1ee82cf2059c18db6dd94dc8ee27108b85ef9119b7c47ae",
-      "token": "r124"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/campaign_service/service.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
-      "token": "R119"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/campaign_service/service.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
-      "token": "R121"
-    },
-    {
-      "count": 17,
-      "path": "redagent_platform/campaign_service/service.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
-      "token": "R123"
-    },
-    {
-      "count": 28,
-      "path": "redagent_platform/campaign_service/service.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
-      "token": "R124"
     },
     {
       "count": 15,
       "path": "redagent_platform/campaign_service/service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
+      "sha256": "67ab5e22d013d7541642a8b23253b5388307d3a02fbfc7c1e57d8b016dff080f",
       "token": "r119"
     },
     {
       "count": 2,
       "path": "redagent_platform/campaign_service/service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
+      "sha256": "67ab5e22d013d7541642a8b23253b5388307d3a02fbfc7c1e57d8b016dff080f",
       "token": "r121"
     },
     {
-      "count": 24,
+      "count": 19,
       "path": "redagent_platform/campaign_service/service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
+      "sha256": "67ab5e22d013d7541642a8b23253b5388307d3a02fbfc7c1e57d8b016dff080f",
       "token": "r123"
     },
     {
-      "count": 54,
+      "count": 42,
       "path": "redagent_platform/campaign_service/service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "061f0c36e20981ff5a133fe45efb8fca9a604331620ee1695bf547e0054d33e7",
+      "sha256": "67ab5e22d013d7541642a8b23253b5388307d3a02fbfc7c1e57d8b016dff080f",
       "token": "r124"
-    },
-    {
-      "count": 13,
-      "path": "redagent_platform/campaign_service/status.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "554712cd0c3f0649e7cb257e08a127589090d63ea4a0665ac10b9d7948a3565b",
-      "token": "R123"
-    },
-    {
-      "count": 3,
-      "path": "redagent_platform/campaign_service/status.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "554712cd0c3f0649e7cb257e08a127589090d63ea4a0665ac10b9d7948a3565b",
-      "token": "R124"
     },
     {
       "count": 23,
       "path": "redagent_platform/campaign_service/status.py",
       "reason": "compatibility contract identifier",
-      "sha256": "554712cd0c3f0649e7cb257e08a127589090d63ea4a0665ac10b9d7948a3565b",
+      "sha256": "eaa6d09eeeb646fb0b6054d3f07b98bbe7ce8523014bcad8bf902eae67314b47",
       "token": "r123"
     },
     {
-      "count": 37,
+      "count": 26,
       "path": "redagent_platform/campaign_service/status.py",
       "reason": "compatibility contract identifier",
-      "sha256": "554712cd0c3f0649e7cb257e08a127589090d63ea4a0665ac10b9d7948a3565b",
+      "sha256": "eaa6d09eeeb646fb0b6054d3f07b98bbe7ce8523014bcad8bf902eae67314b47",
       "token": "r124"
     },
     {
-      "count": 33,
+      "count": 34,
       "path": "redagent_platform/campaign_service/strategy.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c8a83f4b392b6206ee0718f4fe9d9e993c9c0f40b928b98a3d45839863d79372",
+      "sha256": "d8decb367d78770a9d3c4f1160d23438d5d607a0c9f09c9aa0a4350991c094b1",
       "token": "r121"
     },
     {
@@ -2909,15 +2895,8 @@
       "count": 1,
       "path": "redagent_platform/deployment_hardening.py",
       "reason": "compatibility contract identifier",
-      "sha256": "2c3fc5ca1ee3604c8674afa6aa39eefa14e6e6b301289839f1887b5b971d91ec",
+      "sha256": "8a7dfcfc95356e45417733d7358824befe6a3a04772dffad95ab9699dd3d54b7",
       "token": "R032"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/deployment_hardening.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "2c3fc5ca1ee3604c8674afa6aa39eefa14e6e6b301289839f1887b5b971d91ec",
-      "token": "r032"
     },
     {
       "count": 1,
@@ -3000,15 +2979,8 @@
       "count": 2,
       "path": "redagent_platform/finding_review.py",
       "reason": "compatibility contract identifier",
-      "sha256": "20b76dda0ece218487a9de9676c236f81d7eb373cdb8a35039697c49255a6507",
+      "sha256": "d061ce0da54cf3f5d57cb50bcd1ff33592c88c9a5b02e87ff99a45690fd2a6d7",
       "token": "R021"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/finding_review.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "20b76dda0ece218487a9de9676c236f81d7eb373cdb8a35039697c49255a6507",
-      "token": "r021"
     },
     {
       "count": 1,
@@ -3341,52 +3313,45 @@
     },
     {
       "count": 3,
-      "path": "redagent_platform/nuclei_service/capability.py",
+      "path": "redagent_platform/nuclei_service/campaign_adapter.py",
       "reason": "compatibility contract identifier",
-      "sha256": "cb4434f287f56e343e3592f1a052df3813318acac24b13e29058d445a0aea5ec",
-      "token": "r105"
-    },
-    {
-      "count": 8,
-      "path": "redagent_platform/nuclei_service/compat_123_adapter.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "aff6faf130101309628b644283c2e54a01fde72d41176c386c66136c591ce033",
-      "token": "R123"
-    },
-    {
-      "count": 3,
-      "path": "redagent_platform/nuclei_service/compat_123_adapter.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "aff6faf130101309628b644283c2e54a01fde72d41176c386c66136c591ce033",
+      "sha256": "fc2937aecd4984a3508b6e461889a046ea1462fc5ae907a54fee8337766ab9a6",
       "token": "r105"
     },
     {
       "count": 14,
-      "path": "redagent_platform/nuclei_service/compat_123_adapter.py",
+      "path": "redagent_platform/nuclei_service/campaign_adapter.py",
       "reason": "compatibility contract identifier",
-      "sha256": "aff6faf130101309628b644283c2e54a01fde72d41176c386c66136c591ce033",
+      "sha256": "fc2937aecd4984a3508b6e461889a046ea1462fc5ae907a54fee8337766ab9a6",
       "token": "r123"
     },
     {
       "count": 6,
-      "path": "redagent_platform/nuclei_service/compat_123_transport.py",
+      "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "reason": "compatibility contract identifier",
-      "sha256": "798de7bf8cc07e693cba3e0e3999ac42db0d7f425a099d2881d1af7f1f390d9d",
+      "sha256": "11a0ec368151597348f1d6e034f9add9178890df82ae10987b2b47e4991abba2",
       "token": "R105"
     },
     {
       "count": 24,
-      "path": "redagent_platform/nuclei_service/compat_123_transport.py",
+      "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "reason": "compatibility contract identifier",
-      "sha256": "798de7bf8cc07e693cba3e0e3999ac42db0d7f425a099d2881d1af7f1f390d9d",
+      "sha256": "11a0ec368151597348f1d6e034f9add9178890df82ae10987b2b47e4991abba2",
       "token": "r105"
     },
     {
       "count": 38,
-      "path": "redagent_platform/nuclei_service/compat_123_transport.py",
+      "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "reason": "compatibility contract identifier",
-      "sha256": "798de7bf8cc07e693cba3e0e3999ac42db0d7f425a099d2881d1af7f1f390d9d",
+      "sha256": "11a0ec368151597348f1d6e034f9add9178890df82ae10987b2b47e4991abba2",
       "token": "r123"
+    },
+    {
+      "count": 3,
+      "path": "redagent_platform/nuclei_service/capability.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "cb4434f287f56e343e3592f1a052df3813318acac24b13e29058d445a0aea5ec",
+      "token": "r105"
     },
     {
       "count": 1,
@@ -3483,63 +3448,42 @@
       "count": 1,
       "path": "redagent_platform/observability_ir.py",
       "reason": "compatibility contract identifier",
-      "sha256": "f9f6b14ef7986ef2b54177a11eeddee81dc3167fee5385f48e5271016c02b09c",
+      "sha256": "bc144abd8455227c08f072e7422a3d00a28e1ef8154f09cc45e5cf04baa2ff33",
       "token": "R033"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/observability_ir.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "f9f6b14ef7986ef2b54177a11eeddee81dc3167fee5385f48e5271016c02b09c",
-      "token": "r033"
-    },
-    {
-      "count": 15,
-      "path": "redagent_platform/orchestration/activities.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "95d03e51301674eec5a728bcb6d33918f4d8334b620081c4ccd7fa089a7e39f4",
-      "token": "R123"
     },
     {
       "count": 4,
       "path": "redagent_platform/orchestration/activities.py",
       "reason": "compatibility contract identifier",
-      "sha256": "95d03e51301674eec5a728bcb6d33918f4d8334b620081c4ccd7fa089a7e39f4",
+      "sha256": "8f1a8213953b56f609d40cb69666dd54579fd661936e2a59d04b2d03681ef1b3",
       "token": "r096"
     },
     {
       "count": 1,
       "path": "redagent_platform/orchestration/activities.py",
       "reason": "compatibility contract identifier",
-      "sha256": "95d03e51301674eec5a728bcb6d33918f4d8334b620081c4ccd7fa089a7e39f4",
+      "sha256": "8f1a8213953b56f609d40cb69666dd54579fd661936e2a59d04b2d03681ef1b3",
       "token": "r100"
     },
     {
       "count": 1,
       "path": "redagent_platform/orchestration/activities.py",
       "reason": "compatibility contract identifier",
-      "sha256": "95d03e51301674eec5a728bcb6d33918f4d8334b620081c4ccd7fa089a7e39f4",
+      "sha256": "8f1a8213953b56f609d40cb69666dd54579fd661936e2a59d04b2d03681ef1b3",
       "token": "r101"
     },
     {
-      "count": 22,
+      "count": 19,
       "path": "redagent_platform/orchestration/activities.py",
       "reason": "compatibility contract identifier",
-      "sha256": "95d03e51301674eec5a728bcb6d33918f4d8334b620081c4ccd7fa089a7e39f4",
+      "sha256": "8f1a8213953b56f609d40cb69666dd54579fd661936e2a59d04b2d03681ef1b3",
       "token": "r123"
     },
     {
-      "count": 9,
-      "path": "redagent_platform/orchestration/compat_123_gateway.py",
+      "count": 8,
+      "path": "redagent_platform/orchestration/closed_loop_gateway.py",
       "reason": "compatibility contract identifier",
-      "sha256": "003a43b6d9f8470e67b3dbe52c77267b5b02059a610b9ae8b5fa83c4ca3a1d9b",
-      "token": "R123"
-    },
-    {
-      "count": 14,
-      "path": "redagent_platform/orchestration/compat_123_gateway.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "003a43b6d9f8470e67b3dbe52c77267b5b02059a610b9ae8b5fa83c4ca3a1d9b",
+      "sha256": "3cb4509035b4c91f0ee4b457dba3a922e725fb9c84e5e1851b5df72de050900e",
       "token": "r123"
     },
     {
@@ -3550,17 +3494,10 @@
       "token": "r096"
     },
     {
-      "count": 10,
+      "count": 29,
       "path": "redagent_platform/orchestration/contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "89dc5963463fb30fba7a2d6be901aa471511f7c215664f8fbccc1d8a7d7d9460",
-      "token": "R123"
-    },
-    {
-      "count": 31,
-      "path": "redagent_platform/orchestration/contracts.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "89dc5963463fb30fba7a2d6be901aa471511f7c215664f8fbccc1d8a7d7d9460",
+      "sha256": "0e203e509ab895dc2ef4bb430408095bc7dce43e755d96f3f1c042cc4fe3892d",
       "token": "r123"
     },
     {
@@ -3578,73 +3515,66 @@
       "token": "r101"
     },
     {
-      "count": 2,
-      "path": "redagent_platform/orchestration/worker.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "93ea5b0f7f05a0d01ab327920b3e070950caa05d2fef340da228a40fc83d61f6",
-      "token": "R123"
-    },
-    {
       "count": 6,
       "path": "redagent_platform/orchestration/worker.py",
       "reason": "compatibility contract identifier",
-      "sha256": "93ea5b0f7f05a0d01ab327920b3e070950caa05d2fef340da228a40fc83d61f6",
+      "sha256": "213f785a94baabfd3e7ab47d6895b3cc2d0cd5f372cade9ee97bac278922a106",
       "token": "r096"
     },
     {
       "count": 1,
       "path": "redagent_platform/orchestration/worker.py",
       "reason": "compatibility contract identifier",
-      "sha256": "93ea5b0f7f05a0d01ab327920b3e070950caa05d2fef340da228a40fc83d61f6",
+      "sha256": "213f785a94baabfd3e7ab47d6895b3cc2d0cd5f372cade9ee97bac278922a106",
       "token": "r100"
     },
     {
       "count": 1,
       "path": "redagent_platform/orchestration/worker.py",
       "reason": "compatibility contract identifier",
-      "sha256": "93ea5b0f7f05a0d01ab327920b3e070950caa05d2fef340da228a40fc83d61f6",
+      "sha256": "213f785a94baabfd3e7ab47d6895b3cc2d0cd5f372cade9ee97bac278922a106",
       "token": "r101"
     },
     {
-      "count": 45,
+      "count": 42,
       "path": "redagent_platform/orchestration/worker.py",
       "reason": "compatibility contract identifier",
-      "sha256": "93ea5b0f7f05a0d01ab327920b3e070950caa05d2fef340da228a40fc83d61f6",
+      "sha256": "213f785a94baabfd3e7ab47d6895b3cc2d0cd5f372cade9ee97bac278922a106",
       "token": "r123"
     },
     {
-      "count": 38,
+      "count": 3,
       "path": "redagent_platform/orchestration/workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "daba74696a33f1981a4459521a7e3332500be91cb75b4c369940ca07f8005de0",
+      "sha256": "b4ab3ecacdc75c5f2ae88cb8c32bbae1cde796c1388c2b8d5b0e24df0b422ecb",
       "token": "R123"
     },
     {
       "count": 8,
       "path": "redagent_platform/orchestration/workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "daba74696a33f1981a4459521a7e3332500be91cb75b4c369940ca07f8005de0",
+      "sha256": "b4ab3ecacdc75c5f2ae88cb8c32bbae1cde796c1388c2b8d5b0e24df0b422ecb",
       "token": "r096"
     },
     {
       "count": 2,
       "path": "redagent_platform/orchestration/workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "daba74696a33f1981a4459521a7e3332500be91cb75b4c369940ca07f8005de0",
+      "sha256": "b4ab3ecacdc75c5f2ae88cb8c32bbae1cde796c1388c2b8d5b0e24df0b422ecb",
       "token": "r100"
     },
     {
       "count": 1,
       "path": "redagent_platform/orchestration/workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "daba74696a33f1981a4459521a7e3332500be91cb75b4c369940ca07f8005de0",
+      "sha256": "b4ab3ecacdc75c5f2ae88cb8c32bbae1cde796c1388c2b8d5b0e24df0b422ecb",
       "token": "r101"
     },
     {
-      "count": 16,
+      "count": 10,
       "path": "redagent_platform/orchestration/workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "daba74696a33f1981a4459521a7e3332500be91cb75b4c369940ca07f8005de0",
+      "sha256": "b4ab3ecacdc75c5f2ae88cb8c32bbae1cde796c1388c2b8d5b0e24df0b422ecb",
       "token": "r123"
     },
     {
@@ -3663,45 +3593,38 @@
     },
     {
       "count": 2,
-      "path": "redagent_platform/persistence/models.py",
+      "path": "redagent_platform/persistence/models/control_plane.py",
       "reason": "compatibility contract identifier",
-      "sha256": "730536149d257723dae791d99c347b476087074289c3bed3840a67f492e67585",
+      "sha256": "26fbea8f1f3a7a2d1658b79009b28f5fa7b87e30824265d0464b94eb9ac8038b",
       "token": "r123"
     },
     {
-      "count": 13,
+      "count": 12,
       "path": "redagent_platform/persistence/repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d1878501d994fb6eb64a6872d7d522e8d156ce3cdaebc46d0ca4a8fe3b76fd64",
+      "sha256": "2d1ef279b293f41fe32adc86cd26ecd9f3b26e1a05d005c9f65f9ba4a50144a9",
       "token": "r123"
     },
     {
       "count": 3,
       "path": "redagent_platform/platform_security_assessment.py",
       "reason": "compatibility contract identifier",
-      "sha256": "0865326e998e61ca15c7ac20291928753fb7f6d3d2492fc39d7fc5d7a8a24fbf",
+      "sha256": "c7bbd7706ff7bc77c01a8d65207a1aefce6f8a355cd38e7fd9b3500ac8687f17",
       "token": "R031"
     },
     {
       "count": 1,
       "path": "redagent_platform/platform_security_assessment.py",
       "reason": "compatibility contract identifier",
-      "sha256": "0865326e998e61ca15c7ac20291928753fb7f6d3d2492fc39d7fc5d7a8a24fbf",
+      "sha256": "c7bbd7706ff7bc77c01a8d65207a1aefce6f8a355cd38e7fd9b3500ac8687f17",
       "token": "R032"
     },
     {
       "count": 1,
       "path": "redagent_platform/platform_security_assessment.py",
       "reason": "compatibility contract identifier",
-      "sha256": "0865326e998e61ca15c7ac20291928753fb7f6d3d2492fc39d7fc5d7a8a24fbf",
+      "sha256": "c7bbd7706ff7bc77c01a8d65207a1aefce6f8a355cd38e7fd9b3500ac8687f17",
       "token": "R034"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/platform_security_assessment.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "0865326e998e61ca15c7ac20291928753fb7f6d3d2492fc39d7fc5d7a8a24fbf",
-      "token": "r031"
     },
     {
       "count": 1,
@@ -3714,7 +3637,7 @@
       "count": 1,
       "path": "redagent_platform/policy_service/contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "077c67411c087be5e9dfc7dbcf30b2053a8ec4dbf47b761e480051ccef24019f",
+      "sha256": "0a57c2f8137db0974b8028814f4d66a1909d0d2285a6961415fe88e97788b0e7",
       "token": "R099"
     },
     {
@@ -3798,29 +3721,15 @@
       "count": 1,
       "path": "redagent_platform/release_gate.py",
       "reason": "compatibility contract identifier",
-      "sha256": "82fdd51dd97dd2be5e34a4766b9df5a06194e2bab4b9e5901689370a19949d30",
+      "sha256": "cf86114d2a106bb8dc8264684dcfb799f3d325aefe5e1644eac392e59605902e",
       "token": "R034"
     },
     {
-      "count": 13,
+      "count": 2,
       "path": "redagent_platform/release_gate.py",
       "reason": "compatibility contract identifier",
-      "sha256": "82fdd51dd97dd2be5e34a4766b9df5a06194e2bab4b9e5901689370a19949d30",
+      "sha256": "cf86114d2a106bb8dc8264684dcfb799f3d325aefe5e1644eac392e59605902e",
       "token": "R089"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/release_gate.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "82fdd51dd97dd2be5e34a4766b9df5a06194e2bab4b9e5901689370a19949d30",
-      "token": "r034"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/release_gate.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "82fdd51dd97dd2be5e34a4766b9df5a06194e2bab4b9e5901689370a19949d30",
-      "token": "r089"
     },
     {
       "count": 1,
@@ -3837,59 +3746,38 @@
       "token": "R028"
     },
     {
-      "count": 18,
-      "path": "redagent_platform/runner_service/compat_123_dispatch.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "42216c9103a7af476dd2fa8d870d9f1b71c5943e2b56dbd7278f27ffee1c5a43",
-      "token": "R123"
-    },
-    {
       "count": 1,
-      "path": "redagent_platform/runner_service/compat_123_dispatch.py",
+      "path": "redagent_platform/runner_service/campaign_dispatch.py",
       "reason": "compatibility contract identifier",
-      "sha256": "42216c9103a7af476dd2fa8d870d9f1b71c5943e2b56dbd7278f27ffee1c5a43",
+      "sha256": "3828ee338f8abbb8b153df7d8221ce5c976ee1fd9c34813c1725444372d15270",
       "token": "r104"
     },
     {
       "count": 1,
-      "path": "redagent_platform/runner_service/compat_123_dispatch.py",
+      "path": "redagent_platform/runner_service/campaign_dispatch.py",
       "reason": "compatibility contract identifier",
-      "sha256": "42216c9103a7af476dd2fa8d870d9f1b71c5943e2b56dbd7278f27ffee1c5a43",
+      "sha256": "3828ee338f8abbb8b153df7d8221ce5c976ee1fd9c34813c1725444372d15270",
       "token": "r105"
     },
     {
       "count": 25,
-      "path": "redagent_platform/runner_service/compat_123_dispatch.py",
+      "path": "redagent_platform/runner_service/campaign_dispatch.py",
       "reason": "compatibility contract identifier",
-      "sha256": "42216c9103a7af476dd2fa8d870d9f1b71c5943e2b56dbd7278f27ffee1c5a43",
+      "sha256": "3828ee338f8abbb8b153df7d8221ce5c976ee1fd9c34813c1725444372d15270",
       "token": "r123"
-    },
-    {
-      "count": 6,
-      "path": "redagent_platform/runner_service/compat_123_lifecycle.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "deea12bb340bf7836580bc5f1419d40d12573496f2bb6f3924dcd7d416c37dfa",
-      "token": "R123"
     },
     {
       "count": 14,
-      "path": "redagent_platform/runner_service/compat_123_lifecycle.py",
+      "path": "redagent_platform/runner_service/campaign_lifecycle.py",
       "reason": "compatibility contract identifier",
-      "sha256": "deea12bb340bf7836580bc5f1419d40d12573496f2bb6f3924dcd7d416c37dfa",
+      "sha256": "1ad6ed6855ef26aa52ab55ef5b0cad47c503a8c1764503d0622752b04d2d97ed",
       "token": "r123"
     },
     {
-      "count": 7,
-      "path": "redagent_platform/runner_service/compat_123_result.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "59dcef2d2fa4c7a813070bc7b0cb1fcd8c8c20d9d35dbef22bcdca2320a974d1",
-      "token": "R123"
-    },
-    {
       "count": 26,
-      "path": "redagent_platform/runner_service/compat_123_result.py",
+      "path": "redagent_platform/runner_service/campaign_result.py",
       "reason": "compatibility contract identifier",
-      "sha256": "59dcef2d2fa4c7a813070bc7b0cb1fcd8c8c20d9d35dbef22bcdca2320a974d1",
+      "sha256": "6c447f14b1aa265ceffbf39b148a01c176dcf53d193e7a44c56b963c124da785",
       "token": "r123"
     },
     {
@@ -3984,11 +3872,18 @@
       "token": "r118"
     },
     {
-      "count": 3,
+      "count": 2,
       "path": "redagent_platform/validation/stages.py",
       "reason": "compatibility contract identifier",
-      "sha256": "eaf2490ae9a042338e9201cf34df9d845e663b1976629f28a16bf365dc27363c",
+      "sha256": "0412d9d2f582b87c1faef607287a4ee46243db9e441dc6a5900ef01c24fdcf59",
       "token": "r118"
+    },
+    {
+      "count": 1,
+      "path": "redagent_platform/validation/stages.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "0412d9d2f582b87c1faef607287a4ee46243db9e441dc6a5900ef01c24fdcf59",
+      "token": "r134"
     },
     {
       "count": 1,
@@ -4019,53 +3914,46 @@
       "token": "r104"
     },
     {
+      "count": 1,
+      "path": "redagent_platform/zap_service/campaign_adapter.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "271c14e8d331a2a206becaf7c6fc16a2fde63c0bba3afbff27926f44399234cd",
+      "token": "r104"
+    },
+    {
+      "count": 16,
+      "path": "redagent_platform/zap_service/campaign_adapter.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "271c14e8d331a2a206becaf7c6fc16a2fde63c0bba3afbff27926f44399234cd",
+      "token": "r123"
+    },
+    {
+      "count": 4,
+      "path": "redagent_platform/zap_service/campaign_transport.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "40086a33b45a4ede7047f4815636ec2ff0b5b75b2858234cf6cb47c1d11189f5",
+      "token": "R104"
+    },
+    {
+      "count": 18,
+      "path": "redagent_platform/zap_service/campaign_transport.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "40086a33b45a4ede7047f4815636ec2ff0b5b75b2858234cf6cb47c1d11189f5",
+      "token": "r104"
+    },
+    {
+      "count": 46,
+      "path": "redagent_platform/zap_service/campaign_transport.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "40086a33b45a4ede7047f4815636ec2ff0b5b75b2858234cf6cb47c1d11189f5",
+      "token": "r123"
+    },
+    {
       "count": 3,
       "path": "redagent_platform/zap_service/capability.py",
       "reason": "compatibility contract identifier",
       "sha256": "7060d442a0b4a652ae048cbbf5e452d20979cb2fa3c733950a1b2ada12634f78",
       "token": "r104"
-    },
-    {
-      "count": 8,
-      "path": "redagent_platform/zap_service/compat_123_adapter.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "dd58f10fdf26f9cb398b7f5f639393c820f431e7b3170021501c575dd3af96d5",
-      "token": "R123"
-    },
-    {
-      "count": 1,
-      "path": "redagent_platform/zap_service/compat_123_adapter.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "dd58f10fdf26f9cb398b7f5f639393c820f431e7b3170021501c575dd3af96d5",
-      "token": "r104"
-    },
-    {
-      "count": 16,
-      "path": "redagent_platform/zap_service/compat_123_adapter.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "dd58f10fdf26f9cb398b7f5f639393c820f431e7b3170021501c575dd3af96d5",
-      "token": "r123"
-    },
-    {
-      "count": 4,
-      "path": "redagent_platform/zap_service/compat_123_transport.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "3df61fba6dadfd40bc23010c19d234623287a85b00878ab1c14ca14f07730493",
-      "token": "R104"
-    },
-    {
-      "count": 18,
-      "path": "redagent_platform/zap_service/compat_123_transport.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "3df61fba6dadfd40bc23010c19d234623287a85b00878ab1c14ca14f07730493",
-      "token": "r104"
-    },
-    {
-      "count": 46,
-      "path": "redagent_platform/zap_service/compat_123_transport.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "3df61fba6dadfd40bc23010c19d234623287a85b00878ab1c14ca14f07730493",
-      "token": "r123"
     },
     {
       "count": 3,
@@ -4799,14 +4687,14 @@
       "count": 8,
       "path": "scripts/opa_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "f59fc5dc6d4dcef855464021380687303d32319a02c6f03c87fc938cfc152283",
+      "sha256": "0a42df650dd88aa43cf67eed31435ef4cec18ec08cfd9e710d2ad8017829f5e9",
       "token": "r099"
     },
     {
       "count": 8,
       "path": "scripts/openbao_conformance.py",
       "reason": "compatibility contract identifier",
-      "sha256": "3a3704ad5d6729d406b4276ab16b35db2e32656e0a61af1a92e6196e98ad535b",
+      "sha256": "5f19baff5c151f76bfb6d5d2efc8308015d794ee1049f64e226e7346ff5da4ad",
       "token": "r098"
     },
     {
@@ -4824,10 +4712,10 @@
       "token": "R116"
     },
     {
-      "count": 14,
+      "count": 10,
       "path": "scripts/redagent_workflow_worker.py",
       "reason": "compatibility contract identifier",
-      "sha256": "76f68a77663f3dc7456fd410fcb88a89abd30f8f9d428eec8ca7399cffd1f701",
+      "sha256": "364667d9f6bcc9b1456be1c1c202b302ed7b92778b49568b6fb79692ee5a8577",
       "token": "r123"
     },
     {
@@ -5121,28 +5009,28 @@
       "count": 1,
       "path": "tests/integration/test_compat_096_temporal_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c429110fed5fca1d42f4b54b9a72997404ed7ebe99bd7336b74a247cf15ed854",
+      "sha256": "24efa953d0c4f93d203cb2bebc4693247cb66564780a741bfeea6623631b48fa",
       "token": "R101"
     },
     {
       "count": 5,
       "path": "tests/integration/test_compat_096_temporal_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c429110fed5fca1d42f4b54b9a72997404ed7ebe99bd7336b74a247cf15ed854",
+      "sha256": "24efa953d0c4f93d203cb2bebc4693247cb66564780a741bfeea6623631b48fa",
       "token": "r096"
     },
     {
       "count": 2,
       "path": "tests/integration/test_compat_096_temporal_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c429110fed5fca1d42f4b54b9a72997404ed7ebe99bd7336b74a247cf15ed854",
+      "sha256": "24efa953d0c4f93d203cb2bebc4693247cb66564780a741bfeea6623631b48fa",
       "token": "r099"
     },
     {
       "count": 2,
       "path": "tests/integration/test_compat_096_temporal_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c429110fed5fca1d42f4b54b9a72997404ed7ebe99bd7336b74a247cf15ed854",
+      "sha256": "24efa953d0c4f93d203cb2bebc4693247cb66564780a741bfeea6623631b48fa",
       "token": "r101"
     },
     {
@@ -5629,66 +5517,66 @@
       "token": "r115"
     },
     {
-      "count": 66,
+      "count": 3,
       "path": "tests/integration/test_compat_123_campaign_repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "285e710f9f388e2222d0b94b0b385f659c516eaa800712e6fbd5371b848055be",
+      "sha256": "6a0cd699ff9105bf76ccce75dde256f9a0daa684a87d5a79e03b27b520395572",
       "token": "R123"
     },
     {
       "count": 1,
       "path": "tests/integration/test_compat_123_campaign_repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "285e710f9f388e2222d0b94b0b385f659c516eaa800712e6fbd5371b848055be",
+      "sha256": "6a0cd699ff9105bf76ccce75dde256f9a0daa684a87d5a79e03b27b520395572",
       "token": "r101"
     },
     {
-      "count": 3,
+      "count": 4,
       "path": "tests/integration/test_compat_123_campaign_repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "285e710f9f388e2222d0b94b0b385f659c516eaa800712e6fbd5371b848055be",
+      "sha256": "6a0cd699ff9105bf76ccce75dde256f9a0daa684a87d5a79e03b27b520395572",
       "token": "r104"
     },
     {
       "count": 3,
       "path": "tests/integration/test_compat_123_campaign_repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "285e710f9f388e2222d0b94b0b385f659c516eaa800712e6fbd5371b848055be",
+      "sha256": "6a0cd699ff9105bf76ccce75dde256f9a0daa684a87d5a79e03b27b520395572",
       "token": "r119"
     },
     {
       "count": 3,
       "path": "tests/integration/test_compat_123_campaign_repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "285e710f9f388e2222d0b94b0b385f659c516eaa800712e6fbd5371b848055be",
+      "sha256": "6a0cd699ff9105bf76ccce75dde256f9a0daa684a87d5a79e03b27b520395572",
       "token": "r121"
     },
     {
-      "count": 133,
+      "count": 152,
       "path": "tests/integration/test_compat_123_campaign_repository.py",
       "reason": "compatibility contract identifier",
-      "sha256": "285e710f9f388e2222d0b94b0b385f659c516eaa800712e6fbd5371b848055be",
+      "sha256": "6a0cd699ff9105bf76ccce75dde256f9a0daa684a87d5a79e03b27b520395572",
       "token": "r123"
     },
     {
-      "count": 11,
+      "count": 2,
       "path": "tests/integration/test_compat_123_live_qualification.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7f56afa923f97081d44a0316f46c96c07daa5c7a6ee5bf24eea26f1725b1a5d1",
+      "sha256": "f27541e4c8e682e68d2e715abe788312eca10d2e191d2dbdf9cd43630b652d6c",
       "token": "R123"
     },
     {
       "count": 1,
       "path": "tests/integration/test_compat_123_live_qualification.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7f56afa923f97081d44a0316f46c96c07daa5c7a6ee5bf24eea26f1725b1a5d1",
+      "sha256": "f27541e4c8e682e68d2e715abe788312eca10d2e191d2dbdf9cd43630b652d6c",
       "token": "r105"
     },
     {
       "count": 4,
       "path": "tests/integration/test_compat_123_live_qualification.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7f56afa923f97081d44a0316f46c96c07daa5c7a6ee5bf24eea26f1725b1a5d1",
+      "sha256": "f27541e4c8e682e68d2e715abe788312eca10d2e191d2dbdf9cd43630b652d6c",
       "token": "r123"
     },
     {
@@ -5741,45 +5629,38 @@
       "token": "r123"
     },
     {
-      "count": 36,
+      "count": 28,
       "path": "tests/integration/test_compat_123_temporal_workflow.py",
       "reason": "compatibility contract identifier",
-      "sha256": "9da79b65e6e6dd24a5140f04bb86975e8578d4fda81561628b5674ae25ef8c91",
-      "token": "R123"
-    },
-    {
-      "count": 35,
-      "path": "tests/integration/test_compat_123_temporal_workflow.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "9da79b65e6e6dd24a5140f04bb86975e8578d4fda81561628b5674ae25ef8c91",
+      "sha256": "af99c8dbfc9bd1686904fecbf9e1b4d2cab88b6bd295403a3a3f09dad9b46dd0",
       "token": "r123"
     },
     {
-      "count": 11,
+      "count": 3,
       "path": "tests/integration/test_compat_124_campaign_core.py",
       "reason": "compatibility contract identifier",
-      "sha256": "01d0d43f89f7c701afb59a0b28798e4ff7fa216a836011aa6b88918b5aae0e18",
+      "sha256": "d45e4ea84c3affb2b20ff8a3ee79450f44c4e87bfaa60c7dd7bef5071b711ca2",
       "token": "R124"
     },
     {
       "count": 1,
       "path": "tests/integration/test_compat_124_campaign_core.py",
       "reason": "compatibility contract identifier",
-      "sha256": "01d0d43f89f7c701afb59a0b28798e4ff7fa216a836011aa6b88918b5aae0e18",
+      "sha256": "d45e4ea84c3affb2b20ff8a3ee79450f44c4e87bfaa60c7dd7bef5071b711ca2",
       "token": "r119"
     },
     {
       "count": 1,
       "path": "tests/integration/test_compat_124_campaign_core.py",
       "reason": "compatibility contract identifier",
-      "sha256": "01d0d43f89f7c701afb59a0b28798e4ff7fa216a836011aa6b88918b5aae0e18",
+      "sha256": "d45e4ea84c3affb2b20ff8a3ee79450f44c4e87bfaa60c7dd7bef5071b711ca2",
       "token": "r121"
     },
     {
       "count": 36,
       "path": "tests/integration/test_compat_124_campaign_core.py",
       "reason": "compatibility contract identifier",
-      "sha256": "01d0d43f89f7c701afb59a0b28798e4ff7fa216a836011aa6b88918b5aae0e18",
+      "sha256": "d45e4ea84c3affb2b20ff8a3ee79450f44c4e87bfaa60c7dd7bef5071b711ca2",
       "token": "r124"
     },
     {
@@ -6189,17 +6070,24 @@
       "token": "r100"
     },
     {
+      "count": 1,
+      "path": "tests/unit/test_compat_100_runner_identity.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "398ed87b6d353b05e0c9f051248fa6dcef0540a0cd1fcc5f1ec085116dfa2173",
+      "token": "R100"
+    },
+    {
       "count": 3,
       "path": "tests/unit/test_compat_100_runner_identity.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d914604e0837306cfb48e82e504d2f75db2683fc586a1ab4f8a45a5a6efb0e38",
+      "sha256": "398ed87b6d353b05e0c9f051248fa6dcef0540a0cd1fcc5f1ec085116dfa2173",
       "token": "r099"
     },
     {
       "count": 1,
       "path": "tests/unit/test_compat_100_runner_identity.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d914604e0837306cfb48e82e504d2f75db2683fc586a1ab4f8a45a5a6efb0e38",
+      "sha256": "398ed87b6d353b05e0c9f051248fa6dcef0540a0cd1fcc5f1ec085116dfa2173",
       "token": "r100"
     },
     {
@@ -6490,10 +6378,10 @@
       "token": "r100"
     },
     {
-      "count": 3,
+      "count": 2,
       "path": "tests/unit/test_compat_105_api_contract.py",
       "reason": "compatibility contract identifier",
-      "sha256": "f5eaf973038a2323bc74c868d8ab64bd6212156d72edc443cd7959fcc568e17a",
+      "sha256": "f622935dc190faba2ce94df71c09d834cbe1e1f3561104be4053d1b693839b46",
       "token": "r105"
     },
     {
@@ -7365,10 +7253,17 @@
       "token": "r112"
     },
     {
-      "count": 31,
+      "count": 2,
       "path": "tests/unit/test_compat_114_api_contract.py",
       "reason": "compatibility contract identifier",
-      "sha256": "51963fc2d9b5a9704d09b2cd71ad59163b6b58945f516eee1e46c5a837a47c27",
+      "sha256": "8c52ac700c93871f4a98e251c1b5c0fd8f17ad8dfb2947d1c765166d313fab3b",
+      "token": "R114"
+    },
+    {
+      "count": 23,
+      "path": "tests/unit/test_compat_114_api_contract.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "8c52ac700c93871f4a98e251c1b5c0fd8f17ad8dfb2947d1c765166d313fab3b",
       "token": "r114"
     },
     {
@@ -7575,13 +7470,6 @@
       "token": "r118"
     },
     {
-      "count": 1,
-      "path": "tests/unit/test_compat_118_verification_receipt.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "2f5d83c21cbc04a25db7e0917467309c054faa756dee27fa47933d8abc85a483",
-      "token": "r118"
-    },
-    {
       "count": 7,
       "path": "tests/unit/test_compat_119_capability_context.py",
       "reason": "compatibility contract identifier",
@@ -7645,24 +7533,17 @@
       "token": "r122"
     },
     {
-      "count": 22,
-      "path": "tests/unit/test_compat_123_activity_coordinator.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "5a7aa677e8bb5411ebb8a77ad96ef17cd55585cfd83b3ca25303042b8317b328",
-      "token": "R123"
-    },
-    {
       "count": 1,
       "path": "tests/unit/test_compat_123_activity_coordinator.py",
       "reason": "compatibility contract identifier",
-      "sha256": "5a7aa677e8bb5411ebb8a77ad96ef17cd55585cfd83b3ca25303042b8317b328",
+      "sha256": "c52d02349bb1c3e643172bbae2bfde331a031070165aea7c9c83660161de8411",
       "token": "r119"
     },
     {
-      "count": 38,
+      "count": 39,
       "path": "tests/unit/test_compat_123_activity_coordinator.py",
       "reason": "compatibility contract identifier",
-      "sha256": "5a7aa677e8bb5411ebb8a77ad96ef17cd55585cfd83b3ca25303042b8317b328",
+      "sha256": "c52d02349bb1c3e643172bbae2bfde331a031070165aea7c9c83660161de8411",
       "token": "r123"
     },
     {
@@ -7673,143 +7554,115 @@
       "token": "r123"
     },
     {
-      "count": 6,
+      "count": 1,
       "path": "tests/unit/test_compat_123_api_contract.py",
       "reason": "compatibility contract identifier",
-      "sha256": "fcdd5f66afff3474193efaafaf3c8190bfcfb73133174ebf2ca870b187523314",
+      "sha256": "42ceb080d9071d2bf6d0f234ed2d852c251134f7716aedfcd61cd017e80a1591",
       "token": "R123"
     },
     {
       "count": 29,
       "path": "tests/unit/test_compat_123_api_contract.py",
       "reason": "compatibility contract identifier",
-      "sha256": "fcdd5f66afff3474193efaafaf3c8190bfcfb73133174ebf2ca870b187523314",
+      "sha256": "42ceb080d9071d2bf6d0f234ed2d852c251134f7716aedfcd61cd017e80a1591",
       "token": "r123"
     },
     {
-      "count": 3,
+      "count": 9,
       "path": "tests/unit/test_compat_123_campaign_start_service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "29a978761879180bd0a030bb28bf98cb15a3e1db9ff66755139cc439cd7d789e",
-      "token": "R119"
-    },
-    {
-      "count": 12,
-      "path": "tests/unit/test_compat_123_campaign_start_service.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "29a978761879180bd0a030bb28bf98cb15a3e1db9ff66755139cc439cd7d789e",
+      "sha256": "693a62f9a9a9a9f47659a9585c68d93160ab92b282a071cbd8d33eb4ae1d11a5",
       "token": "R121"
-    },
-    {
-      "count": 11,
-      "path": "tests/unit/test_compat_123_campaign_start_service.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "29a978761879180bd0a030bb28bf98cb15a3e1db9ff66755139cc439cd7d789e",
-      "token": "R123"
     },
     {
       "count": 6,
       "path": "tests/unit/test_compat_123_campaign_start_service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "29a978761879180bd0a030bb28bf98cb15a3e1db9ff66755139cc439cd7d789e",
+      "sha256": "693a62f9a9a9a9f47659a9585c68d93160ab92b282a071cbd8d33eb4ae1d11a5",
       "token": "r119"
     },
     {
       "count": 2,
       "path": "tests/unit/test_compat_123_campaign_start_service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "29a978761879180bd0a030bb28bf98cb15a3e1db9ff66755139cc439cd7d789e",
+      "sha256": "693a62f9a9a9a9f47659a9585c68d93160ab92b282a071cbd8d33eb4ae1d11a5",
       "token": "r121"
     },
     {
-      "count": 29,
+      "count": 28,
       "path": "tests/unit/test_compat_123_campaign_start_service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "29a978761879180bd0a030bb28bf98cb15a3e1db9ff66755139cc439cd7d789e",
+      "sha256": "693a62f9a9a9a9f47659a9585c68d93160ab92b282a071cbd8d33eb4ae1d11a5",
       "token": "r123"
-    },
-    {
-      "count": 15,
-      "path": "tests/unit/test_compat_123_closed_dispatcher.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "c8188ade48eb5513326469e5f148655856a6ba3f9f3d0ec4e215c960d7f74853",
-      "token": "R123"
     },
     {
       "count": 1,
       "path": "tests/unit/test_compat_123_closed_dispatcher.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c8188ade48eb5513326469e5f148655856a6ba3f9f3d0ec4e215c960d7f74853",
+      "sha256": "d8efb0dc405cd342834acba98f75dc337606f952aba183b9e88192c1297de838",
       "token": "r104"
     },
     {
       "count": 1,
       "path": "tests/unit/test_compat_123_closed_dispatcher.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c8188ade48eb5513326469e5f148655856a6ba3f9f3d0ec4e215c960d7f74853",
+      "sha256": "d8efb0dc405cd342834acba98f75dc337606f952aba183b9e88192c1297de838",
       "token": "r105"
     },
     {
       "count": 27,
       "path": "tests/unit/test_compat_123_closed_dispatcher.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c8188ade48eb5513326469e5f148655856a6ba3f9f3d0ec4e215c960d7f74853",
+      "sha256": "d8efb0dc405cd342834acba98f75dc337606f952aba183b9e88192c1297de838",
       "token": "r123"
     },
     {
-      "count": 16,
+      "count": 9,
       "path": "tests/unit/test_compat_123_composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c6e781164009476999a51c177539680a1e41997ce94f8884f205a6f0bdd33117",
+      "sha256": "c9abf1a309a696e6aa42d76b56ba7894d7524173c88e18d21d774c7256d9ea03",
       "token": "R123"
     },
     {
       "count": 5,
       "path": "tests/unit/test_compat_123_composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c6e781164009476999a51c177539680a1e41997ce94f8884f205a6f0bdd33117",
+      "sha256": "c9abf1a309a696e6aa42d76b56ba7894d7524173c88e18d21d774c7256d9ea03",
       "token": "r104"
     },
     {
       "count": 5,
       "path": "tests/unit/test_compat_123_composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c6e781164009476999a51c177539680a1e41997ce94f8884f205a6f0bdd33117",
+      "sha256": "c9abf1a309a696e6aa42d76b56ba7894d7524173c88e18d21d774c7256d9ea03",
       "token": "r105"
     },
     {
-      "count": 37,
+      "count": 21,
       "path": "tests/unit/test_compat_123_composition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c6e781164009476999a51c177539680a1e41997ce94f8884f205a6f0bdd33117",
+      "sha256": "c9abf1a309a696e6aa42d76b56ba7894d7524173c88e18d21d774c7256d9ea03",
       "token": "r123"
     },
     {
-      "count": 20,
-      "path": "tests/unit/test_compat_123_effect_coordinator.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "d0a5bde03b90766724827cf81e8136f5bf6a22312ed957ba00ea8aa15fddb46f",
-      "token": "R123"
-    },
-    {
       "count": 1,
       "path": "tests/unit/test_compat_123_effect_coordinator.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d0a5bde03b90766724827cf81e8136f5bf6a22312ed957ba00ea8aa15fddb46f",
+      "sha256": "e32799d9cef6eb51a11b7e09835255eb842c2cbb9592537484639ae6cd5a8ebe",
       "token": "r105"
     },
     {
       "count": 1,
       "path": "tests/unit/test_compat_123_effect_coordinator.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d0a5bde03b90766724827cf81e8136f5bf6a22312ed957ba00ea8aa15fddb46f",
+      "sha256": "e32799d9cef6eb51a11b7e09835255eb842c2cbb9592537484639ae6cd5a8ebe",
       "token": "r119"
     },
     {
-      "count": 73,
+      "count": 96,
       "path": "tests/unit/test_compat_123_effect_coordinator.py",
       "reason": "compatibility contract identifier",
-      "sha256": "d0a5bde03b90766724827cf81e8136f5bf6a22312ed957ba00ea8aa15fddb46f",
+      "sha256": "e32799d9cef6eb51a11b7e09835255eb842c2cbb9592537484639ae6cd5a8ebe",
       "token": "r123"
     },
     {
@@ -7841,80 +7694,66 @@
       "token": "r123"
     },
     {
-      "count": 9,
-      "path": "tests/unit/test_compat_123_orchestration_contracts.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "8820f09e66be5f47d1651980ab5d32f3f83e870b22937b7d1ecf087b21e19c32",
-      "token": "R123"
-    },
-    {
       "count": 8,
       "path": "tests/unit/test_compat_123_orchestration_contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8820f09e66be5f47d1651980ab5d32f3f83e870b22937b7d1ecf087b21e19c32",
+      "sha256": "7a1835fd012cefef94acd14d92e15053ae45c00de9f6ffcf5d0fb6c13b542ef8",
       "token": "r096"
     },
     {
       "count": 1,
       "path": "tests/unit/test_compat_123_orchestration_contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8820f09e66be5f47d1651980ab5d32f3f83e870b22937b7d1ecf087b21e19c32",
+      "sha256": "7a1835fd012cefef94acd14d92e15053ae45c00de9f6ffcf5d0fb6c13b542ef8",
       "token": "r100"
     },
     {
       "count": 1,
       "path": "tests/unit/test_compat_123_orchestration_contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8820f09e66be5f47d1651980ab5d32f3f83e870b22937b7d1ecf087b21e19c32",
+      "sha256": "7a1835fd012cefef94acd14d92e15053ae45c00de9f6ffcf5d0fb6c13b542ef8",
       "token": "r101"
     },
     {
-      "count": 43,
+      "count": 32,
       "path": "tests/unit/test_compat_123_orchestration_contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8820f09e66be5f47d1651980ab5d32f3f83e870b22937b7d1ecf087b21e19c32",
+      "sha256": "7a1835fd012cefef94acd14d92e15053ae45c00de9f6ffcf5d0fb6c13b542ef8",
       "token": "r123"
     },
     {
       "count": 1,
       "path": "tests/unit/test_compat_123_orchestration_contracts.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8820f09e66be5f47d1651980ab5d32f3f83e870b22937b7d1ecf087b21e19c32",
+      "sha256": "7a1835fd012cefef94acd14d92e15053ae45c00de9f6ffcf5d0fb6c13b542ef8",
       "token": "r124"
-    },
-    {
-      "count": 23,
-      "path": "tests/unit/test_compat_123_product_adapters.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "f51b0fbe28a063dafd61974bb4a8bdb3bde894b4ae119f22ed790faa158f94df",
-      "token": "R123"
     },
     {
       "count": 2,
       "path": "tests/unit/test_compat_123_product_adapters.py",
       "reason": "compatibility contract identifier",
-      "sha256": "f51b0fbe28a063dafd61974bb4a8bdb3bde894b4ae119f22ed790faa158f94df",
+      "sha256": "37a1f02645886335ae2fa8ac8fdef17c3658639eb4868bca1057c44cc654bf20",
       "token": "r105"
     },
     {
       "count": 17,
       "path": "tests/unit/test_compat_123_product_adapters.py",
       "reason": "compatibility contract identifier",
-      "sha256": "f51b0fbe28a063dafd61974bb4a8bdb3bde894b4ae119f22ed790faa158f94df",
+      "sha256": "37a1f02645886335ae2fa8ac8fdef17c3658639eb4868bca1057c44cc654bf20",
       "token": "r123"
     },
     {
-      "count": 10,
+      "count": 2,
       "path": "tests/unit/test_compat_123_qualification_boundary.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7ce3e072fd377195a9efb62a72f681f9f6da01a0b0621f83ce814103e20cf80d",
+      "sha256": "2c806a7e20756aaffe0fdcf7af2c4fca7d048191505ef38339433082591fdc66",
       "token": "R123"
     },
     {
-      "count": 15,
+      "count": 7,
       "path": "tests/unit/test_compat_123_qualification_boundary.py",
       "reason": "compatibility contract identifier",
-      "sha256": "7ce3e072fd377195a9efb62a72f681f9f6da01a0b0621f83ce814103e20cf80d",
+      "sha256": "2c806a7e20756aaffe0fdcf7af2c4fca7d048191505ef38339433082591fdc66",
       "token": "r123"
     },
     {
@@ -7928,21 +7767,21 @@
       "count": 4,
       "path": "tests/unit/test_compat_123_real_transports.py",
       "reason": "compatibility contract identifier",
-      "sha256": "365d513c5de500ef5f2b00fd5c8557f05ca74df0edd4d26d1a7dcc09898deb2a",
+      "sha256": "c061b36ee784e0bc5363732b6ea024830f3824a598755784541b72fb40659bbf",
       "token": "r104"
     },
     {
       "count": 9,
       "path": "tests/unit/test_compat_123_real_transports.py",
       "reason": "compatibility contract identifier",
-      "sha256": "365d513c5de500ef5f2b00fd5c8557f05ca74df0edd4d26d1a7dcc09898deb2a",
+      "sha256": "c061b36ee784e0bc5363732b6ea024830f3824a598755784541b72fb40659bbf",
       "token": "r105"
     },
     {
       "count": 15,
       "path": "tests/unit/test_compat_123_real_transports.py",
       "reason": "compatibility contract identifier",
-      "sha256": "365d513c5de500ef5f2b00fd5c8557f05ca74df0edd4d26d1a7dcc09898deb2a",
+      "sha256": "c061b36ee784e0bc5363732b6ea024830f3824a598755784541b72fb40659bbf",
       "token": "r123"
     },
     {
@@ -7960,17 +7799,10 @@
       "token": "r105"
     },
     {
-      "count": 3,
-      "path": "tests/unit/test_compat_123_relay_runtime.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "8ef328ba1ce19649d9fe6d147eef05d14852a3fb39668140a8b8c149249abb2d",
-      "token": "R123"
-    },
-    {
       "count": 5,
       "path": "tests/unit/test_compat_123_relay_runtime.py",
       "reason": "compatibility contract identifier",
-      "sha256": "8ef328ba1ce19649d9fe6d147eef05d14852a3fb39668140a8b8c149249abb2d",
+      "sha256": "9ab1e2f4f6ff5ea9081b7fabf23e762573acd55875438f976a6bf6104bd80e5c",
       "token": "r123"
     },
     {
@@ -7981,24 +7813,17 @@
       "token": "r123"
     },
     {
-      "count": 3,
-      "path": "tests/unit/test_compat_123_result_writer.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "ce63f51778a13beef28c80a926ef0f82301be39a7d2f09146fa99350b0878302",
-      "token": "R123"
-    },
-    {
       "count": 1,
       "path": "tests/unit/test_compat_123_result_writer.py",
       "reason": "compatibility contract identifier",
-      "sha256": "ce63f51778a13beef28c80a926ef0f82301be39a7d2f09146fa99350b0878302",
+      "sha256": "11bc4b64e1e7ac9cea76290344bc9cb26b851ea70e2f5bcd52e2bed0d278051f",
       "token": "r115"
     },
     {
-      "count": 7,
+      "count": 8,
       "path": "tests/unit/test_compat_123_result_writer.py",
       "reason": "compatibility contract identifier",
-      "sha256": "ce63f51778a13beef28c80a926ef0f82301be39a7d2f09146fa99350b0878302",
+      "sha256": "11bc4b64e1e7ac9cea76290344bc9cb26b851ea70e2f5bcd52e2bed0d278051f",
       "token": "r123"
     },
     {
@@ -8023,17 +7848,10 @@
       "token": "r123"
     },
     {
-      "count": 7,
+      "count": 26,
       "path": "tests/unit/test_compat_123_temporal_gateway.py",
       "reason": "compatibility contract identifier",
-      "sha256": "265947f46582896f0d93cec50b07dd7095811e9b40b26aa4903f7874f21ea030",
-      "token": "R123"
-    },
-    {
-      "count": 29,
-      "path": "tests/unit/test_compat_123_temporal_gateway.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "265947f46582896f0d93cec50b07dd7095811e9b40b26aa4903f7874f21ea030",
+      "sha256": "89f13d6f874fbe9676d0aa4faac5de09aa62d0059fdc92b8b68d740e84794548",
       "token": "r123"
     },
     {
@@ -8047,70 +7865,49 @@
       "count": 11,
       "path": "tests/unit/test_compat_123_transport_lifecycle.py",
       "reason": "compatibility contract identifier",
-      "sha256": "47e423e151cb2db29c83358300dd01950ffeea5bcd1640db49642da2c89b41b1",
+      "sha256": "2e129a9680ddd2eb433440f72b5e5553c5c879fa73aa67c5ad58a9d202237718",
       "token": "r105"
     },
     {
       "count": 17,
       "path": "tests/unit/test_compat_123_transport_lifecycle.py",
       "reason": "compatibility contract identifier",
-      "sha256": "47e423e151cb2db29c83358300dd01950ffeea5bcd1640db49642da2c89b41b1",
+      "sha256": "2e129a9680ddd2eb433440f72b5e5553c5c879fa73aa67c5ad58a9d202237718",
       "token": "r123"
     },
     {
-      "count": 6,
+      "count": 32,
       "path": "tests/unit/test_compat_123_workflow_relay.py",
       "reason": "compatibility contract identifier",
-      "sha256": "36414ab6f77f190b0b58ad9a5da7113ae912a8bac62617951a74ce2514814572",
-      "token": "R123"
-    },
-    {
-      "count": 31,
-      "path": "tests/unit/test_compat_123_workflow_relay.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "36414ab6f77f190b0b58ad9a5da7113ae912a8bac62617951a74ce2514814572",
+      "sha256": "df89335ca18e988b7d234e2232149b9f19b37fe99a4489a91bfa606a0b6dbcfa",
       "token": "r123"
     },
     {
-      "count": 3,
+      "count": 5,
       "path": "tests/unit/test_compat_124_api_contract.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c24b998107ac54a62b876230d0e6e49796a69172d3f2a866f7ad05f933760d6e",
-      "token": "R123"
-    },
-    {
-      "count": 9,
-      "path": "tests/unit/test_compat_124_api_contract.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "c24b998107ac54a62b876230d0e6e49796a69172d3f2a866f7ad05f933760d6e",
+      "sha256": "77a96ddc60e4625c23d3d5e6b58af0b193579b46f5e3f0fd94b49e83d4fcf24d",
       "token": "R124"
     },
     {
       "count": 40,
       "path": "tests/unit/test_compat_124_api_contract.py",
       "reason": "compatibility contract identifier",
-      "sha256": "c24b998107ac54a62b876230d0e6e49796a69172d3f2a866f7ad05f933760d6e",
+      "sha256": "77a96ddc60e4625c23d3d5e6b58af0b193579b46f5e3f0fd94b49e83d4fcf24d",
       "token": "r124"
-    },
-    {
-      "count": 17,
-      "path": "tests/unit/test_compat_124_campaign_service.py",
-      "reason": "compatibility contract identifier",
-      "sha256": "716f8352c14800be5d2c99beca52b0f2fe37a1aad33728bc00f44b8e1477def2",
-      "token": "R124"
     },
     {
       "count": 48,
       "path": "tests/unit/test_compat_124_campaign_service.py",
       "reason": "compatibility contract identifier",
-      "sha256": "716f8352c14800be5d2c99beca52b0f2fe37a1aad33728bc00f44b8e1477def2",
+      "sha256": "b402e1570764055f7cf9eddff463283b1a5335481b7d4ddd2fbb1a88d073b2f5",
       "token": "r124"
     },
     {
-      "count": 5,
+      "count": 3,
       "path": "tests/unit/test_compat_124_status_projection.py",
       "reason": "compatibility contract identifier",
-      "sha256": "278759bb8662d5964ff2aea1557c0e5bc1c98272ba033c73a910eaf229f4df0d",
+      "sha256": "36345e102f93ee2c8013c7679ca642947dcb7f1dfcb8470b3e7ce3e71e7d4829",
       "token": "r124"
     },
     {
@@ -8124,14 +7921,14 @@
       "count": 4,
       "path": "tests/unit/test_compat_131_api_decomposition.py",
       "reason": "compatibility contract identifier",
-      "sha256": "cd4a9e7ca440f3c9cd87e360786fccd123cdf1a1121c468df212b6742df26485",
+      "sha256": "f4332f3b6d0e1e9f36ad7559801673c6705122f1b9c83a6b2fea5d7f2b31487e",
       "token": "r131"
     },
     {
-      "count": 10,
+      "count": 1,
       "path": "tests/unit/test_deployment_hardening.py",
       "reason": "compatibility contract identifier",
-      "sha256": "88e635fe001214d2758d0d4fd94696bce60bfdfe2f41bb774ee07dc00a7ac5c1",
+      "sha256": "f6262eafb5f7783d23bbbeacd4afb81177daa6dc7b88d716b0cbcccd0eb9b62b",
       "token": "r032"
     },
     {
@@ -8163,6 +7960,62 @@
       "token": "r116"
     },
     {
+      "count": 10,
+      "path": "tests/unit/test_detection_campaign_start.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "bb746cc75c03ff84c6c0b92c5bf46077051bbea752832a7936f339838487adf1",
+      "token": "r119"
+    },
+    {
+      "count": 1,
+      "path": "tests/unit/test_detection_campaign_start.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "bb746cc75c03ff84c6c0b92c5bf46077051bbea752832a7936f339838487adf1",
+      "token": "r121"
+    },
+    {
+      "count": 1,
+      "path": "tests/unit/test_detection_feedback.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "78342f373c2f35fcdb4e0893bf716bceeb4310591669fcb1595368672bdf4796",
+      "token": "R138"
+    },
+    {
+      "count": 2,
+      "path": "tests/unit/test_detection_feedback.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "78342f373c2f35fcdb4e0893bf716bceeb4310591669fcb1595368672bdf4796",
+      "token": "r104"
+    },
+    {
+      "count": 7,
+      "path": "tests/unit/test_detection_feedback.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "78342f373c2f35fcdb4e0893bf716bceeb4310591669fcb1595368672bdf4796",
+      "token": "r105"
+    },
+    {
+      "count": 2,
+      "path": "tests/unit/test_detection_feedback.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "78342f373c2f35fcdb4e0893bf716bceeb4310591669fcb1595368672bdf4796",
+      "token": "r119"
+    },
+    {
+      "count": 2,
+      "path": "tests/unit/test_detection_feedback.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "78342f373c2f35fcdb4e0893bf716bceeb4310591669fcb1595368672bdf4796",
+      "token": "r121"
+    },
+    {
+      "count": 1,
+      "path": "tests/unit/test_detection_feedback.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "78342f373c2f35fcdb4e0893bf716bceeb4310591669fcb1595368672bdf4796",
+      "token": "r138"
+    },
+    {
       "count": 3,
       "path": "tests/unit/test_domain_model.py",
       "reason": "compatibility contract identifier",
@@ -8184,10 +8037,10 @@
       "token": "r008"
     },
     {
-      "count": 2,
+      "count": 1,
       "path": "tests/unit/test_finding_review.py",
       "reason": "compatibility contract identifier",
-      "sha256": "3b1f98071733a42fa2e2519762570faac99e7e2c22532d64bc7e92f07c6be8c5",
+      "sha256": "53965b80bb0c21afd07379d4d0aa50025314f7dbf09da80ff4d7afb0679b8a35",
       "token": "r021"
     },
     {
@@ -8275,24 +8128,24 @@
       "token": "r017"
     },
     {
-      "count": 10,
+      "count": 1,
       "path": "tests/unit/test_observability_ir.py",
       "reason": "compatibility contract identifier",
-      "sha256": "b749220b1eba1e748c562c91ebdd0cd3d9d256b73f10bc6169b9d5114ef92771",
+      "sha256": "85ad821a1379b4e5a5963a6b382a36ac283b8f258d0ce871f84052cb35b0d1ef",
       "token": "r033"
     },
     {
       "count": 5,
       "path": "tests/unit/test_platform_security_assessment.py",
       "reason": "compatibility contract identifier",
-      "sha256": "b7a4fde3c1251f57bfae4d53d60a6605c5b1208037d1c63d74f1d0ed71bd6af3",
+      "sha256": "b87950e63c851990230ec7e84c45d60d25d4c9c4db8d0cba2d070d53533e72f1",
       "token": "R031"
     },
     {
-      "count": 10,
+      "count": 1,
       "path": "tests/unit/test_platform_security_assessment.py",
       "reason": "compatibility contract identifier",
-      "sha256": "b7a4fde3c1251f57bfae4d53d60a6605c5b1208037d1c63d74f1d0ed71bd6af3",
+      "sha256": "b87950e63c851990230ec7e84c45d60d25d4c9c4db8d0cba2d070d53533e72f1",
       "token": "r031"
     },
     {
@@ -8324,24 +8177,38 @@
       "token": "R081"
     },
     {
-      "count": 4,
+      "count": 3,
       "path": "tests/unit/test_release_gate.py",
       "reason": "compatibility contract identifier",
-      "sha256": "08b63129562b8cd89006c9c64b5b3468ea4bbe0598864b3e334c69f9eb7dd6e8",
+      "sha256": "a5def28178608c887016c47884b1e073f18d8a357adac0898b4e28203edc9de8",
+      "token": "R010"
+    },
+    {
+      "count": 5,
+      "path": "tests/unit/test_release_gate.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "a5def28178608c887016c47884b1e073f18d8a357adac0898b4e28203edc9de8",
+      "token": "R011"
+    },
+    {
+      "count": 1,
+      "path": "tests/unit/test_release_gate.py",
+      "reason": "compatibility contract identifier",
+      "sha256": "a5def28178608c887016c47884b1e073f18d8a357adac0898b4e28203edc9de8",
       "token": "R089"
     },
     {
-      "count": 11,
+      "count": 1,
       "path": "tests/unit/test_release_gate.py",
       "reason": "compatibility contract identifier",
-      "sha256": "08b63129562b8cd89006c9c64b5b3468ea4bbe0598864b3e334c69f9eb7dd6e8",
+      "sha256": "a5def28178608c887016c47884b1e073f18d8a357adac0898b4e28203edc9de8",
       "token": "r034"
     },
     {
-      "count": 22,
+      "count": 14,
       "path": "tests/unit/test_release_gate.py",
       "reason": "compatibility contract identifier",
-      "sha256": "08b63129562b8cd89006c9c64b5b3468ea4bbe0598864b3e334c69f9eb7dd6e8",
+      "sha256": "a5def28178608c887016c47884b1e073f18d8a357adac0898b4e28203edc9de8",
       "token": "r089"
     },
     {
@@ -8588,7 +8455,7 @@
       "count": 1,
       "path": "config/validation/r118-stage-registry.json",
       "reason": "runtime contract filename",
-      "sha256": "83db7781e84ae6a06eb20f7d6de72c2182552f1091dbe81008ac913cb446b5b3",
+      "sha256": "8791f9671e73f22792e75c7cd64ed559f9123e6a9d4357633800e21a6f2ca8ca",
       "token": "r118"
     },
     {

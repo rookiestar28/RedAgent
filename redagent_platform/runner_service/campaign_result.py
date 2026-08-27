@@ -24,9 +24,9 @@ from redagent_platform.finding_operations.contracts import (
 )
 from redagent_platform.finding_operations.repository import FindingOperationsRepository
 from redagent_platform.persistence.models import metadata
-from redagent_platform.runner_service.compat_123_dispatch import (
+from redagent_platform.runner_service.campaign_dispatch import (
     AdapterTerminalReceipt,
-    R123AdapterRequest,
+    CampaignAdapterRequest,
 )
 
 
@@ -86,7 +86,7 @@ class NormalizedAdapterFindingV1:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AdapterResultMaterialV1:
-    request: R123AdapterRequest
+    request: CampaignAdapterRequest
     report_safe_content: bytes
     findings: tuple[NormalizedAdapterFindingV1, ...]
     coverage_state: CoverageState
@@ -94,7 +94,7 @@ class AdapterResultMaterialV1:
     observed_at: datetime
 
     def __post_init__(self) -> None:
-        if not isinstance(self.request, R123AdapterRequest):
+        if not isinstance(self.request, CampaignAdapterRequest):
             raise ValueError("r123_result_request_invalid")
         if not isinstance(self.report_safe_content, bytes) or not 1 <= len(
             self.report_safe_content
@@ -125,7 +125,7 @@ class AdapterResultWriter(Protocol):
 
     async def lookup(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         *,
         cleanup_receipt_id: str,
     ) -> AdapterTerminalReceipt | None: ...
@@ -260,7 +260,7 @@ class PostgresAdapterResultWriter:
 
     async def lookup(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         *,
         cleanup_receipt_id: str,
     ) -> AdapterTerminalReceipt | None:
@@ -341,7 +341,7 @@ class PostgresAdapterResultWriter:
         )
 
 
-async def _result_context(session: object, request: R123AdapterRequest):
+async def _result_context(session: object, request: CampaignAdapterRequest):
     manifests = metadata.tables["runner_job_manifests"]
     jobs = metadata.tables["jobs"]
     row = (
@@ -377,7 +377,7 @@ async def _advance_retests(
     session: object,
     repository: FindingOperationsRepository,
     *,
-    request: R123AdapterRequest,
+    request: CampaignAdapterRequest,
     campaign_id: str,
     execution_id: str,
     issue_ids: tuple[str, ...],

@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import insert, select, text, update
+from sqlalchemy.engine import RowMapping
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from redagent_platform.persistence.models import metadata
 from redagent_platform.policy_service.contracts import PolicyDecision, PolicyDecisionInput
@@ -22,7 +24,7 @@ class PolicyDecisionConflict(RuntimeError):
 
 
 class TransactionalPolicyDecisionRecorder:
-    def __init__(self, session_factory) -> None:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self.session_factory = session_factory
 
     async def persist_decision_and_receipt(
@@ -119,7 +121,11 @@ class TransactionalPolicyDecisionRecorder:
             return receipt_id
 
 
-def _same_decision(row, request: PolicyDecisionInput, decision: PolicyDecision) -> bool:
+def _same_decision(
+    row: RowMapping,
+    request: PolicyDecisionInput,
+    decision: PolicyDecision,
+) -> bool:
     return (
         str(row["bundle_revision"]) == decision.bundle_revision
         and str(row["input_hash"]) == decision.input_hash
@@ -134,7 +140,12 @@ def _same_decision(row, request: PolicyDecisionInput, decision: PolicyDecision) 
     )
 
 
-async def _audit_outbox(session, request: PolicyDecisionInput, decision: PolicyDecision, receipt_id: str) -> None:
+async def _audit_outbox(
+    session: AsyncSession,
+    request: PolicyDecisionInput,
+    decision: PolicyDecision,
+    receipt_id: str,
+) -> None:
     outcome = "allowed" if decision.allowed else "denied"
     details = {
         "boundary": request.boundary.value,
@@ -167,7 +178,14 @@ async def _audit_outbox(session, request: PolicyDecisionInput, decision: PolicyD
 class PolicyAdministrationRepository:
     """Repository-only bundle registration and convergent promotion boundary."""
 
-    def __init__(self, session, *, tenant_id: str, actor_user_id: str, correlation_id: str) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str,
+        actor_user_id: str,
+        correlation_id: str,
+    ) -> None:
         self.session = session
         self.tenant_id = tenant_id
         self.actor_user_id = actor_user_id
@@ -373,7 +391,7 @@ class PolicyAdministrationRepository:
         )
 
 
-def _bundle_from_row(row) -> BundleRevision:
+def _bundle_from_row(row: RowMapping) -> BundleRevision:
     return BundleRevision(
         revision=str(row["revision_name"]), source_sha256=str(row["source_sha256"]),
         artifact_sha256=str(row["artifact_sha256"]), artifact_size=int(row["artifact_size"]),
@@ -389,7 +407,7 @@ def _bundle_from_row(row) -> BundleRevision:
 
 
 async def _admin_audit_outbox(
-    session, *, tenant_id: str, actor_user_id: str, correlation_id: str,
+    session: AsyncSession, *, tenant_id: str, actor_user_id: str, correlation_id: str,
     revision: str, event_type: str, details: dict[str, object], occurred_at: datetime,
 ) -> None:
     payload = {"revision": revision, **details}

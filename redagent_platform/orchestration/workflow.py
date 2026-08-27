@@ -26,21 +26,21 @@ from redagent_platform.orchestration.contracts import (
     OperatorCommand,
     RunnerDispatchCommand,
     RunnerDispatchResult,
-    R123CampaignSnapshot,
-    R123CampaignWorkflowInput,
-    R123ContainActivityCommand,
-    R123ContainActivityResult,
-    R123DispatchActivityCommand,
-    R123DispatchActivityResult,
-    R123ReconcileActivityCommand,
-    R123ReconcileActivityResult,
-    R123StopSignal,
+    ClosedLoopCampaignSnapshot,
+    ClosedLoopCampaignWorkflowInput,
+    ClosedLoopContainActivityCommand,
+    ClosedLoopContainActivityResult,
+    ClosedLoopDispatchActivityCommand,
+    ClosedLoopDispatchActivityResult,
+    ClosedLoopReconcileActivityCommand,
+    ClosedLoopReconcileActivityResult,
+    ClosedLoopStopSignal,
     WorkflowState,
     deterministic_job_workflow_id,
     command_request_hash,
     stop_request_hash,
     system_request_hash,
-    r123_workflow_request_sha256,
+    closed_loop_workflow_request_sha256,
 )
 from redagent_platform.orchestration.state import CommandDecision, CommandRejected, LifecycleReducer
 
@@ -69,7 +69,7 @@ def activity_retry_policy(maximum_attempts: int) -> RetryPolicy:
     )
 
 
-def r123_activity_retry_policy(maximum_attempts: int) -> RetryPolicy:
+def closed_loop_activity_retry_policy(maximum_attempts: int) -> RetryPolicy:
     """R123-only permanent failures without changing historical compat_096 replay policy."""
     if isinstance(maximum_attempts, bool) or not 1 <= maximum_attempts <= 5:
         raise ValueError("activity_attempts_invalid")
@@ -146,7 +146,7 @@ class JobLifecycleWorkflow:
                         retry_policy=activity_retry_policy(request.max_activity_attempts),
                     )
                     result = await self._dispatch_handle
-                except Exception:
+                except Exception:  # noqa: BLE001
                     if self._pending_stop is None:
                         self._reducer.fail("runner_dispatch_failed")
                 else:
@@ -196,7 +196,7 @@ class JobLifecycleWorkflow:
                         cancellation_type=ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
                         retry_policy=activity_retry_policy(request.max_activity_attempts),
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     await self._record_system_state("containment_failed")
                     self._reducer.complete_stop(
                         outcome="containment_failed", failure_code="containment_activity_failed",
@@ -394,20 +394,20 @@ class CampaignLifecycleWorkflow:
 
 
 @workflow.defn(name="redagent.r123.campaign-closed-loop.v1")
-class R123ClosedLoopWorkflow:
+class ClosedLoopWorkflow:
     """Durable control only; every business transition is owned by PostgreSQL Activities."""
 
     def __init__(self) -> None:
-        self._request: R123CampaignWorkflowInput | None = None
-        self._snapshot: R123CampaignSnapshot | None = None
-        self._pending_stop: R123StopSignal | None = None
+        self._request: ClosedLoopCampaignWorkflowInput | None = None
+        self._snapshot: ClosedLoopCampaignSnapshot | None = None
+        self._pending_stop: ClosedLoopStopSignal | None = None
         self._dispatch_handle = None
 
     @workflow.run
-    async def run(self, request: R123CampaignWorkflowInput) -> R123CampaignSnapshot:
+    async def run(self, request: ClosedLoopCampaignWorkflowInput) -> ClosedLoopCampaignSnapshot:
         self._request = request
-        request_sha256 = r123_workflow_request_sha256(request)
-        self._snapshot = R123CampaignSnapshot(
+        request_sha256 = closed_loop_workflow_request_sha256(request)
+        self._snapshot = ClosedLoopCampaignSnapshot(
             schema_version=request.schema_version,
             campaign_id=request.campaign_id,
             strategy_revision_id=request.strategy_revision_id,
@@ -426,7 +426,7 @@ class R123ClosedLoopWorkflow:
             snapshot = self._required_snapshot()
             result = await workflow.execute_activity(
                 "redagent.r123.reconcile-level.v1",
-                R123ReconcileActivityCommand(
+                ClosedLoopReconcileActivityCommand(
                     schema_version=request.schema_version,
                     tenant_id=request.tenant_id,
                     campaign_id=request.campaign_id,
@@ -436,12 +436,12 @@ class R123ClosedLoopWorkflow:
                     revision=snapshot.revision,
                     stop_requested=False,
                 ),
-                result_type=R123ReconcileActivityResult,
+                result_type=ClosedLoopReconcileActivityResult,
                 start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=r123_activity_retry_policy(request.max_activity_attempts),
+                retry_policy=closed_loop_activity_retry_policy(request.max_activity_attempts),
             )
             self._validate_reconcile(result, request)
-            self._snapshot = R123CampaignSnapshot(
+            self._snapshot = ClosedLoopCampaignSnapshot(
                 schema_version=request.schema_version,
                 campaign_id=request.campaign_id,
                 strategy_revision_id=request.strategy_revision_id,
@@ -463,7 +463,7 @@ class R123ClosedLoopWorkflow:
                 continue
             self._dispatch_handle = workflow.start_activity(
                 "redagent.r123.dispatch-effect.v1",
-                R123DispatchActivityCommand(
+                ClosedLoopDispatchActivityCommand(
                     schema_version=request.schema_version,
                     tenant_id=request.tenant_id,
                     campaign_id=request.campaign_id,
@@ -473,11 +473,11 @@ class R123ClosedLoopWorkflow:
                     envelope_sha256=request.envelope_sha256,
                     expected_revision=result.revision,
                 ),
-                result_type=R123DispatchActivityResult,
+                result_type=ClosedLoopDispatchActivityResult,
                 start_to_close_timeout=timedelta(seconds=90),
                 heartbeat_timeout=timedelta(seconds=2),
                 cancellation_type=ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
-                retry_policy=r123_activity_retry_policy(request.max_activity_attempts),
+                retry_policy=closed_loop_activity_retry_policy(request.max_activity_attempts),
             )
             try:
                 dispatch = await self._dispatch_handle
@@ -493,7 +493,7 @@ class R123ClosedLoopWorkflow:
                 or dispatch.revision <= result.revision
             ):
                 raise RuntimeError("r123_dispatch_result_binding_invalid")
-            self._snapshot = R123CampaignSnapshot(
+            self._snapshot = ClosedLoopCampaignSnapshot(
                 schema_version=request.schema_version,
                 campaign_id=request.campaign_id,
                 strategy_revision_id=request.strategy_revision_id,
@@ -507,7 +507,7 @@ class R123ClosedLoopWorkflow:
                 stop_requested=False,
             )
         snapshot = self._required_snapshot()
-        self._snapshot = R123CampaignSnapshot(
+        self._snapshot = ClosedLoopCampaignSnapshot(
             schema_version=snapshot.schema_version,
             campaign_id=snapshot.campaign_id,
             strategy_revision_id=snapshot.strategy_revision_id,
@@ -523,16 +523,16 @@ class R123ClosedLoopWorkflow:
         return self._snapshot
 
     @workflow.query(name="status")
-    def status(self) -> R123CampaignSnapshot:
+    def status(self) -> ClosedLoopCampaignSnapshot:
         return self._required_snapshot()
 
     @workflow.signal(name="emergency_stop")
-    def emergency_stop(self, request: R123StopSignal) -> None:
+    def emergency_stop(self, request: ClosedLoopStopSignal) -> None:
         if self._pending_stop is not None and self._pending_stop != request:
             raise RuntimeError("r123_stop_signal_conflict")
         self._pending_stop = request
         snapshot = self._required_snapshot()
-        self._snapshot = R123CampaignSnapshot(
+        self._snapshot = ClosedLoopCampaignSnapshot(
             schema_version=snapshot.schema_version,
             campaign_id=snapshot.campaign_id,
             strategy_revision_id=snapshot.strategy_revision_id,
@@ -548,12 +548,12 @@ class R123ClosedLoopWorkflow:
         if self._dispatch_handle is not None:
             self._dispatch_handle.cancel()
 
-    async def _contain(self, signal: R123StopSignal) -> R123CampaignSnapshot:
+    async def _contain(self, signal: ClosedLoopStopSignal) -> ClosedLoopCampaignSnapshot:
         request = self._required_request()
         snapshot = self._required_snapshot()
         result = await workflow.execute_activity(
             "redagent.r123.contain.v1",
-            R123ContainActivityCommand(
+            ClosedLoopContainActivityCommand(
                 schema_version=request.schema_version,
                 tenant_id=request.tenant_id,
                 campaign_id=request.campaign_id,
@@ -563,13 +563,13 @@ class R123ClosedLoopWorkflow:
                 reason_sha256=signal.reason_sha256,
                 expected_revision=snapshot.revision,
             ),
-            result_type=R123ContainActivityResult,
+            result_type=ClosedLoopContainActivityResult,
             start_to_close_timeout=timedelta(seconds=30),
-            retry_policy=r123_activity_retry_policy(request.max_activity_attempts),
+            retry_policy=closed_loop_activity_retry_policy(request.max_activity_attempts),
         )
         if result.campaign_id != request.campaign_id or result.revision <= snapshot.revision:
             raise RuntimeError("r123_containment_result_binding_invalid")
-        self._snapshot = R123CampaignSnapshot(
+        self._snapshot = ClosedLoopCampaignSnapshot(
             schema_version=request.schema_version,
             campaign_id=request.campaign_id,
             strategy_revision_id=request.strategy_revision_id,
@@ -586,8 +586,8 @@ class R123ClosedLoopWorkflow:
 
     def _validate_reconcile(
         self,
-        result: R123ReconcileActivityResult,
-        request: R123CampaignWorkflowInput,
+        result: ClosedLoopReconcileActivityResult,
+        request: ClosedLoopCampaignWorkflowInput,
     ) -> None:
         snapshot = self._required_snapshot()
         if (
@@ -599,12 +599,12 @@ class R123ClosedLoopWorkflow:
         ):
             raise RuntimeError("r123_reconcile_result_binding_invalid")
 
-    def _required_request(self) -> R123CampaignWorkflowInput:
+    def _required_request(self) -> ClosedLoopCampaignWorkflowInput:
         if self._request is None:
             raise RuntimeError("r123_workflow_not_initialized")
         return self._request
 
-    def _required_snapshot(self) -> R123CampaignSnapshot:
+    def _required_snapshot(self) -> ClosedLoopCampaignSnapshot:
         if self._snapshot is None:
             raise RuntimeError("r123_workflow_not_initialized")
         return self._snapshot

@@ -15,21 +15,21 @@ from redagent_platform.orchestration.config import TemporalSettings
 
 from redagent_platform.orchestration.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    R123CampaignSnapshot,
-    R123CampaignWorkflowInput,
-    R123ContainActivityCommand,
-    R123ContainActivityResult,
-    R123DispatchActivityCommand,
-    R123DispatchActivityResult,
-    R123ReconcileActivityCommand,
-    R123ReconcileActivityResult,
-    R123StopSignal,
-    deterministic_r123_campaign_workflow_id,
-    r123_workflow_request_sha256,
+    ClosedLoopCampaignSnapshot,
+    ClosedLoopCampaignWorkflowInput,
+    ClosedLoopContainActivityCommand,
+    ClosedLoopContainActivityResult,
+    ClosedLoopDispatchActivityCommand,
+    ClosedLoopDispatchActivityResult,
+    ClosedLoopReconcileActivityCommand,
+    ClosedLoopReconcileActivityResult,
+    ClosedLoopStopSignal,
+    deterministic_closed_loop_campaign_workflow_id,
+    closed_loop_workflow_request_sha256,
 )
 from redagent_platform.orchestration.gateway import connect_temporal, temporal_data_converter
-from redagent_platform.orchestration.compat_123_gateway import R123TemporalStartGateway
-from redagent_platform.orchestration.workflow import R123ClosedLoopWorkflow
+from redagent_platform.orchestration.closed_loop_gateway import ClosedLoopTemporalStartGateway
+from redagent_platform.orchestration.workflow import ClosedLoopWorkflow
 from tests.integration.runtime_coordinates import persisted_temporal_target
 
 
@@ -50,17 +50,17 @@ def test_r123_real_temporal_gateway_duplicate_query_and_replay() -> None:
 
 class ScriptedActivities:
     def __init__(self, *, block_dispatch: bool = False) -> None:
-        self.reconcile_calls: list[R123ReconcileActivityCommand] = []
-        self.dispatch_calls: list[R123DispatchActivityCommand] = []
-        self.contain_calls: list[R123ContainActivityCommand] = []
+        self.reconcile_calls: list[ClosedLoopReconcileActivityCommand] = []
+        self.dispatch_calls: list[ClosedLoopDispatchActivityCommand] = []
+        self.contain_calls: list[ClosedLoopContainActivityCommand] = []
         self.block_dispatch = block_dispatch
         self.dispatch_started = asyncio.Event()
 
     @activity.defn(name="redagent.r123.reconcile-level.v1")
-    async def reconcile(self, command: R123ReconcileActivityCommand) -> R123ReconcileActivityResult:
+    async def reconcile(self, command: ClosedLoopReconcileActivityCommand) -> ClosedLoopReconcileActivityResult:
         self.reconcile_calls.append(command)
         if not self.dispatch_calls:
-            return R123ReconcileActivityResult(
+            return ClosedLoopReconcileActivityResult(
                 CONTRACT_SCHEMA_VERSION,
                 command.campaign_id,
                 command.strategy_revision_id,
@@ -74,7 +74,7 @@ class ScriptedActivities:
                 "effect_reserved",
                 None,
             )
-        return R123ReconcileActivityResult(
+        return ClosedLoopReconcileActivityResult(
             CONTRACT_SCHEMA_VERSION,
             command.campaign_id,
             command.strategy_revision_id,
@@ -90,14 +90,14 @@ class ScriptedActivities:
         )
 
     @activity.defn(name="redagent.r123.dispatch-effect.v1")
-    async def dispatch(self, command: R123DispatchActivityCommand) -> R123DispatchActivityResult:
+    async def dispatch(self, command: ClosedLoopDispatchActivityCommand) -> ClosedLoopDispatchActivityResult:
         self.dispatch_calls.append(command)
         self.dispatch_started.set()
         if self.block_dispatch:
             while True:
                 activity.heartbeat({"phase": "r123_dispatch", "effect_id": command.effect_id})
                 await asyncio.sleep(0.01)
-        return R123DispatchActivityResult(
+        return ClosedLoopDispatchActivityResult(
             CONTRACT_SCHEMA_VERSION,
             command.campaign_id,
             command.effect_id,
@@ -107,9 +107,9 @@ class ScriptedActivities:
         )
 
     @activity.defn(name="redagent.r123.contain.v1")
-    async def contain(self, command: R123ContainActivityCommand) -> R123ContainActivityResult:
+    async def contain(self, command: ClosedLoopContainActivityCommand) -> ClosedLoopContainActivityResult:
         self.contain_calls.append(command)
-        return R123ContainActivityResult(
+        return ClosedLoopContainActivityResult(
             CONTRACT_SCHEMA_VERSION,
             command.campaign_id,
             "contained",
@@ -124,11 +124,11 @@ async def _dispatch_then_settle() -> None:
         async with Worker(
             environment.client,
             task_queue="r123-normal",
-            workflows=[R123ClosedLoopWorkflow],
+            workflows=[ClosedLoopWorkflow],
             activities=[activities.reconcile, activities.dispatch, activities.contain],
         ):
             result = await environment.client.execute_workflow(
-                R123ClosedLoopWorkflow.run,
+                ClosedLoopWorkflow.run,
                 _request(),
                 id="r123-normal-workflow",
                 task_queue="r123-normal",
@@ -147,11 +147,11 @@ async def _stop_and_contain() -> None:
         async with Worker(
             environment.client,
             task_queue="r123-stop",
-            workflows=[R123ClosedLoopWorkflow],
+            workflows=[ClosedLoopWorkflow],
             activities=[activities.reconcile, activities.dispatch, activities.contain],
         ):
             handle = await environment.client.start_workflow(
-                R123ClosedLoopWorkflow.run,
+                ClosedLoopWorkflow.run,
                 _request(),
                 id="r123-stop-workflow",
                 task_queue="r123-stop",
@@ -159,7 +159,7 @@ async def _stop_and_contain() -> None:
             await asyncio.wait_for(activities.dispatch_started.wait(), timeout=5)
             await handle.signal(
                 "emergency_stop",
-                R123StopSignal(
+                ClosedLoopStopSignal(
                     CONTRACT_SCHEMA_VERSION,
                     "stop-r123",
                     "operator-r123",
@@ -174,8 +174,8 @@ async def _stop_and_contain() -> None:
     assert len(activities.contain_calls) == 1
 
 
-def _request() -> R123CampaignWorkflowInput:
-    return R123CampaignWorkflowInput(
+def _request() -> ClosedLoopCampaignWorkflowInput:
+    return ClosedLoopCampaignWorkflowInput(
         CONTRACT_SCHEMA_VERSION,
         "tenant-r123",
         "campaign-r123",
@@ -205,7 +205,7 @@ async def _real_temporal_gateway() -> None:
     )
     client = await connect_temporal(settings)
     activities = ScriptedActivities()
-    request = R123CampaignWorkflowInput(
+    request = ClosedLoopCampaignWorkflowInput(
         CONTRACT_SCHEMA_VERSION,
         tenant_id,
         campaign_id,
@@ -215,7 +215,7 @@ async def _real_temporal_gateway() -> None:
         1,
         3,
     )
-    workflow_id = deterministic_r123_campaign_workflow_id(tenant_id, campaign_id)
+    workflow_id = deterministic_closed_loop_campaign_workflow_id(tenant_id, campaign_id)
     payload = {
         "schema_version": "redagent.r123-workflow-start/v1",
         "tenant_id": tenant_id,
@@ -225,34 +225,34 @@ async def _real_temporal_gateway() -> None:
         "campaign_id": campaign_id,
         "strategy_revision_id": strategy_revision_id,
         "workflow_id": workflow_id,
-        "workflow_request_sha256": r123_workflow_request_sha256(request),
+        "workflow_request_sha256": closed_loop_workflow_request_sha256(request),
         "envelope_sha256": request.envelope_sha256,
     }
     async with Worker(
         client,
         task_queue=queue,
-        workflows=[R123ClosedLoopWorkflow],
+        workflows=[ClosedLoopWorkflow],
         activities=[activities.reconcile, activities.dispatch, activities.contain],
     ):
-        gateway = R123TemporalStartGateway(client, task_queue=queue)
+        gateway = ClosedLoopTemporalStartGateway(client, task_queue=queue)
         started = await gateway.start(
             workflow_id=workflow_id,
-            request_sha256=r123_workflow_request_sha256(request),
+            request_sha256=closed_loop_workflow_request_sha256(request),
             payload=payload,
         )
         assert started.workflow_run_id
         result = await client.get_workflow_handle(
-            workflow_id, result_type=R123CampaignSnapshot
+            workflow_id, result_type=ClosedLoopCampaignSnapshot
         ).result()
         assert result.state == "settled"
         queried = await gateway.query(workflow_id)
         assert queried.workflow_id == workflow_id
         assert queried.workflow_run_id == started.workflow_run_id
-        assert queried.request_sha256 == r123_workflow_request_sha256(request)
+        assert queried.request_sha256 == closed_loop_workflow_request_sha256(request)
         with pytest.raises(WorkflowAlreadyStarted):
             await gateway.start(
                 workflow_id=workflow_id,
-                request_sha256=r123_workflow_request_sha256(request),
+                request_sha256=closed_loop_workflow_request_sha256(request),
                 payload=payload,
             )
         history = await client.get_workflow_handle(workflow_id).fetch_history()
@@ -261,6 +261,6 @@ async def _real_temporal_gateway() -> None:
         assert campaign_id not in serialized
         assert request.envelope_sha256 not in serialized
         await Replayer(
-            workflows=[R123ClosedLoopWorkflow],
+            workflows=[ClosedLoopWorkflow],
             data_converter=temporal_data_converter(settings),
         ).replay_workflow(history)

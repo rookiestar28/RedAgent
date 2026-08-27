@@ -744,7 +744,7 @@ class ControlPlaneRepository:
             occurred_at=occurred_at,
         )
 
-    async def create_r123_runner_job(
+    async def create_runner_job(
         self,
         *,
         campaign_id: str,

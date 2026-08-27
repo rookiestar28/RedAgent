@@ -23,11 +23,11 @@ from redagent_platform.campaign_service.registry import closed_execution_registr
 from redagent_platform.persistence.models import metadata
 
 
-class R123RecordConflict(RuntimeError):
+class CampaignRecordConflict(RuntimeError):
     pass
 
 
-class R123ClaimConflict(RuntimeError):
+class CampaignClaimConflict(RuntimeError):
     pass
 
 
@@ -141,7 +141,7 @@ class CampaignTransitionResult:
     replayed: bool = False
 
 
-class PostgresR124AuthorizedOptionOwner:
+class PostgresCampaignCoreAuthorizedOptionOwner:
     """Project bounded operator options from canonical tenant-owned control-plane rows."""
 
     def __init__(self, sessions: object) -> None:
@@ -162,7 +162,7 @@ class PostgresR124AuthorizedOptionOwner:
                 select(text("set_config('redagent.tenant_id', :tenant_id, true)"))
                 .params(tenant_id=tenant_id)
             )
-            if not await r124_principal_is_active(
+            if not await campaign_core_principal_is_active(
                 session,
                 tenant_id=tenant_id,
                 principal_id=principal_id,
@@ -202,10 +202,10 @@ class PostgresR124AuthorizedOptionOwner:
             ).mappings().all()
         if len(rows) > 500:
             raise ValueError("r124_engagement_inventory_unbounded")
-        from redagent_platform.campaign_service.service import R124AuthorizedResource
+        from redagent_platform.campaign_service.service import CampaignCoreAuthorizedResource
 
         return tuple(
-            R124AuthorizedResource(
+            CampaignCoreAuthorizedResource(
                 resource_id=str(row["id"]),
                 label=str(row["name"]),
                 revision=str(row["version"]),
@@ -244,7 +244,7 @@ class PostgresR124AuthorizedOptionOwner:
                 select(text("set_config('redagent.tenant_id', :tenant_id, true)"))
                 .params(tenant_id=tenant_id)
             )
-            if not await r124_principal_is_active(
+            if not await campaign_core_principal_is_active(
                 session,
                 tenant_id=tenant_id,
                 principal_id=principal_id,
@@ -281,10 +281,10 @@ class PostgresR124AuthorizedOptionOwner:
             ).mappings().all()
         if len(rows) > 500:
             raise ValueError("r124_target_inventory_unbounded")
-        from redagent_platform.campaign_service.service import R124AuthorizedResource
+        from redagent_platform.campaign_service.service import CampaignCoreAuthorizedResource
 
         return tuple(
-            R124AuthorizedResource(
+            CampaignCoreAuthorizedResource(
                 resource_id=str(row["id"]),
                 parent_id=engagement_id,
                 label=f'{row["target_type"]}: {row["normalized_value"]}',
@@ -297,7 +297,7 @@ class PostgresR124AuthorizedOptionOwner:
         )
 
 
-async def r124_principal_is_active(
+async def campaign_core_principal_is_active(
     session: AsyncSession,
     *,
     tenant_id: str,
@@ -398,7 +398,7 @@ class TrustedEffectOwners:
     coverage_state: str
 
 
-class R123CampaignRepository:
+class CampaignRepository:
     """Transaction-neutral repository; the caller owns commit and rollback."""
 
     def __init__(
@@ -467,7 +467,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if authority is None:
-            raise R123RecordConflict("current_campaign_scope_not_found")
+            raise CampaignRecordConflict("current_campaign_scope_not_found")
         existing = await self.session.scalar(
             select(campaigns.c.id).where(
                 campaigns.c.tenant_id == self.tenant_id,
@@ -475,7 +475,7 @@ class R123CampaignRepository:
             )
         )
         if existing is not None:
-            raise R123RecordConflict("campaign_already_exists")
+            raise CampaignRecordConflict("campaign_already_exists")
         await self.session.execute(
             insert(campaigns).values(
                 id=command.campaign_id,
@@ -603,7 +603,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("effect_manifest_context_claim_mismatch")
+            raise CampaignClaimConflict("effect_manifest_context_claim_mismatch")
         return EffectManifestContext(
             campaign_id=str(row["campaign_id"]),
             engagement_id=str(row["engagement_id"]),
@@ -723,7 +723,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if campaign is None:
-            raise R123RecordConflict("current_strategy_not_found")
+            raise CampaignRecordConflict("current_strategy_not_found")
         existing = await self.session.scalar(
             select(effects.c.id).where(
                 effects.c.tenant_id == self.tenant_id,
@@ -738,7 +738,7 @@ class R123CampaignRepository:
             )
         )
         if existing is not None:
-            raise R123RecordConflict("effect_reservation_conflict")
+            raise CampaignRecordConflict("effect_reservation_conflict")
         aggregate_sequence = int(campaign["aggregate_sequence"]) + 1
         await self.session.execute(
             insert(effects).values(
@@ -797,7 +797,7 @@ class R123CampaignRepository:
             )
         ).scalar_one_or_none()
         if updated_campaign is None:
-            raise R123RecordConflict("campaign_effect_sequence_conflict")
+            raise CampaignRecordConflict("campaign_effect_sequence_conflict")
         await self._record_transition(
             campaign_id=command.campaign_id,
             aggregate_sequence=aggregate_sequence,
@@ -877,7 +877,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("effect_claim_conflict")
+            raise CampaignClaimConflict("effect_claim_conflict")
         await self._record_effect_audit(row, action="campaign.r123.effect_claimed", occurred_at=now)
         return _effect_result(row)
 
@@ -940,7 +940,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("effect_dispatch_claim_conflict")
+            raise CampaignClaimConflict("effect_dispatch_claim_conflict")
         await self._record_effect_audit(
             row, action="campaign.r123.effect_dispatching", occurred_at=occurred_at
         )
@@ -1006,7 +1006,7 @@ class R123CampaignRepository:
             ):
                 # IMPORTANT: exact replay resolves ambiguity-transition response loss.
                 return _effect_result(replay)
-            raise R123ClaimConflict("effect_ambiguity_claim_conflict")
+            raise CampaignClaimConflict("effect_ambiguity_claim_conflict")
         await self._record_effect_audit(
             row, action="campaign.r123.effect_reconciliation_required", occurred_at=occurred_at
         )
@@ -1047,7 +1047,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if current is None:
-            raise R123ClaimConflict("effect_reconciliation_conflict")
+            raise CampaignClaimConflict("effect_reconciliation_conflict")
         if current["effect_state"] == "not_applied":
             if (
                 current["claim_version"] == expected_claim_version + 1
@@ -1055,7 +1055,7 @@ class R123CampaignRepository:
                 and current["effect_receipt_payload"] == receipt_payload
             ):
                 return _effect_result(current)
-            raise R123ClaimConflict("effect_reconciliation_replay_conflict")
+            raise CampaignClaimConflict("effect_reconciliation_replay_conflict")
         if (
             current["effect_state"] != "reconciliation_required"
             or current["reconciliation_state"] != "reconciliation_required"
@@ -1069,7 +1069,7 @@ class R123CampaignRepository:
             or current["request_sha256"] != receipt.request_sha256
             or current["started_at"] != receipt.started_at
         ):
-            raise R123ClaimConflict("effect_reconciliation_conflict")
+            raise CampaignClaimConflict("effect_reconciliation_conflict")
         row = (
             await self.session.execute(
                 update(effects)
@@ -1103,7 +1103,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("effect_reconciliation_conflict")
+            raise CampaignClaimConflict("effect_reconciliation_conflict")
         await self._record_effect_audit(
             row, action="campaign.r123.effect_not_applied", occurred_at=occurred_at
         )
@@ -1139,7 +1139,7 @@ class R123CampaignRepository:
             or current["reconciliation_state"] != "reconciliation_required"
             or current["claim_version"] != expected_claim_version
         ):
-            raise R123ClaimConflict("effect_reconciliation_conflict")
+            raise CampaignClaimConflict("effect_reconciliation_conflict")
         next_retry = current["next_retry_at"]
         if next_retry is not None and occurred_at < next_retry:
             # IMPORTANT: Activity response-loss replay preserves the existing retry boundary.
@@ -1178,7 +1178,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("effect_reconciliation_conflict")
+            raise CampaignClaimConflict("effect_reconciliation_conflict")
         await self._record_effect_audit(
             row,
             action=action,
@@ -1239,7 +1239,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if current is None:
-            raise R123ClaimConflict("effect_receipt_claim_conflict")
+            raise CampaignClaimConflict("effect_receipt_claim_conflict")
 
         # IMPORTANT: an exact terminal receipt replay is read-only; never create a second effect.
         if current["effect_state"] == "confirmed":
@@ -1249,7 +1249,7 @@ class R123CampaignRepository:
                 and current["effect_receipt_payload"] == receipt_payload
             ):
                 return _effect_result(current)
-            raise R123ClaimConflict("effect_receipt_replay_conflict")
+            raise CampaignClaimConflict("effect_receipt_replay_conflict")
 
         direct_confirmation = (
             current["effect_state"] == "dispatching"
@@ -1274,7 +1274,7 @@ class R123CampaignRepository:
             or receipt_payload["request_sha256"] != current["request_sha256"]
             or started_at != current["started_at"]
         ):
-            raise R123ClaimConflict("effect_receipt_claim_conflict")
+            raise CampaignClaimConflict("effect_receipt_claim_conflict")
 
         row = (
             await self.session.execute(
@@ -1320,7 +1320,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("effect_receipt_claim_conflict")
+            raise CampaignClaimConflict("effect_receipt_claim_conflict")
         await self._record_effect_audit(
             row,
             action=(
@@ -1387,7 +1387,7 @@ class R123CampaignRepository:
         ).scalar_one_or_none()
         if replay is not None:
             if replay != payload:
-                raise R123RecordConflict("campaign_checkpoint_replay_conflict")
+                raise CampaignRecordConflict("campaign_checkpoint_replay_conflict")
             return next_sequence
 
         campaigns = metadata.tables["campaigns"]
@@ -1414,7 +1414,7 @@ class R123CampaignRepository:
             )
         ).scalar_one_or_none()
         if current is None:
-            raise R123RecordConflict("campaign_checkpoint_binding_conflict")
+            raise CampaignRecordConflict("campaign_checkpoint_binding_conflict")
         status = "contained" if checkpoint_kind == "contain" else str(current)
         attention_reason = (
             normalized_reason
@@ -1441,7 +1441,7 @@ class R123CampaignRepository:
             )
         ).scalar_one_or_none()
         if updated is None:
-            raise R123RecordConflict("campaign_checkpoint_sequence_conflict")
+            raise CampaignRecordConflict("campaign_checkpoint_sequence_conflict")
         await self._record_transition(
             campaign_id=normalized_campaign,
             aggregate_sequence=next_sequence,
@@ -1483,7 +1483,7 @@ class R123CampaignRepository:
             _identifier_list("evidence_ids", list(evidence_ids), maximum_items=32)
         )
         if not normalized_evidence:
-            raise R123RecordConflict("effect_trusted_evidence_required")
+            raise CampaignRecordConflict("effect_trusted_evidence_required")
         effects = metadata.tables["campaign_effects"]
         jobs = metadata.tables["jobs"]
         manifests = metadata.tables["runner_job_manifests"]
@@ -1509,16 +1509,16 @@ class R123CampaignRepository:
             # CRITICAL: only the explicit read-only reconciliation owner may admit ambiguity.
             trusted_states.add("reconciliation_required")
         if effect is None or effect["effect_state"] not in trusted_states:
-            raise R123RecordConflict("effect_trusted_owner_state_invalid")
+            raise CampaignRecordConflict("effect_trusted_owner_state_invalid")
         if effect["cleanup_receipt_id"] is not None and effect["cleanup_receipt_id"] != normalized_cleanup:
-            raise R123RecordConflict("effect_trusted_cleanup_mismatch")
+            raise CampaignRecordConflict("effect_trusted_cleanup_mismatch")
         capability = effect["effect_intent_payload"].get("capability_id")
         if not isinstance(capability, str) or not capability.endswith("@2"):
-            raise R123RecordConflict("effect_trusted_capability_invalid")
+            raise CampaignRecordConflict("effect_trusted_capability_invalid")
         capability_id = capability[:-2]
         closed_binding = closed_execution_registry().get(capability)
         if closed_binding is None:
-            raise R123RecordConflict("effect_trusted_capability_invalid")
+            raise CampaignRecordConflict("effect_trusted_capability_invalid")
         execution = (
             await self.session.execute(
                 select(
@@ -1549,7 +1549,7 @@ class R123CampaignRepository:
             or execution["manifest_state"] != "completed"
             or execution["evidence_artifact_id"] not in normalized_evidence
         ):
-            raise R123RecordConflict("effect_trusted_execution_owner_mismatch")
+            raise CampaignRecordConflict("effect_trusted_execution_owner_mismatch")
         evidence_rows = (
             await self.session.execute(
                 select(artifacts).where(
@@ -1566,14 +1566,14 @@ class R123CampaignRepository:
             or row["finalized_at"] is None
             for row in evidence_rows
         ):
-            raise R123RecordConflict("effect_trusted_evidence_owner_mismatch")
+            raise CampaignRecordConflict("effect_trusted_evidence_owner_mismatch")
         primary = next(
             row
             for row in evidence_rows
             if row["id"] == execution["evidence_artifact_id"]
         )
         if primary["content_sha256"] != execution["evidence_sha256"]:
-            raise R123RecordConflict("effect_trusted_evidence_digest_mismatch")
+            raise CampaignRecordConflict("effect_trusted_evidence_digest_mismatch")
         import_row = (
             await self.session.execute(
                 select(imports).where(
@@ -1583,7 +1583,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if import_row is None:
-            raise R123RecordConflict("effect_trusted_finding_import_mismatch")
+            raise CampaignRecordConflict("effect_trusted_finding_import_mismatch")
         coverage_state = str(import_row["coverage_state"])
         if (
             coverage_state not in {"complete", "partial", "unknown"}
@@ -1594,7 +1594,7 @@ class R123CampaignRepository:
                 and coverage_state != "complete"
             )
         ):
-            raise R123RecordConflict("effect_trusted_finding_import_mismatch")
+            raise CampaignRecordConflict("effect_trusted_finding_import_mismatch")
         record_ids = tuple(
             (
                 await self.session.scalars(
@@ -1606,7 +1606,7 @@ class R123CampaignRepository:
             ).all()
         )
         if len(record_ids) != import_row["record_count"]:
-            raise R123RecordConflict("effect_trusted_finding_import_mismatch")
+            raise CampaignRecordConflict("effect_trusted_finding_import_mismatch")
         if not record_ids:
             return TrustedEffectOwners(
                 effect_id=normalized_effect,
@@ -1645,7 +1645,7 @@ class R123CampaignRepository:
             or row["link_state"] != "approved"
             for row in issue_rows
         ):
-            raise R123RecordConflict("effect_trusted_finding_owner_mismatch")
+            raise CampaignRecordConflict("effect_trusted_finding_owner_mismatch")
         if not require_retest:
             return TrustedEffectOwners(
                 effect_id=normalized_effect,
@@ -1675,7 +1675,7 @@ class R123CampaignRepository:
         for row in retest_rows:
             by_issue.setdefault(str(row["issue_id"]), []).append(str(row["retest_id"]))
         if set(by_issue) != set(issue_ids) or any(len(values) != 1 for values in by_issue.values()):
-            raise R123RecordConflict("effect_trusted_retest_owner_mismatch")
+            raise CampaignRecordConflict("effect_trusted_retest_owner_mismatch")
         return TrustedEffectOwners(
             effect_id=normalized_effect,
             execution_receipt_id=normalized_execution,
@@ -1703,7 +1703,7 @@ class R123CampaignRepository:
             raise ValueError("campaign_terminal_sequence_invalid")
         receipt_sha256 = verify_success_lineage(lineage)
         if lineage.tenant_id != self.tenant_id:
-            raise R123RecordConflict("campaign_terminal_tenant_mismatch")
+            raise CampaignRecordConflict("campaign_terminal_tenant_mismatch")
         campaigns = metadata.tables["campaigns"]
         strategies = metadata.tables["campaign_strategy_revisions"]
         effects = metadata.tables["campaign_effects"]
@@ -1728,10 +1728,10 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if campaign is None:
-            raise R123RecordConflict("campaign_terminal_strategy_not_current")
+            raise CampaignRecordConflict("campaign_terminal_strategy_not_current")
         if campaign["status"] == "completed":
             if campaign["terminal_receipt_sha256"] != receipt_sha256:
-                raise R123RecordConflict("campaign_terminal_replay_conflict")
+                raise CampaignRecordConflict("campaign_terminal_replay_conflict")
             return CampaignTerminalResult(
                 campaign_id=lineage.campaign_id,
                 aggregate_sequence=int(campaign["aggregate_sequence"]),
@@ -1750,7 +1750,7 @@ class R123CampaignRepository:
             or campaign["approval_receipt_sha256"] != lineage.approval_receipt_sha256
             or campaign["envelope_sha256"] != lineage.resolved_envelope_sha256
         ):
-            raise R123RecordConflict("campaign_terminal_lineage_binding_mismatch")
+            raise CampaignRecordConflict("campaign_terminal_lineage_binding_mismatch")
         start_event = await self.session.scalar(
             select(outbox.c.id).where(
                 outbox.c.tenant_id == self.tenant_id,
@@ -1762,7 +1762,7 @@ class R123CampaignRepository:
             )
         )
         if start_event is None:
-            raise R123RecordConflict("campaign_terminal_outbox_binding_mismatch")
+            raise CampaignRecordConflict("campaign_terminal_outbox_binding_mismatch")
         effect_rows = (
             await self.session.execute(
                 select(effects).where(
@@ -1773,7 +1773,7 @@ class R123CampaignRepository:
         ).mappings().all()
         by_effect = {str(row["effect_id"]): row for row in effect_rows}
         if set(by_effect) != {item.effect_id for item in lineage.nodes}:
-            raise R123RecordConflict("campaign_terminal_effect_inventory_mismatch")
+            raise CampaignRecordConflict("campaign_terminal_effect_inventory_mismatch")
         for item in lineage.nodes:
             row = by_effect[item.effect_id]
             if (
@@ -1787,7 +1787,7 @@ class R123CampaignRepository:
                 or row["reconciliation_state"] != item.reconciliation_state
                 or row["effect_state"] not in {"confirmed", "compensated"}
             ):
-                raise R123RecordConflict("campaign_terminal_effect_binding_mismatch")
+                raise CampaignRecordConflict("campaign_terminal_effect_binding_mismatch")
         await self._validate_terminal_owner_lineage(lineage)
         aggregate_sequence = expected_aggregate_sequence + 1
         updated = (
@@ -1811,7 +1811,7 @@ class R123CampaignRepository:
             )
         ).scalar_one_or_none()
         if updated is None:
-            raise R123RecordConflict("campaign_terminal_sequence_conflict")
+            raise CampaignRecordConflict("campaign_terminal_sequence_conflict")
         await self._record_transition(
             campaign_id=lineage.campaign_id,
             aggregate_sequence=aggregate_sequence,
@@ -1854,7 +1854,7 @@ class R123CampaignRepository:
         ).mappings().all()
         evidence_by_id = {str(row["id"]): row for row in evidence_rows}
         if set(evidence_by_id) != requested_evidence:
-            raise R123RecordConflict("campaign_terminal_evidence_owner_mismatch")
+            raise CampaignRecordConflict("campaign_terminal_evidence_owner_mismatch")
         for row in evidence_rows:
             if (
                 row["artifact_class"] not in {"report_safe", "export_safe"}
@@ -1862,7 +1862,7 @@ class R123CampaignRepository:
                 or row["quarantine_reason"] is not None
                 or row["finalized_at"] is None
             ):
-                raise R123RecordConflict("campaign_terminal_evidence_not_report_safe")
+                raise CampaignRecordConflict("campaign_terminal_evidence_not_report_safe")
 
         receipts = metadata.tables["runner_execution_receipts"]
         leases = metadata.tables["runner_pull_leases"]
@@ -1909,7 +1909,7 @@ class R123CampaignRepository:
                 != execution["evidence_sha256"]
                 or execution["manifest_state"] != "completed"
             ):
-                raise R123RecordConflict("campaign_terminal_execution_owner_mismatch")
+                raise CampaignRecordConflict("campaign_terminal_execution_owner_mismatch")
 
             import_row = (
                 await self.session.execute(
@@ -1923,7 +1923,7 @@ class R123CampaignRepository:
                 import_row["coverage_state"] != "complete"
                 or import_row["import_state"] != "accepted"
             ):
-                raise R123RecordConflict("campaign_terminal_finding_import_mismatch")
+                raise CampaignRecordConflict("campaign_terminal_finding_import_mismatch")
             imported_record_ids = tuple(
                 (
                     await self.session.scalars(
@@ -1935,10 +1935,10 @@ class R123CampaignRepository:
                 ).all()
             )
             if len(imported_record_ids) != import_row["record_count"]:
-                raise R123RecordConflict("campaign_terminal_finding_import_mismatch")
+                raise CampaignRecordConflict("campaign_terminal_finding_import_mismatch")
             if node.no_finding_coverage:
                 if imported_record_ids:
-                    raise R123RecordConflict("campaign_terminal_no_finding_coverage_mismatch")
+                    raise CampaignRecordConflict("campaign_terminal_no_finding_coverage_mismatch")
                 continue
 
             linked_rows = (
@@ -1974,7 +1974,7 @@ class R123CampaignRepository:
                 or row["link_state"] != "approved"
                 for row in linked_rows
             ):
-                raise R123RecordConflict("campaign_terminal_finding_owner_mismatch")
+                raise CampaignRecordConflict("campaign_terminal_finding_owner_mismatch")
 
             retest_rows = (
                 await self.session.execute(
@@ -1996,7 +1996,7 @@ class R123CampaignRepository:
                 zip(node.retest_receipt_ids, node.finding_issue_ids, strict=True)
             )
             if actual_retests != expected_retests:
-                raise R123RecordConflict("campaign_terminal_retest_owner_mismatch")
+                raise CampaignRecordConflict("campaign_terminal_retest_owner_mismatch")
 
     async def acknowledge_workflow_start(
         self,
@@ -2030,7 +2030,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("outbox_claim_conflict")
+            raise CampaignClaimConflict("outbox_claim_conflict")
         await self.session.execute(
             update(outbox)
             .where(
@@ -2073,7 +2073,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if campaign is None:
-            raise R123ClaimConflict("campaign_workflow_ack_conflict")
+            raise CampaignClaimConflict("campaign_workflow_ack_conflict")
         aggregate_sequence = int(campaign["aggregate_sequence"])
         audit_id, acknowledgement_outbox_id = await self._record_transition(
             campaign_id=str(campaign["id"]),
@@ -2138,7 +2138,7 @@ class R123CampaignRepository:
             )
         ).mappings().one_or_none()
         if row is None:
-            raise R123ClaimConflict("outbox_claim_conflict")
+            raise CampaignClaimConflict("outbox_claim_conflict")
         decision = apply_relay_failure(
             attempt_count=int(row["attempt_count"]),
             failure=failure,

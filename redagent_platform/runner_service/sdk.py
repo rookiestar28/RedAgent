@@ -251,7 +251,7 @@ class RunnerExecutionCoordinator:
                 try:
                     await adapter.cancel(request, workdir)
                     phases[-1] = PhaseReceipt("cancel", "completed", "runner_phase_completed")
-                except BaseException:
+                except BaseException:  # noqa: BLE001
                     phases[-1] = PhaseReceipt("cancel", "failed", "runner_adapter_cancel_failed")
             cleanup_completed = await self._cleanup(request, adapter, workdir, phases)
             receipt = AdapterExecutionReceipt(
@@ -292,7 +292,7 @@ class RunnerExecutionCoordinator:
         completed = True
         try:
             await adapter.cleanup(request, workdir)
-        except BaseException:
+        except BaseException:  # noqa: BLE001
             completed = False
         finally:
             shutil.rmtree(workdir, ignore_errors=False)

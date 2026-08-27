@@ -160,7 +160,7 @@ class RollbackPlanEvidence:
 
 
 @dataclass(frozen=True, kw_only=True)
-class R089ReleaseCandidate:
+class ReleaseQualificationCandidate:
     release_id: str
     full_gate: FullGateEvidence
     artifacts: tuple[ReleaseArtifactInventoryItem, ...]
@@ -176,7 +176,7 @@ class R089ReleaseCandidate:
 
 
 @dataclass(frozen=True, kw_only=True)
-class R089ReleasePackage:
+class ReleaseQualificationPackage:
     release_id: str
     artifact_inventory: tuple[ReleaseArtifactInventoryItem, ...]
     adapter_result_hashes: tuple[str, ...]
@@ -188,12 +188,12 @@ class R089ReleasePackage:
 
 
 @dataclass(frozen=True, kw_only=True)
-class R089ReleaseGateValidation:
+class ReleaseQualificationValidation:
     accepted: bool
     reason: str
     gaps: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
-    package: R089ReleasePackage | None = None
+    package: ReleaseQualificationPackage | None = None
 
 
 PHASE_0_TO_6_BLOCKING_ITEMS: tuple[str, ...] = tuple(f"R{index:03d}" for index in range(0, 36))
@@ -203,7 +203,7 @@ REQUIRED_RELEASE_NOTE_SECTIONS: frozenset[ReleaseNoteSection] = frozenset(Releas
 REQUIRED_R089_ARTIFACT_KINDS: frozenset[ReleaseArtifactKind] = frozenset(ReleaseArtifactKind)
 
 
-def build_r034_release_gate_checklist() -> ReleaseGateChecklist:
+def build_release_gate_checklist() -> ReleaseGateChecklist:
     return ReleaseGateChecklist(
         release_id="R034-initial-release-readiness",
         blocking_items=tuple(
@@ -261,7 +261,7 @@ def validate_release_gate(checklist: ReleaseGateChecklist) -> ReleaseGateValidat
     return ReleaseGateValidation(accepted=True, reason="release_gate_accepted")
 
 
-def validate_r089_release_candidate(candidate: R089ReleaseCandidate) -> R089ReleaseGateValidation:
+def validate_release_qualification_candidate(candidate: ReleaseQualificationCandidate) -> ReleaseQualificationValidation:
     gaps: list[str] = []
     warnings: list[str] = []
     _append_missing(gaps, "release_id", candidate.release_id)
@@ -282,14 +282,14 @@ def validate_r089_release_candidate(candidate: R089ReleaseCandidate) -> R089Rele
     _append_missing(gaps, "environment_baseline_hash", candidate.environment_baseline_hash)
     _append_missing(gaps, "current_environment_hash", candidate.current_environment_hash)
     if gaps:
-        return R089ReleaseGateValidation(
+        return ReleaseQualificationValidation(
             accepted=False,
             reason="release_readiness_blocked",
             gaps=tuple(gaps),
             warnings=tuple(warnings),
         )
     package = _release_package(candidate)
-    return R089ReleaseGateValidation(
+    return ReleaseQualificationValidation(
         accepted=True,
         reason="release_readiness_accepted",
         warnings=tuple(warnings),
@@ -505,7 +505,7 @@ def _rollback_plan_gaps(plan: RollbackPlanEvidence) -> tuple[str, ...]:
     return tuple(gaps)
 
 
-def _release_package(candidate: R089ReleaseCandidate) -> R089ReleasePackage:
+def _release_package(candidate: ReleaseQualificationCandidate) -> ReleaseQualificationPackage:
     artifact_inventory = tuple(sorted(candidate.artifacts, key=lambda item: (item.kind.value, item.relative_path)))
     adapter_hashes = tuple(sorted(result.result_hash for result in candidate.adapter_certifications))
     policy_versions = tuple(sorted(f"{pack.pack_id}:{pack.version}" for pack in candidate.policy_packs))
@@ -519,7 +519,7 @@ def _release_package(candidate: R089ReleaseCandidate) -> R089ReleasePackage:
         "audit_export_batch_hashes": tuple(sorted(candidate.audit_export_batch_hashes)),
         "rollback_plan_id": candidate.rollback_plan.plan_id,
     }
-    return R089ReleasePackage(
+    return ReleaseQualificationPackage(
         release_id=candidate.release_id,
         artifact_inventory=artifact_inventory,
         adapter_result_hashes=adapter_hashes,

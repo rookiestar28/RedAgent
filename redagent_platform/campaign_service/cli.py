@@ -26,7 +26,7 @@ _ALLOWED_AUTH_HEADERS = frozenset({
 
 
 @dataclass(frozen=True, slots=True)
-class R123ApiCall:
+class CampaignApiCall:
     method: str
     url: str
     headers: dict[str, str]
@@ -60,9 +60,9 @@ def build_cli_parser() -> argparse.ArgumentParser:
 
 def build_status_call(
     *, api_base: str, auth_headers: Mapping[str, str]
-) -> R123ApiCall:
+) -> CampaignApiCall:
     base = _loopback_base(api_base)
-    return R123ApiCall(
+    return CampaignApiCall(
         method="GET",
         url=base + _STATUS_PATH,
         headers=_validated_headers(auth_headers),
@@ -77,7 +77,7 @@ def build_qualification_call(
     objective_kind: str,
     require_corroboration: bool,
     idempotency_factory: Callable[[], str] | None = None,
-) -> R123ApiCall:
+) -> CampaignApiCall:
     base = _loopback_base(api_base)
     if objective_kind not in {"http_posture", "security_header_assertion"}:
         raise ValueError("r123_cli_objective_invalid")
@@ -91,7 +91,7 @@ def build_qualification_call(
         "Idempotency-Key": token,
         "X-RedAgent-Policy-Reference": "policy-r123-owned-loopback",
     })
-    return R123ApiCall(
+    return CampaignApiCall(
         method="POST",
         url=base + _QUALIFICATION_PATH,
         headers=headers,
@@ -145,7 +145,7 @@ def load_auth_headers(workspace: Path, path: Path) -> dict[str, str]:
     return _validated_headers(payload)
 
 
-def send_api_call(call: R123ApiCall) -> dict[str, object]:
+def send_api_call(call: CampaignApiCall) -> dict[str, object]:
     body = None
     if call.payload is not None:
         body = json.dumps(call.payload, sort_keys=True, separators=(",", ":")).encode()

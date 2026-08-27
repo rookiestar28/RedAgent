@@ -6,39 +6,53 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CONTRACT_SCHEMA_VERSION,
+from datetime import (
+    datetime,
+    timedelta,
+)
+from fastapi import (
     Depends,
-    EmergencyStopSignal,
-    NucleiAuthorization,
+    Request,
+    status,
+)
+from pathlib import Path
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _match_roe_reference,
+    _now,
+    _orchestration,
+)
+from redagent_platform.api.schemas.nuclei import (
     NucleiCancelRequest,
     NucleiCompileRequest,
     NucleiDashboardResponse,
     NucleiPlanResponse,
-    NucleiProfileId,
     NucleiProfileListResponse,
-    NucleiRepository,
-    NucleiRepositoryConflict,
     NucleiRunCreateRequest,
     NucleiRunResponse,
-    NucleiTargetBinding,
-    Path,
-    Request,
-    RequestGuard,
-    _match_roe_reference,
-    _now,
-    _orchestration,
-    certified_nuclei_profiles,
-    compile_nuclei_plan,
-    datetime,
-    metadata,
-    nuclei_profile_values,
-    select,
-    status,
-    timedelta,
-    verify_current_nuclei_bundle_promotion,
 )
+from redagent_platform.nuclei_service.compiler import compile_nuclei_plan
+from redagent_platform.nuclei_service.contracts import (
+    NucleiAuthorization,
+    NucleiProfileId,
+    NucleiTargetBinding,
+    certified_profiles as certified_nuclei_profiles,
+)
+from redagent_platform.nuclei_service.promotion import verify_current_nuclei_bundle_promotion
+from redagent_platform.nuclei_service.repository import (
+    NucleiRepository,
+    NucleiRepositoryConflict,
+    profile_values as nuclei_profile_values,
+)
+from redagent_platform.orchestration.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    EmergencyStopSignal,
+)
+from redagent_platform.persistence.models import metadata
+from sqlalchemy import select
 
 # IMPORTANT: router modules are one level below api; promotion assets remain workspace-relative.
 def _public_nuclei_profile(row: dict[str, object]) -> dict[str, object]:
@@ -76,22 +90,28 @@ def _public_nuclei_run(row: dict[str, object], plan_id: str) -> dict[str, object
     }
 
 
-def _load_r105_bundle(now: datetime):
+def _load_nuclei_bundle(now: datetime):
     workspace = Path(__file__).resolve().parents[3]
     return verify_current_nuclei_bundle_promotion(
         manifest_bytes=(workspace / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
-        signature_bundle_bytes=(workspace / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json").read_bytes(),
-        public_key_bytes=(workspace / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub").read_bytes(),
+        signature_bundle_bytes=(
+            workspace / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json"
+        ).read_bytes(),
+        public_key_bytes=(
+            workspace / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub"
+        ).read_bytes(),
         template_bytes=(workspace / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml").read_bytes(),
         certificate_bytes=(workspace / "config/trust/r105-nuclei-user.crt").read_bytes(),
-        qualification_bytes=(workspace / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json").read_bytes(),
+        qualification_bytes=(
+            workspace / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+        ).read_bytes(),
         now=now,
     )
 
 
-def _require_r105_bundle(now: datetime):
+def _require_nuclei_bundle(now: datetime):
     try:
-        return _load_r105_bundle(now)
+        return _load_nuclei_bundle(now)
     except (OSError, ValueError) as exc:
         raise ApiError(503, "nuclei_supply_chain_unavailable", "The signed Nuclei bundle is unavailable.") from exc
 
@@ -109,7 +129,7 @@ def register_nuclei_routes(app: APIRouter, dependencies: ApiDependencies) -> Non
         guard: RequestGuard = Depends(require_guard("job:read", safety_preserving=True)),
     ) -> dict:
         del guard
-        _require_r105_bundle(_now())
+        _require_nuclei_bundle(_now())
         return {"data": [nuclei_profile_values(profile) for profile in certified_nuclei_profiles().values()]}
 
     @app.post(
@@ -125,7 +145,7 @@ def register_nuclei_routes(app: APIRouter, dependencies: ApiDependencies) -> Non
     ) -> dict:
         now = _now()
         _match_roe_reference(guard, payload.roe_version_id)
-        promoted = _require_r105_bundle(now)
+        promoted = _require_nuclei_bundle(now)
         profile_id = NucleiProfileId(payload.profile_id)
         profile = certified_nuclei_profiles()[profile_id]
         target = NucleiTargetBinding(

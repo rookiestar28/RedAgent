@@ -18,8 +18,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from redagent_platform.orchestration.config import TemporalConfigError  # noqa: E402
 from redagent_platform.campaign_service.composition import (  # noqa: E402
-    build_stock_r123_coordinator_factory,
-    build_stock_r123_relay_factory,
+    build_stock_campaign_coordinator_factory,
+    build_stock_campaign_relay_factory,
 )
 from redagent_platform.orchestration.gateway import OrchestrationUnavailable  # noqa: E402
 from redagent_platform.orchestration.worker import run_workflow_worker  # noqa: E402
@@ -31,12 +31,12 @@ def build_runtime_r123_factory(
     env: Mapping[str, str],
 ):
     """Select the stock compat_123 graph from the same immutable startup environment."""
-    return build_stock_r123_coordinator_factory(workspace, env)
+    return build_stock_campaign_coordinator_factory(workspace, env)
 
 
 def build_runtime_r123_relay_factory(env: Mapping[str, str]):
     """Select the mandatory compat_123 outbox relay from the same startup environment."""
-    return build_stock_r123_relay_factory(env)
+    return build_stock_campaign_relay_factory(env)
 
 
 def worker_health_response(path: str, *, ready: bool) -> tuple[int, bytes]:

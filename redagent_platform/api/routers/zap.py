@@ -6,35 +6,47 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CONTRACT_SCHEMA_VERSION,
-    CertifiedProfileId,
+from datetime import timedelta
+from fastapi import (
     Depends,
-    EmergencyStopSignal,
     Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
     RequestGuard,
-    ZapAuthorization,
+)
+from redagent_platform.api.router_primitives import (
+    _now,
+    _orchestration,
+)
+from redagent_platform.api.schemas.zap import (
     ZapCancelRequest,
     ZapCompileRequest,
     ZapDashboardResponse,
     ZapPlanResponse,
     ZapProfileListResponse,
-    ZapRepository,
-    ZapRepositoryConflict,
     ZapRunCreateRequest,
     ZapRunResponse,
-    ZapTargetBinding,
-    _now,
-    _orchestration,
-    certified_profiles,
-    compile_zap_plan,
-    metadata,
-    profile_values,
-    select,
-    status,
-    timedelta,
 )
+from redagent_platform.orchestration.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    EmergencyStopSignal,
+)
+from redagent_platform.persistence.models import metadata
+from redagent_platform.zap_service.compiler import compile_zap_plan
+from redagent_platform.zap_service.contracts import (
+    CertifiedProfileId,
+    ZapAuthorization,
+    ZapTargetBinding,
+    certified_profiles,
+)
+from redagent_platform.zap_service.repository import (
+    ZapRepository,
+    ZapRepositoryConflict,
+    profile_values,
+)
+from sqlalchemy import select
 
 def _public_zap_profile(row: dict[str, object]) -> dict[str, object]:
     return {key: row[key] for key in (

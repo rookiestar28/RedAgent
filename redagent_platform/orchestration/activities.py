@@ -19,12 +19,12 @@ from redagent_platform.orchestration.contracts import (
     JobWorkflowInput,
     RunnerDispatchCommand,
     RunnerDispatchResult,
-    R123ContainActivityCommand,
-    R123ContainActivityResult,
-    R123DispatchActivityCommand,
-    R123DispatchActivityResult,
-    R123ReconcileActivityCommand,
-    R123ReconcileActivityResult,
+    ClosedLoopContainActivityCommand,
+    ClosedLoopContainActivityResult,
+    ClosedLoopDispatchActivityCommand,
+    ClosedLoopDispatchActivityResult,
+    ClosedLoopReconcileActivityCommand,
+    ClosedLoopReconcileActivityResult,
 )
 from redagent_platform.persistence.repository import (
     ActivityAuthorizationError,
@@ -127,7 +127,7 @@ class WorkflowActivities:
             for completed in done:
                 try:
                     completed.result()
-                except BaseException:
+                except BaseException:  # noqa: BLE001
                     pass
             raise
         except ValueError as exc:
@@ -161,7 +161,7 @@ class WorkflowActivities:
             for completed in done:
                 try:
                     completed.result()
-                except BaseException:
+                except BaseException:  # noqa: BLE001
                     pass
             raise
         except ValueError as exc:
@@ -173,9 +173,9 @@ class WorkflowActivities:
         return result
 
     @activity.defn(name="redagent.r123.reconcile-level.v1")
-    async def reconcile_r123_level(
-        self, request: R123ReconcileActivityCommand
-    ) -> R123ReconcileActivityResult:
+    async def reconcile_closed_loop_level(
+        self, request: ClosedLoopReconcileActivityCommand
+    ) -> ClosedLoopReconcileActivityResult:
         if self._r123_coordinator is None:
             raise _permanent("ExecutionDisabled", RuntimeError("r123_coordinator_unavailable"))
         info = activity.info()
@@ -189,7 +189,7 @@ class WorkflowActivities:
         except (ValueError, RuntimeError) as exc:
             raise _permanent("InvalidWorkflowInput", exc) from exc
         if (
-            not isinstance(result, R123ReconcileActivityResult)
+            not isinstance(result, ClosedLoopReconcileActivityResult)
             or result.campaign_id != request.campaign_id
             or result.strategy_revision_id != request.strategy_revision_id
         ):
@@ -199,9 +199,9 @@ class WorkflowActivities:
         return result
 
     @activity.defn(name="redagent.r123.dispatch-effect.v1")
-    async def dispatch_r123_effect(
-        self, request: R123DispatchActivityCommand
-    ) -> R123DispatchActivityResult:
+    async def dispatch_closed_loop_effect(
+        self, request: ClosedLoopDispatchActivityCommand
+    ) -> ClosedLoopDispatchActivityResult:
         if self._r123_coordinator is None:
             raise _permanent("ExecutionDisabled", RuntimeError("r123_coordinator_unavailable"))
         info = activity.info()
@@ -225,13 +225,13 @@ class WorkflowActivities:
             for completed in done:
                 try:
                     completed.result()
-                except BaseException:
+                except BaseException:  # noqa: BLE001
                     pass
             raise
         except (ValueError, RuntimeError) as exc:
             raise _permanent("DispatchDenied", exc) from exc
         if (
-            not isinstance(result, R123DispatchActivityResult)
+            not isinstance(result, ClosedLoopDispatchActivityResult)
             or result.campaign_id != request.campaign_id
             or result.effect_id != request.effect_id
         ):
@@ -241,9 +241,9 @@ class WorkflowActivities:
         return result
 
     @activity.defn(name="redagent.r123.contain.v1")
-    async def contain_r123(
-        self, request: R123ContainActivityCommand
-    ) -> R123ContainActivityResult:
+    async def contain_campaign(
+        self, request: ClosedLoopContainActivityCommand
+    ) -> ClosedLoopContainActivityResult:
         if self._r123_coordinator is None:
             raise _permanent("ContainmentUnavailable", RuntimeError("r123_coordinator_unavailable"))
         info = activity.info()
@@ -256,7 +256,7 @@ class WorkflowActivities:
             )
         except (ValueError, RuntimeError) as exc:
             raise _permanent("ContainmentFailed", exc) from exc
-        if not isinstance(result, R123ContainActivityResult) or result.campaign_id != request.campaign_id:
+        if not isinstance(result, ClosedLoopContainActivityResult) or result.campaign_id != request.campaign_id:
             raise _permanent(
                 "InvalidWorkflowInput", ValueError("r123_containment_result_invalid")
             )

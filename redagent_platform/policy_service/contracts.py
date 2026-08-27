@@ -9,7 +9,7 @@ import hashlib
 import json
 import re
 from types import MappingProxyType
-from typing import Mapping
+from typing import Mapping, Never, SupportsIndex
 import unicodedata
 
 
@@ -129,7 +129,7 @@ class PolicyDecision:
             f"allowed={self.allowed} reason={self.reason_code!r}>"
         )
 
-    def __reduce_ex__(self, protocol: int):
+    def __reduce_ex__(self, protocol: SupportsIndex) -> Never:
         raise TypeError("policy_decision_serialization_forbidden")
 
 

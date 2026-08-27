@@ -16,7 +16,7 @@ from redagent_platform.campaign_service.service import (
     EffectAmbiguityPersistenceError,
     EffectDispatchCommand,
     EffectReconciliationCommand,
-    R123EffectCoordinator,
+    CampaignEffectCoordinator,
 )
 from redagent_platform.runner_service.contracts import (
     JobManifestDraft,
@@ -24,9 +24,9 @@ from redagent_platform.runner_service.contracts import (
     ResourceLimits,
     sign_job_manifest_v2,
 )
-from redagent_platform.runner_service.compat_123_dispatch import (
+from redagent_platform.runner_service.campaign_dispatch import (
     AdapterTerminalReceipt,
-    R123AdapterRequest,
+    CampaignAdapterRequest,
 )
 
 
@@ -244,7 +244,7 @@ def _reconciliation_command() -> EffectReconciliationCommand:
         expected_dispatch_generation=1,
     )
     binding = command.binding
-    request = R123AdapterRequest(
+    request = CampaignAdapterRequest(
         tenant_id=command.tenant_id,
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
@@ -269,20 +269,20 @@ def _reconciliation_command() -> EffectReconciliationCommand:
         request=request,
         request_sha256=request_sha256,
         runner_id="runner-r123",
-        workload_identity="spiffe://redagent/runner/compat_123",
+        workload_identity="spiffe://redagent/runner/r123",
         started_at=NOW,
     )
 
 
 def test_effect_coordinator_rechecks_authority_issues_exact_manifest_and_confirms_once() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store()
     dispatcher = Dispatcher()
     result_owner = ResultOwner()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         authority,
         store,
         Issuer(),
@@ -309,7 +309,7 @@ def test_effect_coordinator_rechecks_authority_issues_exact_manifest_and_confirm
         "dispatch_attempt": 1,
         "dispatch_generation": 1,
         "runner_id": "runner-r123",
-        "workload_identity": "spiffe://redagent/runner/compat_123",
+        "workload_identity": "spiffe://redagent/runner/r123",
         "request_sha256": store.events[1][1],
         "started_at": COMPLETED.isoformat().replace("+00:00", "Z"),
         "completed_at": COMPLETED.isoformat().replace("+00:00", "Z"),
@@ -340,14 +340,14 @@ def test_effect_coordinator_uses_fresh_clock_for_pre_io_authority_recheck() -> N
                 now < expired,
                 "allowed" if now < expired else "lease_expired",
                 "runner-r123",
-                "spiffe://redagent/runner/compat_123",
+                "spiffe://redagent/runner/r123",
             )
 
     moments = iter((NOW + timedelta(seconds=3), NOW + timedelta(seconds=4)))
     authority = ExpiringAuthority(())
     store = Store()
     dispatcher = Dispatcher()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         authority,
         store,
         Issuer(),
@@ -366,12 +366,12 @@ def test_effect_coordinator_uses_fresh_clock_for_pre_io_authority_recheck() -> N
 
 def test_effect_coordinator_records_ambiguity_and_never_redispatches_after_possible_acceptance() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store()
     dispatcher = Dispatcher(fail=True)
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         authority, store, Issuer(), dispatcher, ResultOwner()
     )
 
@@ -383,10 +383,10 @@ def test_effect_coordinator_records_ambiguity_and_never_redispatches_after_possi
 
 
 def test_effect_coordinator_denies_before_claim_and_rejects_manifest_substitution() -> None:
-    denied = Authority((AuthorityRecheck(False, "policy_revoked", "runner-r123", "spiffe://redagent/runner/compat_123"),))
+    denied = Authority((AuthorityRecheck(False, "policy_revoked", "runner-r123", "spiffe://redagent/runner/r123"),))
     store = Store()
     dispatcher = Dispatcher()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         denied, store, Issuer(), dispatcher, ResultOwner()
     )
     with pytest.raises(RuntimeError, match="effect_authority_denied:policy_revoked"):
@@ -401,9 +401,9 @@ def test_effect_coordinator_denies_before_claim_and_rejects_manifest_substitutio
                 manifest=replace(signed.manifest, profile_sha256="0" * 64),
             )
 
-    allowed = Authority((AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),))
+    allowed = Authority((AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),))
     with pytest.raises(ValueError, match="manifest_v2_profile_mismatch"):
-        asyncio.run(R123EffectCoordinator(
+        asyncio.run(CampaignEffectCoordinator(
             allowed, Store(), WrongIssuer(), Dispatcher(), ResultOwner()
         ).dispatch(
             _command(), now=NOW
@@ -412,8 +412,8 @@ def test_effect_coordinator_denies_before_claim_and_rejects_manifest_substitutio
 
 def test_effect_coordinator_requires_trusted_result_persistence_before_confirmation() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store()
     dispatcher = Dispatcher()
@@ -421,7 +421,7 @@ def test_effect_coordinator_requires_trusted_result_persistence_before_confirmat
 
     with pytest.raises(RuntimeError, match="effect_dispatch_reconciliation_required"):
         asyncio.run(
-            R123EffectCoordinator(
+            CampaignEffectCoordinator(
                 authority, store, Issuer(), dispatcher, result_owner
             ).dispatch(_command(), now=NOW)
         )
@@ -436,12 +436,12 @@ def test_effect_coordinator_requires_trusted_result_persistence_before_confirmat
 
 def test_effect_coordinator_preserves_cancellation_after_recording_ambiguity() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store()
     dispatcher = CancelledDispatcher()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         authority, store, Issuer(), dispatcher, ResultOwner()
     )
 
@@ -458,12 +458,12 @@ def test_effect_coordinator_replays_only_the_canonical_receipt_after_confirm_res
     recovers,
 ) -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store(confirm_failures=confirm_failures)
     dispatcher = Dispatcher()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         authority,
         store,
         Issuer(),
@@ -486,12 +486,12 @@ def test_effect_coordinator_replays_only_the_canonical_receipt_after_confirm_res
 
 def test_effect_coordinator_preserves_confirm_cancellation_after_exact_receipt_replay() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store(confirm_cancellations=1)
     dispatcher = Dispatcher()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         authority,
         store,
         Issuer(),
@@ -510,14 +510,14 @@ def test_effect_coordinator_preserves_confirm_cancellation_after_exact_receipt_r
 
 def test_effect_coordinator_does_not_mask_cancellation_when_ambiguity_write_fails() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store(ambiguity_fail=True)
     dispatcher = CancelledDispatcher()
 
     with pytest.raises(asyncio.CancelledError):
-        asyncio.run(R123EffectCoordinator(
+        asyncio.run(CampaignEffectCoordinator(
             authority, store, Issuer(), dispatcher, ResultOwner()
         ).dispatch(_command(), now=NOW))
 
@@ -527,8 +527,8 @@ def test_effect_coordinator_does_not_mask_cancellation_when_ambiguity_write_fail
 
 def test_effect_coordinator_exposes_ambiguity_persistence_failure_for_activity_fallback() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store(ambiguity_fail=True)
 
@@ -536,7 +536,7 @@ def test_effect_coordinator_exposes_ambiguity_persistence_failure_for_activity_f
         EffectAmbiguityPersistenceError,
         match="effect_ambiguity_persistence_failed",
     ):
-        asyncio.run(R123EffectCoordinator(
+        asyncio.run(CampaignEffectCoordinator(
             authority, store, Issuer(), Dispatcher(fail=True), ResultOwner()
         ).dispatch(_command(), now=NOW))
 
@@ -545,8 +545,8 @@ def test_effect_coordinator_exposes_ambiguity_persistence_failure_for_activity_f
 
 def test_effect_coordinator_reconciles_receipt_construction_failure_without_redispatch() -> None:
     authority = Authority((
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
-        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/compat_123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
+        AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),
     ))
     store = Store()
     dispatcher = Dispatcher()
@@ -560,7 +560,7 @@ def test_effect_coordinator_reconciles_receipt_construction_failure_without_redi
         return value
 
     with pytest.raises(RuntimeError, match="effect_dispatch_reconciliation_required"):
-        asyncio.run(R123EffectCoordinator(
+        asyncio.run(CampaignEffectCoordinator(
             authority,
             store,
             Issuer(),
@@ -588,7 +588,7 @@ def test_effect_reconciliation_confirms_lookup_receipt_without_redispatch() -> N
     dispatcher = Dispatcher(lookup_receipt=receipt)
     store = Store()
     result_owner = ResultOwner()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         Authority(()), store, Issuer(), dispatcher, result_owner
     )
 
@@ -622,7 +622,7 @@ def test_effect_reconciliation_replays_only_the_canonical_receipt_after_confirm_
     )
     dispatcher = Dispatcher(lookup_receipt=receipt)
     store = Store(confirm_failures=confirm_failures)
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         Authority(()), store, Issuer(), dispatcher, ResultOwner()
     )
 
@@ -657,7 +657,7 @@ def test_effect_reconciliation_preserves_cancellation_after_one_exact_receipt_re
     )
     dispatcher = Dispatcher(lookup_receipt=receipt)
     store = Store(confirm_cancellations=1, confirm_failures=confirm_failures)
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         Authority(()), store, Issuer(), dispatcher, ResultOwner()
     )
 
@@ -685,7 +685,7 @@ def test_effect_reconciliation_proves_not_applied_without_redispatch() -> None:
     )
     dispatcher = Dispatcher(lookup_receipt=receipt)
     store = Store()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         Authority(()), store, Issuer(), dispatcher, ResultOwner()
     )
 
@@ -711,7 +711,7 @@ def test_effect_reconciliation_persists_lookup_unavailability_without_redispatch
 ) -> None:
     dispatcher = Dispatcher(lookup_fail=lookup_fail)
     store = Store()
-    coordinator = R123EffectCoordinator(
+    coordinator = CampaignEffectCoordinator(
         Authority(()), store, Issuer(), dispatcher, ResultOwner()
     )
 

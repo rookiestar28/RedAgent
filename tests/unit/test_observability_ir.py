@@ -6,14 +6,14 @@ from redagent_platform.observability_ir import (
     LogStreamPolicy,
     MetricKind,
     ObservabilityIncidentResponsePlan,
-    build_r033_observability_plan,
+    build_observability_plan,
     validate_log_records_sensitive_value_free,
     validate_observability_ir_plan,
 )
 
 
 def test_r033_observability_plan_is_accepted():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
 
     validation = validate_observability_ir_plan(plan)
 
@@ -22,7 +22,7 @@ def test_r033_observability_plan_is_accepted():
 
 
 def test_required_metric_coverage_is_complete():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
 
     metric_kinds = {metric.kind for metric in plan.metrics}
 
@@ -30,7 +30,7 @@ def test_required_metric_coverage_is_complete():
 
 
 def test_missing_metric_fails_closed():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
     changed = _replace_plan(plan, metrics=tuple(metric for metric in plan.metrics if metric.kind is not MetricKind.RUNNER_HEARTBEAT))
 
     validation = validate_observability_ir_plan(changed)
@@ -40,7 +40,7 @@ def test_missing_metric_fails_closed():
 
 
 def test_required_alert_coverage_is_complete():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
 
     alert_kinds = {alert.kind for alert in plan.alerts}
 
@@ -48,7 +48,7 @@ def test_required_alert_coverage_is_complete():
 
 
 def test_disabled_or_missing_alert_fails_closed():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
     disabled = AlertRule(
         kind=AlertKind.RUNNER_ANOMALY,
         name="Runner anomaly",
@@ -67,7 +67,7 @@ def test_disabled_or_missing_alert_fails_closed():
 
 
 def test_required_incident_runbooks_are_complete():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
 
     scenarios = {runbook.scenario for runbook in plan.runbooks}
 
@@ -75,7 +75,7 @@ def test_required_incident_runbooks_are_complete():
 
 
 def test_incomplete_incident_runbook_fails_closed():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
     incomplete = IncidentRunbook(
         scenario=IncidentScenario.LEAKED_EVIDENCE,
         owner="security-operations",
@@ -96,7 +96,7 @@ def test_incomplete_incident_runbook_fails_closed():
 
 
 def test_log_stream_requires_redaction_sensitive_validation_and_retention():
-    plan = build_r033_observability_plan()
+    plan = build_observability_plan()
     weak_stream = LogStreamPolicy(
         stream_name="runner-callbacks",
         owner="security-operations",

@@ -6,12 +6,22 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    AsyncSession,
+from fastapi import (
     Depends,
-    PaginationQuery,
-    PolicyAdministrationRepository,
+    Request,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _idempotency,
+    _list_response,
+    _now,
+    _probe_limit,
+)
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.api.schemas.policy import (
     PolicyBundleListResponse,
     PolicyDecisionListResponse,
     PolicyPromotionRequest,
@@ -19,13 +29,9 @@ from redagent_platform.api._route_support import (
     PolicySimulationRequest,
     PolicySimulationResponse,
     PolicyStatusResponse,
-    Request,
-    RequestGuard,
-    _idempotency,
-    _list_response,
-    _now,
-    _probe_limit,
 )
+from redagent_platform.policy_service.repository import PolicyAdministrationRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 
 def _policy_administration(session: AsyncSession, guard: RequestGuard) -> PolicyAdministrationRepository:
     return PolicyAdministrationRepository(

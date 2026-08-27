@@ -15,16 +15,16 @@ from redagent_platform.campaign_service.resolver import (
     ResolutionRequest,
 )
 from redagent_platform.campaign_service.runtime import (
-    LocalR123PlanningFactsOwner,
-    PolicyBoundR123AuthorizationOwner,
+    LocalCampaignPlanningFactsOwner,
+    PolicyBoundCampaignAuthorizationOwner,
 )
 from redagent_platform.campaign_service.service import (
     CampaignAuthorizationMaterial,
     CampaignPlanningFacts,
     CampaignStartMaterial,
     CampaignStartRequest,
-    R119R121CampaignStartPlanner,
-    R123CampaignStartService,
+    DeterministicCampaignStartPlanner,
+    CampaignStartService,
     binding_from_campaign_context,
 )
 from redagent_platform.campaign_service.execution import (
@@ -42,8 +42,8 @@ from tests.unit.test_compat_121_autonomous_strategy import NOW as R121_NOW, empt
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from redagent_platform.orchestration.contracts import (
-    R123CampaignWorkflowInput,
-    r123_workflow_request_sha256,
+    ClosedLoopCampaignWorkflowInput,
+    closed_loop_workflow_request_sha256,
 )
 
 
@@ -266,7 +266,7 @@ def _snapshot() -> CanonicalAuthoritySnapshot:
         quota_reference="quota-r123",
         quota_available=True,
         runner_id="runner-r123",
-        runner_workload_identity="spiffe://redagent.test/runner/compat_123",
+        runner_workload_identity="spiffe://redagent.test/runner/r123",
         runner_ready=True,
         reservation_id="reservation-r123",
         lease_id="lease-r123",
@@ -328,7 +328,7 @@ def test_start_resolves_current_authority_generates_identities_and_commits_once(
     provider = AuthorityProvider(_snapshot())
     planner = Planner(_material())
     store = Store()
-    service = R123CampaignStartService(
+    service = CampaignStartService(
         CampaignContextResolver(provider), planner, store, Identities()
     )
 
@@ -345,7 +345,7 @@ def test_start_resolves_current_authority_generates_identities_and_commits_once(
     assert command.strategy_record_id == "strategy-record-server-generated"
     assert command.strategy_revision_id == "plan-server-generated"
     assert command.roe_id == "roe-r123-v1"
-    expected = R123CampaignWorkflowInput(
+    expected = ClosedLoopCampaignWorkflowInput(
         "1.0",
         "tenant-r123",
         "campaign-server-generated",
@@ -355,13 +355,13 @@ def test_start_resolves_current_authority_generates_identities_and_commits_once(
         1,
         3,
     )
-    assert command.workflow_request_sha256 == r123_workflow_request_sha256(expected)
+    assert command.workflow_request_sha256 == closed_loop_workflow_request_sha256(expected)
 
 
 def test_start_denial_or_planning_binding_drift_never_writes() -> None:
     denied_store = Store()
     denied_planner = Planner(_material())
-    denied = R123CampaignStartService(
+    denied = CampaignStartService(
         CampaignContextResolver(AuthorityProvider(None)),
         denied_planner,
         denied_store,
@@ -372,7 +372,7 @@ def test_start_denial_or_planning_binding_drift_never_writes() -> None:
     assert denied_planner.calls == [] and denied_store.commands == []
 
     drift_store = Store()
-    drift = R123CampaignStartService(
+    drift = CampaignStartService(
         CampaignContextResolver(AuthorityProvider(_snapshot())),
         Planner(replace(_material(), target_sha256="f" * 64)),
         drift_store,
@@ -408,7 +408,7 @@ def test_concrete_planner_runs_canonical_r119_r121_and_envelope_owners() -> None
         engagement_id="engagement-a",
         target_id="target-a",
     )
-    planner = R119R121CampaignStartPlanner(FactsOwner(), AuthorizationOwner())
+    planner = DeterministicCampaignStartPlanner(FactsOwner(), AuthorizationOwner())
 
     material = asyncio.run(
         planner.prepare(
@@ -461,9 +461,9 @@ def test_local_concrete_planning_and_policy_authorization_owners_build_bound_mat
         engagement_id="engagement-a",
         target_id="target-a",
     )
-    planner = R119R121CampaignStartPlanner(
-        LocalR123PlanningFactsOwner(ROOT),
-        PolicyBoundR123AuthorizationOwner(
+    planner = DeterministicCampaignStartPlanner(
+        LocalCampaignPlanningFactsOwner(ROOT),
+        PolicyBoundCampaignAuthorizationOwner(
             Ed25519PrivateKey.generate(),
             signing_key_id="r123-policy-boundary-key",
         ),
@@ -482,6 +482,6 @@ def test_local_concrete_planning_and_policy_authorization_owners_build_bound_mat
 
 
 def test_local_planning_owner_rejects_expired_signed_promotions_before_planning() -> None:
-    owner = LocalR123PlanningFactsOwner(ROOT)
+    owner = LocalCampaignPlanningFactsOwner(ROOT)
     with pytest.raises(ValueError, match="promotion_expired"):
         asyncio.run(owner.read(_request(), _snapshot(), now=NOW))

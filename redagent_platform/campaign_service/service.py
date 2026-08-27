@@ -37,11 +37,12 @@ from redagent_platform.campaign_service.execution import (
     ReconciliationState,
     SafetyEnvelopeV1,
 )
+from redagent_platform.campaign_service import detection_feedback as detection_feedback_contracts
 from redagent_platform.campaign_service.strategy import decide_strategy
 from redagent_platform.campaign_service.registry import closed_execution_registry
 from redagent_platform.campaign_service.repository import (
     CampaignTransitionResult,
-    R123CampaignRepository,
+    CampaignRepository,
     StartCampaignCommand,
 )
 from redagent_platform.campaign_service.resolver import (
@@ -62,15 +63,15 @@ from redagent_platform.runner_service.contracts import (
 from redagent_platform.runner_service.repository import RunnerRepository
 from redagent_platform.persistence.models import metadata
 from redagent_platform.persistence.repository import ControlPlaneRepository, IdempotencyConflict
-from redagent_platform.runner_service.compat_123_dispatch import (
+from redagent_platform.runner_service.campaign_dispatch import (
     AdapterTerminalReceipt,
-    R123AdapterRequest,
+    CampaignAdapterRequest,
 )
 from redagent_platform.orchestration.contracts import (
     CONTRACT_SCHEMA_VERSION,
-    R123CampaignWorkflowInput,
-    deterministic_r123_campaign_workflow_id,
-    r123_workflow_request_sha256,
+    ClosedLoopCampaignWorkflowInput,
+    deterministic_closed_loop_campaign_workflow_id,
+    closed_loop_workflow_request_sha256,
 )
 
 
@@ -139,7 +140,7 @@ class EffectDispatchCommand:
 @dataclass(frozen=True, slots=True)
 class EffectReconciliationCommand:
     effect_command: EffectDispatchCommand
-    request: R123AdapterRequest
+    request: CampaignAdapterRequest
     request_sha256: str
     runner_id: str
     workload_identity: str
@@ -148,7 +149,7 @@ class EffectReconciliationCommand:
     def __post_init__(self) -> None:
         if not isinstance(self.effect_command, EffectDispatchCommand):
             raise ValueError("effect_reconciliation_command_invalid")
-        if not isinstance(self.request, R123AdapterRequest):
+        if not isinstance(self.request, CampaignAdapterRequest):
             raise ValueError("effect_reconciliation_request_invalid")
         _sha256("effect_reconciliation_request_sha256", self.request_sha256)
         _required("effect_reconciliation_runner_id", self.runner_id, 100)
@@ -267,10 +268,10 @@ class ManifestV2Issuer(Protocol):
 
 
 class EffectDispatcher(Protocol):
-    async def dispatch(self, request: R123AdapterRequest) -> AdapterTerminalReceipt: ...
+    async def dispatch(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt: ...
 
     async def lookup(
-        self, request: R123AdapterRequest
+        self, request: CampaignAdapterRequest
     ) -> AdapterTerminalReceipt | None: ...
 
 
@@ -475,11 +476,11 @@ class PostgresEffectTransitionStore:
 
     def _repository(
         self, session: object, command: EffectDispatchCommand, phase: str
-    ) -> R123CampaignRepository:
+    ) -> CampaignRepository:
         if self._tenant_id is not None and command.tenant_id != self._tenant_id:
             raise ValueError("effect_store_tenant_mismatch")
         suffix = hashlib.sha256(command.effect_id.encode()).hexdigest()[:12]
-        return R123CampaignRepository(
+        return CampaignRepository(
             session,
             tenant_id=command.tenant_id,
             actor_user_id=self._actor_user_id,
@@ -534,7 +535,7 @@ class PostgresEffectResultOwner:
             raise ValueError("effect_result_owner_receipt_invalid")
         suffix = hashlib.sha256(command.effect_id.encode()).hexdigest()[:12]
         async with self._sessions() as session, session.begin():
-            await R123CampaignRepository(
+            await CampaignRepository(
                 session,
                 tenant_id=command.tenant_id,
                 actor_user_id=self._actor_user_id,
@@ -615,7 +616,7 @@ class PostgresManifestV2Issuer:
         ).hexdigest()[:32]
         idempotency_key = f"r123-manifest-{stable}"
         async with self._sessions() as session, session.begin():
-            campaign_repo = R123CampaignRepository(
+            campaign_repo = CampaignRepository(
                 session,
                 tenant_id=tenant_id,
                 actor_user_id=self._actor_user_id,
@@ -636,7 +637,7 @@ class PostgresManifestV2Issuer:
                 tenant_id=tenant_id,
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"r123-manifest-job-{stable[:12]}",
-            ).create_r123_runner_job(
+            ).create_runner_job(
                 campaign_id=context.campaign_id,
                 strategy_revision_id=context.strategy_revision_id,
                 effect_id=command.effect_id,
@@ -773,7 +774,7 @@ class EffectAmbiguityPersistenceError(RuntimeError):
     """Primary ambiguity owner failed; the Activity owner must persist the fallback."""
 
 
-class R123EffectCoordinator:
+class CampaignEffectCoordinator:
     """Coordinates one effect while PostgreSQL remains the only transition writer."""
 
     def __init__(
@@ -837,7 +838,7 @@ class R123EffectCoordinator:
             receipt = await self._dispatcher.lookup(reconciliation.request)
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001
             receipt = None
         if receipt is None:
             return await self._store.lookup_unavailable(
@@ -957,23 +958,23 @@ class R123EffectCoordinator:
             try:
                 # CRITICAL: replay only the same receipt; reconciliation never redispatches.
                 await asyncio.shield(confirm_exact_receipt())
-            except BaseException:
+            except BaseException:  # noqa: BLE001
                 try:
                     await asyncio.shield(schedule_lookup_retry())
-                except BaseException:
+                except BaseException:  # noqa: BLE001
                     pass
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001
             try:
                 # IMPORTANT: one exact replay resolves confirmation response loss.
                 return await confirm_exact_receipt()
             except asyncio.CancelledError:
                 try:
                     await asyncio.shield(schedule_lookup_retry())
-                except BaseException:
+                except BaseException:  # noqa: BLE001
                     pass
                 raise
-            except Exception:
+            except Exception:  # noqa: BLE001
                 return await schedule_lookup_retry()
 
     async def dispatch(self, command: EffectDispatchCommand, *, now: datetime) -> object:
@@ -1111,7 +1112,7 @@ class R123EffectCoordinator:
             try:
                 # CRITICAL: replay only the same receipt; never redispatch after adapter acceptance.
                 await asyncio.shield(confirm_exact_receipt())
-            except BaseException:
+            except BaseException:  # noqa: BLE001
                 await self._record_ambiguity(
                     command,
                     expected_claim_version=dispatching_version,
@@ -1120,7 +1121,7 @@ class R123EffectCoordinator:
                     preserve=exc,
                 )
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001
             try:
                 # IMPORTANT: one exact replay resolves commit-response loss idempotently.
                 return await confirm_exact_receipt()
@@ -1181,7 +1182,7 @@ class CampaignStartRequest:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class R124AuthorizedResource:
+class CampaignCoreAuthorizedResource:
     """Canonical resource projected as a non-identifying operator selection."""
 
     resource_id: str
@@ -1210,10 +1211,10 @@ class R124AuthorizedResource:
             _required("r124_resource_parent", self.parent_id, 200)
 
 
-class R124AuthorizedOptionOwner(Protocol):
+class CampaignCoreAuthorizedOptionOwner(Protocol):
     async def list_engagements(
         self, *, tenant_id: str, principal_id: str, now: datetime
-    ) -> tuple[R124AuthorizedResource, ...]: ...
+    ) -> tuple[CampaignCoreAuthorizedResource, ...]: ...
 
     async def list_targets(
         self,
@@ -1222,10 +1223,10 @@ class R124AuthorizedOptionOwner(Protocol):
         principal_id: str,
         engagement_id: str,
         now: datetime,
-    ) -> tuple[R124AuthorizedResource, ...]: ...
+    ) -> tuple[CampaignCoreAuthorizedResource, ...]: ...
 
 
-class R124CampaignStarter(Protocol):
+class CampaignCoreStarter(Protocol):
     async def replay(self, **values: object) -> object | None: ...
 
     async def start(
@@ -1238,7 +1239,7 @@ class R124CampaignStarter(Protocol):
     ) -> object: ...
 
 
-class R124CampaignPresentationOwner(Protocol):
+class CampaignCorePresentationOwner(Protocol):
     async def list_campaigns(self, **values: object) -> dict[str, object]: ...
 
     async def read_campaign(self, **values: object) -> dict[str, object]: ...
@@ -1248,19 +1249,19 @@ class R124CampaignPresentationOwner(Protocol):
     async def list_attention(self, **values: object) -> dict[str, object]: ...
 
 
-class R124EtagConflict(RuntimeError):
+class CampaignCoreEtagConflict(RuntimeError):
     """The recovery mutation no longer targets the current aggregate revision."""
 
 
-class R124CreateDisabled(RuntimeError):
+class CampaignCoreCreateDisabled(RuntimeError):
     """Normal campaign creation is disabled while recovery/read paths remain active."""
 
 
-class R124CampaignRecoveryOwner(Protocol):
+class CampaignCoreRecoveryOwner(Protocol):
     async def recover(self, **values: object) -> object: ...
 
 
-class R124CampaignCoreService:
+class CampaignCoreService:
     """Resolve operator selections and delegate once to the canonical compat_123 start owner."""
 
     _OBJECTIVES = {
@@ -1274,11 +1275,11 @@ class R124CampaignCoreService:
 
     def __init__(
         self,
-        options: R124AuthorizedOptionOwner,
-        starter: R124CampaignStarter,
+        options: CampaignCoreAuthorizedOptionOwner,
+        starter: CampaignCoreStarter,
         *,
-        presentation: R124CampaignPresentationOwner | None = None,
-        recovery: R124CampaignRecoveryOwner | None = None,
+        presentation: CampaignCorePresentationOwner | None = None,
+        recovery: CampaignCoreRecoveryOwner | None = None,
         create_enabled: bool = True,
     ) -> None:
         self._options = options
@@ -1360,7 +1361,7 @@ class R124CampaignCoreService:
             now=now,
         )
         del engagement, target
-        resource = R124AuthorizedResource(
+        resource = CampaignCoreAuthorizedResource(
             resource_id="tier1_passive",
             label="Tier 1 passive",
             revision="1",
@@ -1399,7 +1400,7 @@ class R124CampaignCoreService:
         if replay is not None:
             return self._start_response(replay)
         if not self._create_enabled:
-            raise R124CreateDisabled("r124_campaign_create_disabled")
+            raise CampaignCoreCreateDisabled("r124_campaign_create_disabled")
         engagement, target = await self._resolve_pair(
             tenant_id=tenant_id,
             principal_id=principal_id,
@@ -1411,7 +1412,7 @@ class R124CampaignCoreService:
         objective_contract = self._OBJECTIVES.get(objective)
         if objective_contract is None:
             raise ValueError("objective_unsupported")
-        risk_resource = R124AuthorizedResource(
+        risk_resource = CampaignCoreAuthorizedResource(
             resource_id="tier1_passive",
             label="Tier 1 passive",
             revision="1",
@@ -1419,7 +1420,7 @@ class R124CampaignCoreService:
             eligible=True,
             unavailable_reason=None,
         )
-        if getattr(intent, "risk_profile", None) != _r124_binding(
+        if getattr(intent, "risk_profile", None) != _campaign_core_binding(
             tenant_id, "risk", risk_resource
         ):
             raise ValueError("risk_profile_unsupported")
@@ -1488,7 +1489,7 @@ class R124CampaignCoreService:
             raise ValueError("r124_recovery_action_invalid")
         if len(reason) < 10 or len(reason) > 500:
             raise ValueError("r124_recovery_reason_invalid")
-        sequence = _r124_etag_revision(campaign_id, expected_etag)
+        sequence = _campaign_core_etag_revision(campaign_id, expected_etag)
         key = _required_value("r124_recovery_idempotency", idempotency_key, 200)
         stable = hashlib.sha256(
             f"{tenant_id}\x1f{campaign_id}\x1f{action}\x1f{key}".encode()
@@ -1541,7 +1542,7 @@ class R124CampaignCoreService:
             }
         }
 
-    def _presentation_owner(self) -> R124CampaignPresentationOwner:
+    def _presentation_owner(self) -> CampaignCorePresentationOwner:
         if self._presentation is None:
             raise RuntimeError("r124_campaign_presentation_unavailable")
         return self._presentation
@@ -1554,7 +1555,7 @@ class R124CampaignCoreService:
         engagement_binding: str,
         target_binding: str,
         now: datetime,
-    ) -> tuple[R124AuthorizedResource, R124AuthorizedResource]:
+    ) -> tuple[CampaignCoreAuthorizedResource, CampaignCoreAuthorizedResource]:
         engagement = await self._resolve_engagement(
             tenant_id=tenant_id,
             principal_id=principal_id,
@@ -1589,7 +1590,7 @@ class R124CampaignCoreService:
         principal_id: str,
         binding: str,
         now: datetime,
-    ) -> R124AuthorizedResource:
+    ) -> CampaignCoreAuthorizedResource:
         resources = await self._options.list_engagements(
             tenant_id=tenant_id,
             principal_id=principal_id,
@@ -1605,16 +1606,16 @@ class R124CampaignCoreService:
 
     @staticmethod
     def _resolve(
-        resources: tuple[R124AuthorizedResource, ...],
+        resources: tuple[CampaignCoreAuthorizedResource, ...],
         *,
         tenant_id: str,
         kind: str,
         binding: str,
         error: str,
-    ) -> R124AuthorizedResource:
+    ) -> CampaignCoreAuthorizedResource:
         matches = [
             resource for resource in resources
-            if _r124_binding(tenant_id, kind, resource) == binding
+            if _campaign_core_binding(tenant_id, kind, resource) == binding
         ]
         if len(matches) != 1:
             raise ValueError(error)
@@ -1622,7 +1623,7 @@ class R124CampaignCoreService:
 
     @staticmethod
     def _page(
-        resources: tuple[R124AuthorizedResource, ...],
+        resources: tuple[CampaignCoreAuthorizedResource, ...],
         *,
         tenant_id: str,
         kind: str,
@@ -1645,7 +1646,7 @@ class R124CampaignCoreService:
         return {
             "data": [
                 {
-                    "binding": _r124_binding(tenant_id, kind, resource),
+                    "binding": _campaign_core_binding(tenant_id, kind, resource),
                     "label": resource.label,
                     "revision": resource.revision,
                     "freshness": resource.freshness,
@@ -1658,8 +1659,8 @@ class R124CampaignCoreService:
         }
 
 
-def _r124_binding(
-    tenant_id: str, kind: str, resource: R124AuthorizedResource
+def _campaign_core_binding(
+    tenant_id: str, kind: str, resource: CampaignCoreAuthorizedResource
 ) -> str:
     material = "\x1f".join((
         _required_value("r124_binding_tenant", tenant_id, 64),
@@ -1703,10 +1704,13 @@ class CampaignStartMaterial:
             "approval_receipt_id",
         ):
             _required(f"campaign_start_material_{name}", getattr(self, name), 100)
-        if self.context_schema != "redagent.r119-decision-context/v1":
+        if self.context_schema == "redagent.r119-decision-context/v1":
+            if self.decision_schema != "redagent.r121-strategy-receipt/v1":
+                raise ValueError("campaign_start_decision_schema_invalid")
+        elif not detection_feedback_contracts.detection_campaign_schema_pair_is_valid(
+            self.context_schema, self.decision_schema
+        ):
             raise ValueError("campaign_start_context_schema_invalid")
-        if self.decision_schema != "redagent.r121-strategy-receipt/v1":
-            raise ValueError("campaign_start_decision_schema_invalid")
         for name in (
             "target_sha256", "objective_sha256", "context_sha256", "decision_sha256",
             "plan_sha256", "proposal_ceiling_sha256", "approval_receipt_sha256",
@@ -1729,6 +1733,7 @@ class CampaignPlanningFacts:
     snapshot: DecisionContextSnapshotV1
     authority: AuthorityContextV1
     projections: tuple[ProjectedTool, ...]
+    detection_adaptation: detection_feedback_contracts.DetectionAdaptationRequestV1 | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -1737,6 +1742,13 @@ class CampaignPlanningFacts:
             or not isinstance(self.projections, tuple)
             or not self.projections
             or not all(isinstance(item, ProjectedTool) for item in self.projections)
+            or (
+                self.detection_adaptation is not None
+                and not isinstance(
+                    self.detection_adaptation,
+                    detection_feedback_contracts.DetectionAdaptationRequestV1,
+                )
+            )
         ):
             raise ValueError("campaign_planning_facts_invalid")
 
@@ -1779,7 +1791,7 @@ class CampaignAuthorizationOwner(Protocol):
     ) -> CampaignAuthorizationMaterial: ...
 
 
-class R119R121CampaignStartPlanner:
+class DeterministicCampaignStartPlanner:
     """Run the accepted compat_119/compat_121 decision and bind its output to the envelope owner."""
 
     def __init__(
@@ -1850,6 +1862,7 @@ class R119R121CampaignStartPlanner:
             signals=StrategySignalsV1(),
             model_proposal=None,
             now=now,
+            detection_adaptation=facts.detection_adaptation,
         )
         if receipt.outcome is not StrategyOutcome.SELECT or plan is None:
             raise RuntimeError(f"campaign_strategy_not_executable:{receipt.reason}")
@@ -2021,7 +2034,7 @@ class PostgresCampaignStartStore:
                 _sha256("r124_start_request_sha256", request_sha256)
                 await session.execute(
                     text("SELECT pg_advisory_xact_lock(:lock_key)"),
-                    {"lock_key": _r124_idempotency_lock(tenant_key, key)},
+                    {"lock_key": _campaign_core_idempotency_lock(tenant_key, key)},
                 )
                 records = metadata.tables["idempotency_records"]
                 prior = (
@@ -2037,8 +2050,8 @@ class PostgresCampaignStartStore:
                     )
                 ).mappings().one_or_none()
                 if prior is not None:
-                    return _r124_start_replay(prior, request_sha256=request_sha256)
-            result = await R123CampaignRepository(
+                    return _campaign_core_start_replay(prior, request_sha256=request_sha256)
+            result = await CampaignRepository(
                 session,
                 tenant_id=tenant_key,
                 actor_user_id=actor_key,
@@ -2084,7 +2097,7 @@ class PostgresCampaignStartStore:
         async with self._sessions() as session, session.begin():
             await session.execute(
                 text("SELECT pg_advisory_xact_lock(:lock_key)"),
-                {"lock_key": _r124_idempotency_lock(tenant_key, key)},
+                {"lock_key": _campaign_core_idempotency_lock(tenant_key, key)},
             )
             prior = (
                 await session.execute(
@@ -2095,12 +2108,12 @@ class PostgresCampaignStartStore:
                     )
                 )
             ).mappings().one_or_none()
-        return None if prior is None else _r124_start_replay(
+        return None if prior is None else _campaign_core_start_replay(
             prior, request_sha256=request_sha256
         )
 
 
-class R123CampaignStartService:
+class CampaignStartService:
     def __init__(
         self,
         resolver: CampaignContextResolver,
@@ -2157,10 +2170,10 @@ class R123CampaignStartService:
             != material.objective_sha256
         ):
             raise ValueError("campaign_start_material_authority_mismatch")
-        workflow_id = deterministic_r123_campaign_workflow_id(
+        workflow_id = deterministic_closed_loop_campaign_workflow_id(
             request.tenant_id, campaign_id
         )
-        workflow_request = R123CampaignWorkflowInput(
+        workflow_request = ClosedLoopCampaignWorkflowInput(
             CONTRACT_SCHEMA_VERSION,
             request.tenant_id,
             campaign_id,
@@ -2196,7 +2209,7 @@ class R123CampaignStartService:
             approval_receipt_sha256=material.approval_receipt_sha256,
             envelope_core_sha256=material.envelope_core_sha256,
             envelope_sha256=material.envelope_sha256,
-            workflow_request_sha256=r123_workflow_request_sha256(workflow_request),
+            workflow_request_sha256=closed_loop_workflow_request_sha256(workflow_request),
         )
         store_values: dict[str, object] = {
             "tenant_id": request.tenant_id,
@@ -2224,14 +2237,14 @@ class R123CampaignStartService:
         return await self._store.replay(**values)
 
 
-def _r124_idempotency_lock(tenant_id: str, idempotency_key: str) -> int:
+def _campaign_core_idempotency_lock(tenant_id: str, idempotency_key: str) -> int:
     digest = hashlib.sha256(
         f"{tenant_id}\x1fcampaign.r124.start\x1f{idempotency_key}".encode()
     ).digest()
     return int.from_bytes(digest[:8], "big", signed=True)
 
 
-def _r124_start_replay(
+def _campaign_core_start_replay(
     prior: object, *, request_sha256: str
 ) -> CampaignTransitionResult:
     if prior["request_hash"] != request_sha256:
@@ -2249,24 +2262,24 @@ def _r124_start_replay(
     )
 
 
-def _r124_etag_revision(campaign_id: str, etag: str) -> int:
+def _campaign_core_etag_revision(campaign_id: str, etag: str) -> int:
     prefix = f'"{campaign_id}:'
     if not etag.startswith(prefix) or not etag.endswith('"'):
-        raise R124EtagConflict("r124_etag_conflict")
+        raise CampaignCoreEtagConflict("r124_etag_conflict")
     raw_revision = etag[len(prefix):-1]
     if not raw_revision.isdigit():
-        raise R124EtagConflict("r124_etag_conflict")
+        raise CampaignCoreEtagConflict("r124_etag_conflict")
     revision = int(raw_revision)
     if revision < 1:
-        raise R124EtagConflict("r124_etag_conflict")
+        raise CampaignCoreEtagConflict("r124_etag_conflict")
     return revision
 
 
 def _adapter_request(
     command: EffectDispatchCommand, signed: SignedJobManifestV2
-) -> R123AdapterRequest:
+) -> CampaignAdapterRequest:
     manifest = signed.manifest
-    return R123AdapterRequest(
+    return CampaignAdapterRequest(
         tenant_id=command.tenant_id,
         capability_id=manifest.capability_id,
         capability_revision=manifest.capability_revision,

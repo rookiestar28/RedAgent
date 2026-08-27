@@ -8,3 +8,28 @@ requires-python = ">=3.11"
 testpaths = ["tests/unit"]
 pythonpath = ["."]
 addopts = "-q --strict-config --strict-markers"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "BLE001", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"redagent_platform.api._route_support" = { msg = "The re-export barrel was removed; import from the owning module." }
+
+[tool.mypy]
+python_version = "3.11"
+show_error_codes = true
+warn_unused_configs = true
+warn_redundant_casts = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "redagent_platform.active_policy",
+    "redagent_platform.campaign_service.contracts",
+    "redagent_platform.policy_service.*",
+]
+disallow_untyped_defs = true

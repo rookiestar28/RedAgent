@@ -12,6 +12,7 @@ from redagent_platform.campaign_service.contracts import (
     ConditionalSuccessorV1,
     CollectionState,
     DecisionContextSnapshotV1,
+    DetectionCorrelationDispositionV1,
     InvalidationState,
     ModelStrategyProposalV1,
     ObservationKind,
@@ -28,6 +29,10 @@ from redagent_platform.campaign_service.contracts import (
     _validated_plan_revision,
     _validated_strategy_receipt,
     canonical_sha256,
+)
+from redagent_platform.campaign_service.detection_feedback import (
+    DetectionAdaptationRequestV1,
+    evaluate_detection_adaptation,
 )
 
 
@@ -51,6 +56,7 @@ def decide_strategy(
     signals: StrategySignalsV1,
     model_proposal: ModelStrategyProposalV1 | None,
     now: datetime,
+    detection_adaptation: DetectionAdaptationRequestV1 | None = None,
 ) -> tuple[StrategyDecisionReceiptV1, PlanRevisionV1 | None]:
     """Return one deterministic receipt and at most one width-1/depth-2 plan."""
     _validate_inputs(
@@ -62,6 +68,22 @@ def decide_strategy(
     )
     semantics = {item.binding_key.capability_id: item for item in snapshot.semantics}
     projected = {item.source_capability_id: item for item in projections}
+    detection_disposition = None
+    coverage_matrix_sha256 = None
+    detection_flagged: frozenset[str] = frozenset()
+    if detection_adaptation is not None:
+        evaluated_disposition, detection_flagged = evaluate_detection_adaptation(
+            request=detection_adaptation,
+            observations=snapshot.detection_observations,
+            capability_ids=frozenset(semantics),
+            tenant_id=objective.tenant_id,
+            engagement_id=objective.engagement_id,
+            now=now,
+        )
+        # IMPORTANT: an enabled adaptation policy with no signal remains the exact legacy v1 path.
+        if snapshot.detection_observations:
+            detection_disposition = evaluated_disposition
+            coverage_matrix_sha256 = detection_adaptation.coverage_matrix.matrix_sha256
     preferred = (
         _ZAP if objective.kind is StrategyObjectiveKind.HTTP_POSTURE else _NUCLEI
     )
@@ -79,6 +101,8 @@ def decide_strategy(
             reason=signals.stop_reason,
             selected=None,
             successor=None,
+            detection_disposition=detection_disposition,
+            coverage_matrix_sha256=coverage_matrix_sha256,
         )
         _validate_model_proposal(model_proposal, receipt)
         _validate_strategy_result_structure(receipt=receipt, plan=None)
@@ -97,6 +121,8 @@ def decide_strategy(
             reason=terminal_reason,
             selected=None,
             successor=None,
+            detection_disposition=detection_disposition,
+            coverage_matrix_sha256=coverage_matrix_sha256,
         )
         _validate_model_proposal(model_proposal, receipt)
         _validate_strategy_result_structure(receipt=receipt, plan=None)
@@ -114,6 +140,8 @@ def decide_strategy(
             reason="budget_exhausted",
             selected=None,
             successor=None,
+            detection_disposition=detection_disposition,
+            coverage_matrix_sha256=coverage_matrix_sha256,
         )
         _validate_model_proposal(model_proposal, receipt)
         _validate_strategy_result_structure(receipt=receipt, plan=None)
@@ -131,6 +159,8 @@ def decide_strategy(
             reason="insufficient_observation",
             selected=None,
             successor=None,
+            detection_disposition=detection_disposition,
+            coverage_matrix_sha256=coverage_matrix_sha256,
         )
         _validate_model_proposal(model_proposal, receipt)
         _validate_strategy_result_structure(receipt=receipt, plan=None)
@@ -148,6 +178,8 @@ def decide_strategy(
             reason="objective_satisfied",
             selected=None,
             successor=None,
+            detection_disposition=detection_disposition,
+            coverage_matrix_sha256=coverage_matrix_sha256,
         )
         _validate_model_proposal(model_proposal, receipt)
         _validate_strategy_result_structure(receipt=receipt, plan=None)
@@ -155,6 +187,77 @@ def decide_strategy(
 
     preferred_inconclusive = _has_inconclusive_outcome(snapshot, preferred)
     other_inconclusive = _has_inconclusive_outcome(snapshot, other)
+    if detection_disposition is not None and detection_disposition.correlated:
+        inconclusive = {
+            capability_id
+            for capability_id, present in (
+                (preferred, preferred_inconclusive),
+                (other, other_inconclusive),
+            )
+            if present
+        }
+        viable = tuple(
+            capability_id
+            for capability_id in (preferred, other)
+            if capability_id not in detection_flagged | inconclusive
+        )
+        if not viable:
+            receipt = _build_receipt(
+                objective=objective,
+                snapshot=snapshot,
+                authority=authority,
+                semantics=semantics,
+                preferred=preferred,
+                outcome=StrategyOutcome.STOP,
+                matched_rule="confirmed-detection-adaptation",
+                reason="detection_adaptation_human_review_required",
+                selected=None,
+                successor=None,
+                detection_disposition=detection_disposition,
+                coverage_matrix_sha256=coverage_matrix_sha256,
+            )
+            _validate_model_proposal(model_proposal, receipt)
+            _validate_strategy_result_structure(receipt=receipt, plan=None)
+            return receipt, None
+        original_preferred = preferred
+        preferred = viable[0]
+        other = _NUCLEI if preferred == _ZAP else _ZAP
+        # IMPORTANT: the detection decision is made before campaign start; it selects one
+        # pre-authorized primary and never emits a stale runtime-only successor condition.
+        successor_capability = None
+        selected_binding = canonical_sha256(semantics[preferred].binding_key)
+        receipt = _build_receipt(
+            objective=objective,
+            snapshot=snapshot,
+            authority=authority,
+            semantics=semantics,
+            preferred=preferred,
+            outcome=StrategyOutcome.SELECT,
+            matched_rule="confirmed-detection-adaptation",
+            reason=(
+                "primary_switched_after_confirmed_detection"
+                if preferred != original_preferred
+                else "primary_selected_with_confirmed_detection"
+            ),
+            selected=selected_binding,
+            successor=successor_capability,
+            ineligible_reason="confirmed_detection",
+            detection_disposition=detection_disposition,
+            coverage_matrix_sha256=coverage_matrix_sha256,
+        )
+        _validate_model_proposal(model_proposal, receipt)
+        return _build_selected_plan(
+            objective=objective,
+            snapshot=snapshot,
+            authority=authority,
+            projected=projected,
+            semantics=semantics,
+            budget=budget,
+            receipt=receipt,
+            preferred=preferred,
+            successor_capability=successor_capability,
+            successor_condition="fresh_inconclusive_or_insufficient_observation",
+        )
     if preferred_inconclusive and other_inconclusive:
         receipt = _build_receipt(
             objective=objective,
@@ -167,6 +270,8 @@ def decide_strategy(
             reason="all_candidates_inconclusive",
             selected=None,
             successor=None,
+            detection_disposition=detection_disposition,
+            coverage_matrix_sha256=coverage_matrix_sha256,
         )
         _validate_model_proposal(model_proposal, receipt)
         _validate_strategy_result_structure(receipt=receipt, plan=None)
@@ -213,18 +318,46 @@ def decide_strategy(
             if successor_already_inconclusive
             else "successor_budget_unavailable"
         ),
+        detection_disposition=detection_disposition,
+        coverage_matrix_sha256=coverage_matrix_sha256,
     )
     _validate_model_proposal(model_proposal, receipt)
+    return _build_selected_plan(
+        objective=objective,
+        snapshot=snapshot,
+        authority=authority,
+        projected=projected,
+        semantics=semantics,
+        budget=budget,
+        receipt=receipt,
+        preferred=preferred,
+        successor_capability=successor_capability,
+        successor_condition=(
+            "explicit_corroboration"
+            if objective.require_corroboration
+            else "fresh_inconclusive_or_insufficient_observation"
+        ),
+    )
 
+
+def _build_selected_plan(
+    *,
+    objective: StrategyObjectiveV1,
+    snapshot: DecisionContextSnapshotV1,
+    authority: AuthorityContextV1,
+    projected: dict[str, ProjectedTool],
+    semantics: dict[str, PromotedCapabilitySemanticsV1],
+    budget: StrategyBudgetV1,
+    receipt: StrategyDecisionReceiptV1,
+    preferred: str,
+    successor_capability: str | None,
+    successor_condition: str,
+) -> tuple[StrategyDecisionReceiptV1, PlanRevisionV1]:
     primary = _action(semantics[preferred], projected[preferred], budget)
     successor = None
     if successor_capability is not None:
         successor = ConditionalSuccessorV1(
-            condition=(
-                "explicit_corroboration"
-                if objective.require_corroboration
-                else "fresh_inconclusive_or_insufficient_observation"
-            ),
+            condition=successor_condition,
             action=_action(
                 semantics[successor_capability], projected[successor_capability], budget
             ),
@@ -269,6 +402,7 @@ def validate_strategy_result(
     now: datetime,
     receipt: StrategyDecisionReceiptV1,
     plan: PlanRevisionV1 | None,
+    detection_adaptation: DetectionAdaptationRequestV1 | None = None,
 ) -> None:
     """Recompute from current trusted inputs and reject any stale or forged result."""
     try:
@@ -281,6 +415,7 @@ def validate_strategy_result(
             signals=signals,
             model_proposal=None,
             now=now,
+            detection_adaptation=detection_adaptation,
         )
     except ValueError as exc:
         raise ValueError("r121_result_not_current") from exc
@@ -363,14 +498,17 @@ def _validate_inputs(
         raise ValueError("r121_snapshot_from_future")
     if canonical_sha256(snapshot.semantics) != snapshot.capability_section_sha256:
         raise ValueError("r121_snapshot_capability_digest_mismatch")
-    expected_trusted = canonical_sha256({
+    trusted_body: dict[str, object] = {
         "collection_state": snapshot.collection_state,
         "observations": snapshot.observations,
         "evidence_facts": snapshot.evidence_facts,
         "finding_facts": snapshot.finding_facts,
         "dispositions": snapshot.dispositions,
         "conflicts": snapshot.conflicts,
-    })
+    }
+    if snapshot.detection_observations:
+        trusted_body["detection_observations"] = snapshot.detection_observations
+    expected_trusted = canonical_sha256(trusted_body)
     if expected_trusted != snapshot.trusted_section_sha256:
         raise ValueError("r121_snapshot_trusted_digest_mismatch")
     semantics = {item.binding_key.capability_id: item for item in snapshot.semantics}
@@ -510,6 +648,8 @@ def _build_receipt(
     selected: str | None,
     successor: str | None,
     ineligible_reason: str = "not_actionable",
+    detection_disposition: DetectionCorrelationDispositionV1 | None = None,
+    coverage_matrix_sha256: str | None = None,
 ) -> StrategyDecisionReceiptV1:
     dispositions = tuple(sorted((
         CandidateDispositionV1(
@@ -537,7 +677,11 @@ def _build_receipt(
         for capability_id, sidecar in semantics.items()
     ), key=lambda item: item.binding_key_sha256))
     values: dict[str, object] = {
-        "schema_version": "redagent.r121-strategy-receipt/v1",
+        "schema_version": (
+            "redagent.detection-strategy-receipt/v2"
+            if snapshot.detection_observations
+            else "redagent.r121-strategy-receipt/v1"
+        ),
         "objective": objective,
         "objective_sha256": canonical_sha256(objective),
         "snapshot": snapshot,
@@ -556,10 +700,16 @@ def _build_receipt(
         "matched_rule": matched_rule,
         "reason": reason,
         "selected_binding_sha256": selected,
+        "detection_disposition": detection_disposition,
+        "coverage_matrix_sha256": coverage_matrix_sha256,
     }
+    digest_body = dict(values)
+    if values["schema_version"] == "redagent.r121-strategy-receipt/v1":
+        digest_body.pop("detection_disposition")
+        digest_body.pop("coverage_matrix_sha256")
     return _validated_strategy_receipt(
         **values,
-        receipt_sha256=canonical_sha256(values),
+        receipt_sha256=canonical_sha256(digest_body),
     )
 
 

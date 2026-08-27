@@ -34,6 +34,7 @@ if str(ROOT) not in sys.path:
 from redagent_platform.gate_lease import ValidationLease, ValidationLeaseError  # noqa: E402
 
 POLICY = ROOT / "config" / "opa" / "policy"
+DETECTION_POLICY = ROOT / "config" / "validation" / "detection-feedback"
 RUNTIME = ROOT / ".local" / "redagent" / "opa"
 IMAGE_LOCK = ROOT / "config" / "opa-conformance-image.json"
 BUNDLE_SERVER_IMAGE_LOCK = ROOT / "config" / "opa-bundle-server-image.json"
@@ -594,7 +595,11 @@ def opa_fixture_lease() -> Iterator[None]:
         raise ConformanceError("opa_fixture_already_active") from exc
 
 
-def _run_docker(*arguments: str, timeout: int) -> subprocess.CompletedProcess[str]:
+def _run_docker(
+    *arguments: str,
+    timeout: int,
+    input_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         _docker_command(*arguments),
         cwd=_workspace_root(),
@@ -602,6 +607,7 @@ def _run_docker(*arguments: str, timeout: int) -> subprocess.CompletedProcess[st
         check=False,
         capture_output=True,
         text=True,
+        input=input_text,
         timeout=timeout,
     )
 
@@ -639,23 +645,141 @@ def legacy_fixture_status() -> dict[str, Any]:
     }
 
 
-def _opa(*arguments: str) -> subprocess.CompletedProcess[str]:
+def _opa_source(
+    source: Path,
+    *arguments: str,
+    input_text: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    try:
+        resolved = source.resolve(strict=True)
+    except OSError as exc:
+        raise ConformanceError("opa_policy_source_invalid") from exc
+    if resolved not in {POLICY.resolve(strict=True), DETECTION_POLICY.resolve(strict=True)}:
+        raise ConformanceError("opa_policy_source_invalid")
     command = [
         "run", f"--platform={OPA_PLATFORM}", "--rm", "--network=none", "--read-only",
         "--cap-drop=ALL", "--security-opt=no-new-privileges",
-        f"--user={_container_user()}", "-v", f"{POLICY}:/policy:ro", _image(), *arguments,
+        f"--user={_container_user()}",
     ]
-    result = _run_docker(*command, timeout=180)
+    if input_text is not None:
+        command.append("--interactive")
+    command.extend(("-v", f"{resolved}:/policy:ro", _image(), *arguments))
+    result = _run_docker(*command, timeout=180, input_text=input_text)
     if result.returncode:
         raise ConformanceError(f"opa_command_failed:{arguments[0]}:{result.returncode}")
     return result
+
+
+def _opa(*arguments: str) -> subprocess.CompletedProcess[str]:
+    return _opa_source(POLICY, *arguments)
 
 
 def validate() -> dict[str, Any]:
     _opa("fmt", "--fail", "/policy")
     _opa("check", "--strict", "/policy")
     tests = _opa("test", "--fail-on-empty", "--coverage", "/policy")
-    return {"ok": True, "validated": ["fmt", "check", "test"], "coverage_output": bool(tests.stdout.strip())}
+    # IMPORTANT: detection correlation is a separate non-authorizing validation policy; never
+    # add it to the immutable compat_099 authorization bundle without a separately reviewed revision.
+    _opa_source(DETECTION_POLICY, "fmt", "--fail", "/policy")
+    _opa_source(DETECTION_POLICY, "check", "--strict", "/policy")
+    detection_tests = _opa_source(
+        DETECTION_POLICY, "test", "--fail-on-empty", "--coverage", "/policy"
+    )
+    differential_cases = _validate_detection_correlation_differential()
+    return {
+        "ok": True,
+        "validated": ["fmt", "check", "test", "detection-correlation", "differential"],
+        "coverage_output": bool(tests.stdout.strip()),
+        "detection_coverage_output": bool(detection_tests.stdout.strip()),
+        "detection_differential_cases": differential_cases,
+    }
+
+
+def _validate_detection_correlation_differential() -> int:
+    """Compare Python and Rego results for every frozen synthetic detection case."""
+    from datetime import datetime, timedelta, timezone
+
+    from redagent_platform.campaign_service.contracts import (
+        Confidence,
+        DetectionSeverity,
+        TelemetrySource,
+        TypedReferenceV1,
+    )
+    from redagent_platform.campaign_service.detection_feedback import (
+        build_detection_correlation_opa_input,
+        correlate_detection_observations,
+        ingest_detection_observation,
+        promote_detection_observation_by_human,
+    )
+
+    corpus_path = ROOT / "tests" / "fixtures" / "detection_feedback" / "frozen-corpus.json"
+    corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+    now = datetime(2026, 8, 27, 8, 0, tzinfo=timezone.utc)
+    cases = corpus.get("cases") if isinstance(corpus, dict) else None
+    if not isinstance(cases, list) or not cases:
+        raise ConformanceError("detection_differential_corpus_invalid")
+    for case in cases:
+        if not isinstance(case, dict):
+            raise ConformanceError("detection_differential_corpus_invalid")
+        age = timedelta(seconds=float(case["age_seconds"]))
+        observation = ingest_detection_observation(
+            observation_id=str(case["case_id"]),
+            tenant_id="tenant-a",
+            engagement_id="engagement-a",
+            correlation_key=str(case["correlation_key"]),
+            capability_id="zap-controlled-runtime",
+            source=TelemetrySource.SIEM,
+            source_system="owned-purple-fixture",
+            attack_technique_id=str(case["attack_technique_id"]),
+            attack_version="18.0",
+            confidence=Confidence(str(case["confidence"])),
+            severity=DetectionSeverity.MEDIUM,
+            evidence_ref=TypedReferenceV1(
+                kind="evidence", reference_id=f"evidence-{case['case_id']}", sha256="a" * 64
+            ),
+            observed_at=now - age,
+            ingested_at=now - age + timedelta(seconds=1),
+            expires_at=now + timedelta(minutes=1),
+        )
+        if case["disposition"] == "confirmed":
+            observation = promote_detection_observation_by_human(
+                observation=observation,
+                review_ref=TypedReferenceV1(
+                    kind="human-review",
+                    reference_id=f"review-{case['case_id']}",
+                    sha256="b" * 64,
+                ),
+                reviewed_at=now - age + timedelta(seconds=2),
+            )
+        keyword = {
+            "observations": (observation,),
+            "tenant_id": "tenant-a",
+            "engagement_id": "engagement-a",
+            "correlation_key": str(case["correlation_key"]),
+            "attack_technique_id": str(case["attack_technique_id"]),
+            "now": now,
+            "max_age_seconds": 300,
+        }
+        python_result = correlate_detection_observations(**keyword).correlated
+        opa_input = build_detection_correlation_opa_input(**keyword)
+        evaluated = _opa_source(
+            DETECTION_POLICY,
+            "eval",
+            "--format=json",
+            "--data",
+            "/policy",
+            "--stdin-input",
+            "data.redagent.detection_correlation.correlated",
+            input_text=json.dumps(opa_input, sort_keys=True, separators=(",", ":")),
+        )
+        try:
+            payload = json.loads(evaluated.stdout)
+            opa_result = payload["result"][0]["expressions"][0]["value"]
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            raise ConformanceError("detection_differential_result_invalid") from exc
+        if not isinstance(opa_result, bool) or opa_result is not python_result:
+            raise ConformanceError(f"detection_differential_mismatch:{case['case_id']}")
+    return len(cases)
 
 
 def _build() -> dict[str, Any]:

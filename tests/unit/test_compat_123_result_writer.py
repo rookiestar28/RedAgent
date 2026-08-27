@@ -7,8 +7,8 @@ import pytest
 
 from redagent_platform.campaign_service.registry import closed_execution_registry
 from redagent_platform.finding_operations.contracts import CoverageState
-from redagent_platform.runner_service.compat_123_dispatch import R123AdapterRequest
-from redagent_platform.runner_service.compat_123_result import (
+from redagent_platform.runner_service.campaign_dispatch import CampaignAdapterRequest
+from redagent_platform.runner_service.campaign_result import (
     AdapterResultMaterialV1,
     PostgresAdapterResultWriter,
     _advance_retests,
@@ -69,10 +69,10 @@ class _RetestRepository:
         self.completed.append(values)
 
 
-def _request(capability_key: str = "nuclei-trusted-runtime@2") -> R123AdapterRequest:
+def _request(capability_key: str = "nuclei-trusted-runtime@2") -> CampaignAdapterRequest:
     binding = closed_execution_registry()[capability_key]
     suffix = "successor" if capability_key.startswith("nuclei") else "primary"
-    return R123AdapterRequest(
+    return CampaignAdapterRequest(
         tenant_id="tenant-r123",
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
@@ -97,7 +97,7 @@ def test_result_writer_rejects_actor_identifier_that_cannot_fit_evidence_owner()
             _Dependency(),
             _Dependency(),
             actor_user_id="a" * 65,
-            kms_reference="kms:compat_123:test",
+            kms_reference="kms:r123:test",
         )
 
 

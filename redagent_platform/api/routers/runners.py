@@ -6,20 +6,24 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    AsyncSession,
+from fastapi import (
     Depends,
-    PaginationQuery,
     Request,
-    RequestGuard,
-    RunnerExecutionListResponse,
-    RunnerManifestListResponse,
-    RunnerRegistrationListResponse,
-    RunnerRepository,
-    RunnerStatusResponse,
+)
+from redagent_platform.api.contracts import RequestGuard
+from redagent_platform.api.router_primitives import (
     _list_response,
     _probe_limit,
 )
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.api.schemas.runners import (
+    RunnerExecutionListResponse,
+    RunnerManifestListResponse,
+    RunnerRegistrationListResponse,
+    RunnerStatusResponse,
+)
+from redagent_platform.runner_service.repository import RunnerRepository
+from sqlalchemy.ext.asyncio import AsyncSession
 
 def _runner_repository(session: AsyncSession, guard: RequestGuard) -> RunnerRepository:
     return RunnerRepository(

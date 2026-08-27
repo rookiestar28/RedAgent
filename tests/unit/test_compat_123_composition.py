@@ -10,15 +10,15 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from redagent_platform.campaign_service.activity_coordinator import R123ActivityCoordinator
+from redagent_platform.campaign_service.activity_coordinator import CampaignActivityCoordinator
 from redagent_platform.campaign_service.composition import (
-    R123WorkerReadinessFactsOwner,
-    build_r123_activity_coordinator,
-    build_stock_r123_api_service_factory,
-    build_stock_r123_coordinator_factory,
-    build_stock_r123_relay_factory,
-    build_stock_r123_activity_coordinator,
-    load_r123_signing_identity,
+    CampaignWorkerReadinessFactsOwner,
+    build_campaign_activity_coordinator,
+    build_stock_campaign_api_service_factory,
+    build_stock_campaign_coordinator_factory,
+    build_stock_campaign_relay_factory,
+    build_stock_campaign_activity_coordinator,
+    load_campaign_signing_identity,
 )
 from redagent_platform.evidence_service.backends import LocalAppendOnlyBackend
 
@@ -53,7 +53,7 @@ class _TemporalProbe:
 
 
 def test_enabled_r123_composition_builds_one_closed_owner_path() -> None:
-    coordinator = build_r123_activity_coordinator(
+    coordinator = build_campaign_activity_coordinator(
         Path(__file__).resolve().parents[2],
         _Sessions(),
         resolver=_Dependency(),
@@ -65,11 +65,11 @@ def test_enabled_r123_composition_builds_one_closed_owner_path() -> None:
         signing_key_id="r123-worker-key",
     )
 
-    assert isinstance(coordinator, R123ActivityCoordinator)
+    assert isinstance(coordinator, CampaignActivityCoordinator)
 
 
 def test_stock_composition_owns_resolver_envelope_and_runner_identity_reads() -> None:
-    coordinator = build_stock_r123_activity_coordinator(
+    coordinator = build_stock_campaign_activity_coordinator(
         Path(__file__).resolve().parents[2],
         _Sessions(),
         readiness_facts_owner=_Dependency(),
@@ -78,7 +78,7 @@ def test_stock_composition_owns_resolver_envelope_and_runner_identity_reads() ->
         signing_key_id="r123-worker-key",
     )
 
-    assert isinstance(coordinator, R123ActivityCoordinator)
+    assert isinstance(coordinator, CampaignActivityCoordinator)
 
 
 def test_r123_signing_identity_is_repo_local_ed25519_and_all_or_nothing(
@@ -92,7 +92,7 @@ def test_r123_signing_identity_is_repo_local_ed25519_and_all_or_nothing(
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption(),
     ))
-    loaded, key_id = load_r123_signing_identity(tmp_path, {
+    loaded, key_id = load_campaign_signing_identity(tmp_path, {
         "REDAGENT_R123_SIGNING_KEY_FILE": str(key_path),
         "REDAGENT_R123_SIGNING_KEY_ID": "r123-local-signing-v1",
     })
@@ -106,11 +106,11 @@ def test_r123_signing_identity_is_repo_local_ed25519_and_all_or_nothing(
     assert key_id == "r123-local-signing-v1"
 
     with pytest.raises(ValueError, match="r123_signing_configuration_incomplete"):
-        load_r123_signing_identity(tmp_path, {
+        load_campaign_signing_identity(tmp_path, {
             "REDAGENT_R123_SIGNING_KEY_FILE": str(key_path),
         })
     with pytest.raises(ValueError, match="r123_signing_key_outside_workspace"):
-        load_r123_signing_identity(tmp_path, {
+        load_campaign_signing_identity(tmp_path, {
             "REDAGENT_R123_SIGNING_KEY_FILE": str(tmp_path.parent / "outside.pem"),
             "REDAGENT_R123_SIGNING_KEY_ID": "r123-local-signing-v1",
         })
@@ -119,10 +119,10 @@ def test_r123_signing_identity_is_repo_local_ed25519_and_all_or_nothing(
 def test_stock_worker_factory_is_disabled_without_touching_dependencies_and_closed_when_enabled(
     tmp_path: Path,
 ) -> None:
-    assert build_stock_r123_coordinator_factory(tmp_path, {}) is None
+    assert build_stock_campaign_coordinator_factory(tmp_path, {}) is None
 
     with pytest.raises(ValueError, match="r123_signing_configuration_incomplete"):
-        build_stock_r123_coordinator_factory(
+        build_stock_campaign_coordinator_factory(
             tmp_path,
             {"REDAGENT_STRATEGY_LOOP_MODE": "two_capability"},
         )
@@ -134,7 +134,7 @@ def test_stock_worker_factory_is_disabled_without_touching_dependencies_and_clos
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption(),
     ))
-    factory = build_stock_r123_coordinator_factory(tmp_path, {
+    factory = build_stock_campaign_coordinator_factory(tmp_path, {
         "REDAGENT_STRATEGY_LOOP_MODE": "two_capability",
         "REDAGENT_R123_SIGNING_KEY_FILE": str(key_path),
         "REDAGENT_R123_SIGNING_KEY_ID": "r123-local-signing-v1",
@@ -144,7 +144,7 @@ def test_stock_worker_factory_is_disabled_without_touching_dependencies_and_clos
     })
     assert callable(factory)
 
-    relay_factory = build_stock_r123_relay_factory({
+    relay_factory = build_stock_campaign_relay_factory({
         "REDAGENT_STRATEGY_LOOP_MODE": "two_capability",
     })
     assert callable(relay_factory)
@@ -160,7 +160,7 @@ def test_worker_readiness_requires_current_promotions_before_image_identity_prob
     tmp_path: Path,
 ) -> None:
     calls: list[str] = []
-    owner = R123WorkerReadinessFactsOwner(
+    owner = CampaignWorkerReadinessFactsOwner(
         Path(__file__).resolve().parents[2],
         _Sessions(),
         LocalAppendOnlyBackend(tmp_path / "evidence", profile="synthetic-local"),
@@ -208,7 +208,7 @@ def test_stock_image_probe_reads_only_current_revision_two_lock_keys(monkeypatch
         return subprocess.CompletedProcess(argv, 0, expected[tag] + "\n", "")
 
     monkeypatch.setattr(subprocess, "run", inspect_image)
-    owner = R123WorkerReadinessFactsOwner(
+    owner = CampaignWorkerReadinessFactsOwner(
         root,
         _Sessions(),
         LocalAppendOnlyBackend(root / ".tmp" / "r123-readiness", profile="synthetic-local"),
@@ -228,7 +228,7 @@ def test_stock_image_probe_reads_only_current_revision_two_lock_keys(monkeypatch
 
 def test_readiness_tracks_temporal_health_loss_and_recovery(tmp_path: Path) -> None:
     temporal = _TemporalProbe(False)
-    owner = R123WorkerReadinessFactsOwner(
+    owner = CampaignWorkerReadinessFactsOwner(
         Path(__file__).resolve().parents[2],
         _Sessions(),
         LocalAppendOnlyBackend(tmp_path / "evidence", profile="synthetic-local"),
@@ -263,7 +263,7 @@ def test_stock_api_factory_composes_dynamic_tenant_safe_qualification_services(
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption(),
     ))
-    factory = build_stock_r123_api_service_factory(tmp_path, {
+    factory = build_stock_campaign_api_service_factory(tmp_path, {
         "REDAGENT_STRATEGY_LOOP_MODE": "two_capability",
         "REDAGENT_R123_SIGNING_KEY_FILE": str(key_path),
         "REDAGENT_R123_SIGNING_KEY_ID": "r123-local-signing-v1",

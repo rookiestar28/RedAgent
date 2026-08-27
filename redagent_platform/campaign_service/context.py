@@ -14,6 +14,7 @@ from redagent_platform.campaign_service.contracts import (
     CollectionState,
     Completeness,
     DecisionContextSnapshotV1,
+    DetectionObservationV1,
     EvidenceFactV1,
     FactConflictV1,
     FactDispositionV1,
@@ -29,6 +30,9 @@ from redagent_platform.campaign_service.contracts import (
     TruthValue,
     _validated_decision_context_snapshot,
     canonical_sha256,
+)
+from redagent_platform.campaign_service.detection_feedback import (
+    validate_detection_snapshot_inputs,
 )
 from redagent_platform.nuclei_service.contracts import (
     CURRENT_R105_HTTP_HEADER_BUNDLE_SHA256,
@@ -388,6 +392,7 @@ def build_decision_context_snapshot(
     current_observations: tuple[ObservationFactV1, ...],
     current_evidence_facts: tuple[EvidenceFactV1, ...],
     current_finding_facts: tuple[FindingFactV1, ...],
+    current_detection_observations: tuple[DetectionObservationV1, ...] = (),
     prior_complete_snapshot: DecisionContextSnapshotV1 | None,
     snapshot_at: datetime,
 ) -> DecisionContextSnapshotV1:
@@ -395,7 +400,12 @@ def build_decision_context_snapshot(
     _validate_window(snapshot_at, snapshot_at + timedelta(microseconds=1))
     if not isinstance(collection_state, CollectionState):
         raise ValueError("r119_collection_state_invalid")
-    current_lanes = (current_observations, current_evidence_facts, current_finding_facts)
+    current_lanes = (
+        current_observations,
+        current_evidence_facts,
+        current_finding_facts,
+        current_detection_observations,
+    )
     if collection_state is CollectionState.COMPLETE and prior_complete_snapshot is not None:
         raise ValueError("r119_complete_collection_has_prior_snapshot")
     if collection_state is CollectionState.FAILED and any(current_lanes):
@@ -437,6 +447,7 @@ def build_decision_context_snapshot(
     prior_observations: tuple[ObservationFactV1, ...] = ()
     prior_evidence: tuple[EvidenceFactV1, ...] = ()
     prior_findings: tuple[FindingFactV1, ...] = ()
+    prior_detection_observations: tuple[DetectionObservationV1, ...] = ()
     if prior_complete_snapshot is not None:
         if prior_complete_snapshot.collection_state is not CollectionState.COMPLETE:
             raise ValueError("r119_prior_snapshot_not_complete")
@@ -451,6 +462,7 @@ def build_decision_context_snapshot(
         prior_observations = prior_complete_snapshot.observations
         prior_evidence = prior_complete_snapshot.evidence_facts
         prior_findings = prior_complete_snapshot.finding_facts
+        prior_detection_observations = prior_complete_snapshot.detection_observations
 
     binding_by_sha = {
         canonical_sha256(item.binding_key): item for item in semantics_sorted
@@ -490,6 +502,14 @@ def build_decision_context_snapshot(
             prior_complete_snapshot.conflicts if prior_complete_snapshot is not None else ()
         ),
     )
+    detection_observations = validate_detection_snapshot_inputs(
+        current=current_detection_observations,
+        prior=prior_detection_observations,
+        tenant_id=authority.tenant_id,
+        engagement_id=authority.engagement_id,
+        capability_ids=frozenset(indexed_semantics),
+        snapshot_at=snapshot_at,
+    )
     dispositions = tuple(
         sorted(
             (*evidence_dispositions, *finding_dispositions, *observation_dispositions),
@@ -497,7 +517,7 @@ def build_decision_context_snapshot(
         )
     )
 
-    trusted_body = {
+    trusted_body: dict[str, object] = {
         "collection_state": collection_state,
         "observations": observations,
         "evidence_facts": evidence_sorted,
@@ -505,10 +525,17 @@ def build_decision_context_snapshot(
         "dispositions": dispositions,
         "conflicts": conflicts,
     }
+    if detection_observations:
+        trusted_body["detection_observations"] = detection_observations
+    snapshot_schema_version = (
+        "redagent.detection-decision-context/v2"
+        if detection_observations
+        else "redagent.r119-decision-context/v1"
+    )
     trusted_section_sha256 = canonical_sha256(trusted_body)
     snapshot_sha256 = canonical_sha256(
         {
-            "schema_version": "redagent.r119-decision-context/v1",
+            "schema_version": snapshot_schema_version,
             "snapshot_at": snapshot_at,
             "authority_sha256": authority_sha256,
             "target_mapping_sha256": target_mapping.mapping_sha256,
@@ -517,7 +544,7 @@ def build_decision_context_snapshot(
         }
     )
     return _validated_decision_context_snapshot(
-        schema_version="redagent.r119-decision-context/v1",
+        schema_version=snapshot_schema_version,
         snapshot_at=snapshot_at,
         authority_sha256=authority_sha256,
         target_mapping_sha256=target_mapping.mapping_sha256,
@@ -528,6 +555,7 @@ def build_decision_context_snapshot(
         finding_facts=findings_sorted,
         dispositions=dispositions,
         conflicts=conflicts,
+        detection_observations=detection_observations,
         capability_section_sha256=capability_section_sha256,
         trusted_section_sha256=trusted_section_sha256,
         snapshot_sha256=snapshot_sha256,

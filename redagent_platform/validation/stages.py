@@ -19,7 +19,7 @@ import time
 from typing import Mapping
 
 
-STAGE_REGISTRY_REVISION = "r118-stages-v1"
+STAGE_REGISTRY_REVISION = "r134-stages-v2"
 DEFAULT_STAGE_CONFIG = Path(__file__).resolve().parents[2] / "config/validation/r118-stage-registry.json"
 PIP_BOOTSTRAP_FIXED_ENVIRONMENT = {
     "GIT_CONFIG_NOSYSTEM": "1",
@@ -62,6 +62,20 @@ DEFAULT_STAGE_CONTRACT: tuple[Stage, ...] = (
     Stage("agent-skills", ("python", "scripts/validate_agent_skills.py", "--json"), ("G1", "G2"), 300),
     Stage("changed-file-hooks", ("python", "-m", "pre_commit", "run", "--files"), ("G0", "G1"), 600),
     Stage("pre-commit-all-files", ("python", "-m", "pre_commit", "run", "--all-files", "--show-diff-on-failure"), ("G2",), 1200),
+    Stage(
+        "backend-lint",
+        ("python", "-m", "redagent_platform.validation.static_analysis", "lint"),
+        ("G1", "G2"),
+        300,
+        _BACKEND_G1_PLANES,
+    ),
+    Stage(
+        "backend-typecheck",
+        ("python", "-m", "redagent_platform.validation.static_analysis", "typecheck"),
+        ("G1", "G2"),
+        600,
+        _BACKEND_G1_PLANES,
+    ),
     Stage("backend-tests", ("python", "-m", "pytest", "tests"), ("G1", "G2"), 2400, _BACKEND_G1_PLANES),
     Stage("frontend-install", ("npm", "ci", "--audit=false"), ("G1", "G2"), 900, _FRONTEND_G1_PLANES),
     Stage("frontend-audit", ("npm", "audit", "--audit-level=moderate"), ("G2",), 300),

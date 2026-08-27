@@ -11,13 +11,13 @@ from redagent_platform.deployment_hardening import (
     RunnerNetworkPolicy,
     StorageComponent,
     TLSPlan,
-    build_r032_private_topology,
+    build_private_topology,
     validate_hardened_deployment,
 )
 
 
 def test_r032_private_topology_is_accepted():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
 
     validation = validate_hardened_deployment(topology)
 
@@ -26,7 +26,7 @@ def test_r032_private_topology_is_accepted():
 
 
 def test_public_internet_exposure_is_blocked_by_default():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
     changed = _replace_topology(
         topology,
         exposure=DeploymentExposure.PUBLIC_INTERNET,
@@ -47,7 +47,7 @@ def test_public_internet_exposure_is_blocked_by_default():
 
 
 def test_tls_and_admin_access_are_required():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
     changed = _replace_topology(
         topology,
         tls=TLSPlan(
@@ -77,7 +77,7 @@ def test_tls_and_admin_access_are_required():
 
 
 def test_backup_restore_and_retention_require_evidence():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
     changed = _replace_topology(
         topology,
         backup_restore=BackupRestorePlan(
@@ -105,7 +105,7 @@ def test_backup_restore_and_retention_require_evidence():
 
 
 def test_runner_network_policy_and_emergency_shutdown_are_required():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
     changed = _replace_topology(
         topology,
         runner_network=RunnerNetworkPolicy(
@@ -135,7 +135,7 @@ def test_runner_network_policy_and_emergency_shutdown_are_required():
 
 
 def test_all_required_least_privilege_components_are_required():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
     without_queue = tuple(boundary for boundary in topology.least_privilege_boundaries if boundary.component is not StorageComponent.QUEUE)
     changed = _replace_topology(topology, least_privilege_boundaries=without_queue)
 
@@ -146,7 +146,7 @@ def test_all_required_least_privilege_components_are_required():
 
 
 def test_least_privilege_boundary_requires_identity_scope_encryption_and_evidence():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
     weak_boundary = LeastPrivilegeBoundary(
         component=StorageComponent.SENSITIVE_VALUE_STORE,
         dedicated_identity=False,
@@ -167,7 +167,7 @@ def test_least_privilege_boundary_requires_identity_scope_encryption_and_evidenc
 
 
 def test_rollback_and_disaster_recovery_must_be_tested():
-    topology = build_r032_private_topology()
+    topology = build_private_topology()
     changed = _replace_topology(
         topology,
         rollback_dr=RollbackDisasterRecoveryPlan(

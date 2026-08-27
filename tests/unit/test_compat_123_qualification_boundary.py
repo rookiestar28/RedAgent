@@ -5,12 +5,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from redagent_platform.api.runtime import validate_r123_api_runtime_dependencies
+from redagent_platform.api.runtime import validate_api_runtime_dependencies
 from redagent_platform.campaign_service.qualification import (
     OwnedLoopbackQualificationIntentV1,
     QualificationFixtureBinding,
-    R123QualificationService,
-    R123StatusService,
+    CampaignQualificationService,
+    CampaignStatusService,
 )
 from redagent_platform.campaign_service.registry import (
     ExecutionReadinessFacts,
@@ -33,7 +33,7 @@ class FixtureOwner:
             fixture_id="owned-loopback-http-first-slice",
             engagement_id="engagement-server-owned",
             target_id="target-server-owned",
-            campaign_name="compat_123 owned-loopback qualification",
+            campaign_name="R123 owned-loopback qualification",
         )
 
 
@@ -114,7 +114,7 @@ def test_qualification_intent_is_closed_and_contains_no_runtime_identity_surface
 def test_qualification_service_resolves_server_fixture_and_never_accepts_runtime_ids() -> None:
     fixtures = FixtureOwner()
     starter = StartService()
-    service = R123QualificationService(fixtures, starter)
+    service = CampaignQualificationService(fixtures, starter)
     intent = OwnedLoopbackQualificationIntentV1(
         fixture_id="owned-loopback-http-first-slice",
         objective_kind="security_header_assertion",
@@ -139,7 +139,7 @@ def test_qualification_service_resolves_server_fixture_and_never_accepts_runtime
         principal_id="principal-from-auth",
         engagement_id="engagement-server-owned",
         target_id="target-server-owned",
-        name="compat_123 owned-loopback qualification",
+        name="R123 owned-loopback qualification",
         objective_kind="security_header_assertion",
         header_code="x-content-type-options",
         require_corroboration=True,
@@ -154,7 +154,7 @@ def test_qualification_service_resolves_server_fixture_and_never_accepts_runtime
 def test_status_service_is_default_disabled_and_enabled_mode_fails_closed() -> None:
     disabled_owner = FactsOwner(_facts(database_ready=False))
     disabled = asyncio.run(
-        R123StatusService(StrategyLoopMode.DISABLED, disabled_owner).read(now=NOW)
+        CampaignStatusService(StrategyLoopMode.DISABLED, disabled_owner).read(now=NOW)
     )
     assert disabled.ready is True
     assert disabled.execution_enabled is False
@@ -163,7 +163,7 @@ def test_status_service_is_default_disabled_and_enabled_mode_fails_closed() -> N
 
     missing_owner = FactsOwner(_facts(evidence_ready=False))
     missing = asyncio.run(
-        R123StatusService(StrategyLoopMode.TWO_CAPABILITY, missing_owner).read(now=NOW)
+        CampaignStatusService(StrategyLoopMode.TWO_CAPABILITY, missing_owner).read(now=NOW)
     )
     assert missing.ready is False
     assert missing.execution_enabled is False
@@ -172,7 +172,7 @@ def test_status_service_is_default_disabled_and_enabled_mode_fails_closed() -> N
 
     temporal_owner = FactsOwner(_facts(temporal_ready=False))
     temporal = asyncio.run(
-        R123StatusService(StrategyLoopMode.TWO_CAPABILITY, temporal_owner).read(now=NOW)
+        CampaignStatusService(StrategyLoopMode.TWO_CAPABILITY, temporal_owner).read(now=NOW)
     )
     assert temporal.ready is False
     assert temporal.execution_enabled is False
@@ -181,30 +181,30 @@ def test_status_service_is_default_disabled_and_enabled_mode_fails_closed() -> N
 
 def test_status_service_rejects_enabled_mode_without_current_facts_owner() -> None:
     with pytest.raises(ValueError, match="r123_status_facts_owner_required"):
-        R123StatusService(StrategyLoopMode.TWO_CAPABILITY, None)
+        CampaignStatusService(StrategyLoopMode.TWO_CAPABILITY, None)
 
 
 def test_api_runtime_mode_cannot_silently_drift_from_composed_r123_services() -> None:
-    disabled = R123StatusService(StrategyLoopMode.DISABLED, None)
-    assert validate_r123_api_runtime_dependencies(
+    disabled = CampaignStatusService(StrategyLoopMode.DISABLED, None)
+    assert validate_api_runtime_dependencies(
         {},
         qualification_service=None,
         status_service=disabled,
     ) is StrategyLoopMode.DISABLED
     with pytest.raises(ValueError, match="r123_api_runtime_services_required"):
-        validate_r123_api_runtime_dependencies(
+        validate_api_runtime_dependencies(
             {"REDAGENT_STRATEGY_LOOP_MODE": "two_capability"},
             qualification_service=None,
             status_service=disabled,
         )
     with pytest.raises(ValueError, match="r123_api_runtime_services_forbidden_when_disabled"):
-        validate_r123_api_runtime_dependencies(
+        validate_api_runtime_dependencies(
             {},
             qualification_service=object(),
             status_service=disabled,
         )
-    enabled = R123StatusService(StrategyLoopMode.TWO_CAPABILITY, FactsOwner(_facts()))
-    assert validate_r123_api_runtime_dependencies(
+    enabled = CampaignStatusService(StrategyLoopMode.TWO_CAPABILITY, FactsOwner(_facts()))
+    assert validate_api_runtime_dependencies(
         {"REDAGENT_STRATEGY_LOOP_MODE": "two_capability"},
         qualification_service=object(),
         status_service=enabled,
@@ -212,10 +212,10 @@ def test_api_runtime_mode_cannot_silently_drift_from_composed_r123_services() ->
 
 
 def test_api_runtime_enabled_mode_accepts_only_an_unambiguous_lifespan_factory() -> None:
-    disabled = R123StatusService(StrategyLoopMode.DISABLED, None)
+    disabled = CampaignStatusService(StrategyLoopMode.DISABLED, None)
     factory = object()
 
-    assert validate_r123_api_runtime_dependencies(
+    assert validate_api_runtime_dependencies(
         {"REDAGENT_STRATEGY_LOOP_MODE": "two_capability"},
         qualification_service=None,
         status_service=disabled,
@@ -223,7 +223,7 @@ def test_api_runtime_enabled_mode_accepts_only_an_unambiguous_lifespan_factory()
         service_factory=factory,
     ) is StrategyLoopMode.TWO_CAPABILITY
     with pytest.raises(ValueError, match="r123_api_runtime_services_ambiguous"):
-        validate_r123_api_runtime_dependencies(
+        validate_api_runtime_dependencies(
             {"REDAGENT_STRATEGY_LOOP_MODE": "two_capability"},
             qualification_service=object(),
             status_service=disabled,
@@ -231,7 +231,7 @@ def test_api_runtime_enabled_mode_accepts_only_an_unambiguous_lifespan_factory()
             service_factory=factory,
         )
     with pytest.raises(ValueError, match="r123_api_runtime_services_forbidden_when_disabled"):
-        validate_r123_api_runtime_dependencies(
+        validate_api_runtime_dependencies(
             {},
             qualification_service=None,
             status_service=disabled,

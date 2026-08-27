@@ -8,17 +8,17 @@ import pytest
 
 from redagent_platform.campaign_service.registry import closed_execution_registry
 from redagent_platform.finding_operations.contracts import CoverageState
-from redagent_platform.nuclei_service.compat_123_adapter import (
-    NucleiR123Adapter,
+from redagent_platform.nuclei_service.campaign_adapter import (
+    NucleiCampaignAdapter,
     NucleiRuntimeReceipt,
 )
-from redagent_platform.runner_service.compat_123_dispatch import R123AdapterRequest
-from redagent_platform.runner_service.compat_123_dispatch import AdapterTerminalReceipt
+from redagent_platform.runner_service.campaign_dispatch import CampaignAdapterRequest
+from redagent_platform.runner_service.campaign_dispatch import AdapterTerminalReceipt
 from redagent_platform.zap_service.contracts import (
     ZAP_ADDON_INVENTORY_COUNT,
     ZAP_ADDON_INVENTORY_SHA256,
 )
-from redagent_platform.zap_service.compat_123_adapter import ZapR123Adapter, ZapRuntimeReceipt
+from redagent_platform.zap_service.campaign_adapter import ZapCampaignAdapter, ZapRuntimeReceipt
 
 
 class ZapTransport:
@@ -87,9 +87,9 @@ class ResultWriter:
             failure_code=None,
         )
 
-def _request(capability_key: str) -> R123AdapterRequest:
+def _request(capability_key: str) -> CampaignAdapterRequest:
     binding = closed_execution_registry()[capability_key]
-    return R123AdapterRequest(
+    return CampaignAdapterRequest(
         tenant_id="tenant-r123",
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
@@ -167,7 +167,7 @@ def _nuclei_receipt(**overrides: object) -> NucleiRuntimeReceipt:
 def test_zap_adapter_uses_fixed_passive_command_and_requires_terminal_completeness() -> None:
     transport = ZapTransport(_zap_receipt())
     writer = ResultWriter()
-    adapter = ZapR123Adapter(transport, writer)
+    adapter = ZapCampaignAdapter(transport, writer)
 
     result = asyncio.run(adapter.dispatch(_request("zap-controlled-runtime@2")))
 
@@ -184,18 +184,18 @@ def test_zap_adapter_uses_fixed_passive_command_and_requires_terminal_completene
     assert json.loads(writer.materials[0].report_safe_content) == _zap_receipt().report_safe_payload
 
     with pytest.raises(ValueError, match="r123_zap_terminal_incomplete"):
-        asyncio.run(ZapR123Adapter(ZapTransport(_zap_receipt(output_complete=False)), ResultWriter()).dispatch(
+        asyncio.run(ZapCampaignAdapter(ZapTransport(_zap_receipt(output_complete=False)), ResultWriter()).dispatch(
             _request("zap-controlled-runtime@2")
         ))
     with pytest.raises(ValueError, match="r123_zap_addon_inventory_mismatch"):
-        asyncio.run(ZapR123Adapter(ZapTransport(_zap_receipt(addon_inventory_count=1)), ResultWriter()).dispatch(
+        asyncio.run(ZapCampaignAdapter(ZapTransport(_zap_receipt(addon_inventory_count=1)), ResultWriter()).dispatch(
             _request("zap-controlled-runtime@2")
         ))
 
 
 def test_nuclei_adapter_uses_fixed_signed_bundle_command_and_forbids_dynamic_features() -> None:
     transport = NucleiTransport(_nuclei_receipt())
-    adapter = NucleiR123Adapter(transport, ResultWriter())
+    adapter = NucleiCampaignAdapter(transport, ResultWriter())
 
     result = asyncio.run(adapter.dispatch(_request("nuclei-trusted-runtime@2")))
 
@@ -213,11 +213,11 @@ def test_nuclei_adapter_uses_fixed_signed_bundle_command_and_forbids_dynamic_fea
     assert "-no-interactsh" in argv
 
     with pytest.raises(ValueError, match="r123_nuclei_bundle_mismatch"):
-        asyncio.run(NucleiR123Adapter(NucleiTransport(_nuclei_receipt(bundle_sha256="f" * 64)), ResultWriter()).dispatch(
+        asyncio.run(NucleiCampaignAdapter(NucleiTransport(_nuclei_receipt(bundle_sha256="f" * 64)), ResultWriter()).dispatch(
             _request("nuclei-trusted-runtime@2")
         ))
     with pytest.raises(ValueError, match="r123_nuclei_terminal_incomplete"):
-        asyncio.run(NucleiR123Adapter(NucleiTransport(_nuclei_receipt(output_complete=False)), ResultWriter()).dispatch(
+        asyncio.run(NucleiCampaignAdapter(NucleiTransport(_nuclei_receipt(output_complete=False)), ResultWriter()).dispatch(
             _request("nuclei-trusted-runtime@2")
         ))
 
@@ -226,11 +226,11 @@ def test_adapter_lookup_is_read_only_and_normalizes_same_terminal_contract() -> 
     zap_transport = ZapTransport(_zap_receipt())
     nuclei_transport = NucleiTransport(_nuclei_receipt())
 
-    zap = asyncio.run(ZapR123Adapter(zap_transport, ResultWriter()).lookup(
+    zap = asyncio.run(ZapCampaignAdapter(zap_transport, ResultWriter()).lookup(
         _request("zap-controlled-runtime@2")
     ))
     nuclei = asyncio.run(
-        NucleiR123Adapter(nuclei_transport, ResultWriter()).lookup(
+        NucleiCampaignAdapter(nuclei_transport, ResultWriter()).lookup(
             _request("nuclei-trusted-runtime@2")
         )
     )
@@ -244,7 +244,7 @@ def test_adapter_lookup_accepts_only_complete_not_applied_status_proof() -> None
     zap_writer = ResultWriter()
     nuclei_writer = ResultWriter()
     zap = asyncio.run(
-        ZapR123Adapter(
+        ZapCampaignAdapter(
             ZapTransport(
                 _zap_receipt(
                     terminal_state="not_applied",
@@ -260,7 +260,7 @@ def test_adapter_lookup_accepts_only_complete_not_applied_status_proof() -> None
         ).lookup(_request("zap-controlled-runtime@2"))
     )
     nuclei = asyncio.run(
-        NucleiR123Adapter(
+        NucleiCampaignAdapter(
             NucleiTransport(
                 _nuclei_receipt(
                     terminal_state="not_applied",
@@ -283,7 +283,7 @@ def test_adapter_preserves_closed_observation_coverage_for_successor_policy() ->
     writer = ResultWriter()
 
     asyncio.run(
-        ZapR123Adapter(
+        ZapCampaignAdapter(
             ZapTransport(_zap_receipt(coverage_state="partial")), writer
         ).dispatch(_request("zap-controlled-runtime@2"))
     )
@@ -291,7 +291,7 @@ def test_adapter_preserves_closed_observation_coverage_for_successor_policy() ->
     assert writer.materials[0].coverage_state is CoverageState.PARTIAL
     with pytest.raises(ValueError, match="r123_zap_coverage_invalid"):
         asyncio.run(
-            ZapR123Adapter(
+            ZapCampaignAdapter(
                 ZapTransport(_zap_receipt(coverage_state="unbounded")), ResultWriter()
             ).dispatch(_request("zap-controlled-runtime@2"))
         )
@@ -301,12 +301,12 @@ def test_adapter_preserves_closed_observation_coverage_for_successor_policy() ->
     ("adapter", "request_key", "error"),
     (
         (
-            ZapR123Adapter(ZapTransport(_zap_receipt(external_contact_count=1)), ResultWriter()),
+            ZapCampaignAdapter(ZapTransport(_zap_receipt(external_contact_count=1)), ResultWriter()),
             "zap-controlled-runtime@2",
             "r123_zap_external_contact_forbidden",
         ),
         (
-            NucleiR123Adapter(
+            NucleiCampaignAdapter(
                 NucleiTransport(_nuclei_receipt(external_contact_count=1)), ResultWriter()
             ),
             "nuclei-trusted-runtime@2",
@@ -327,14 +327,14 @@ def test_adapter_rejects_any_runtime_receipt_reporting_external_contact(
     ("adapter", "request_key", "error"),
     (
         (
-            ZapR123Adapter(
+            ZapCampaignAdapter(
                 ZapTransport(_zap_receipt(effect_id="effect-other")), ResultWriter()
             ),
             "zap-controlled-runtime@2",
             "r123_zap_runtime_binding_mismatch",
         ),
         (
-            NucleiR123Adapter(
+            NucleiCampaignAdapter(
                 NucleiTransport(_nuclei_receipt(invocation_id="invocation-other")),
                 ResultWriter(),
             ),
@@ -359,7 +359,7 @@ def test_adapter_rejects_runtime_receipt_lineage_mismatch(
     ("adapter", "request_key", "error"),
     (
         (
-            ZapR123Adapter(
+            ZapCampaignAdapter(
                 ZapTransport(
                     _zap_receipt(
                         report_safe_payload={
@@ -376,7 +376,7 @@ def test_adapter_rejects_runtime_receipt_lineage_mismatch(
             "r123_zap_report_safe_payload_invalid",
         ),
         (
-            NucleiR123Adapter(
+            NucleiCampaignAdapter(
                 NucleiTransport(
                     _nuclei_receipt(
                         report_safe_payload={

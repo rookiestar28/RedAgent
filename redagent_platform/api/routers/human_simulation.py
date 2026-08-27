@@ -6,31 +6,41 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CampaignApproval,
-    CampaignAuthorization,
+from datetime import timedelta
+from fastapi import (
     Depends,
+    Request,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _match_roe_reference,
+    _now,
+)
+from redagent_platform.api.schemas.human_simulation import (
     HumanSimulationCampaignListResponse,
     HumanSimulationCompileRequest,
     HumanSimulationDashboardResponse,
     HumanSimulationPlanResponse,
-    HumanSimulationRepository,
-    HumanSimulationRepositoryConflict,
     HumanSimulationRunCreateRequest,
     HumanSimulationRunResponse,
     HumanSimulationStopRequest,
-    Request,
-    RequestGuard,
-    _match_roe_reference,
-    _now,
-    certified_campaign,
-    compile_campaign_plan,
-    metadata,
-    select,
-    status,
-    timedelta,
 )
+from redagent_platform.human_simulation.catalog import certified_campaign
+from redagent_platform.human_simulation.compiler import compile_campaign_plan
+from redagent_platform.human_simulation.contracts import (
+    CampaignApproval,
+    CampaignAuthorization,
+)
+from redagent_platform.human_simulation.repository import (
+    HumanSimulationRepository,
+    HumanSimulationRepositoryConflict,
+)
+from redagent_platform.persistence.models import metadata
+from sqlalchemy import select
 
 def _public_human_campaign(campaign) -> dict[str, object]:
     return {"campaign_id": campaign.campaign_id, "purpose": campaign.purpose,

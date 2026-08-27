@@ -96,7 +96,7 @@ class SecretLeaseBroker:
             try:
                 await self.provider.revoke_sync(envelope.provider_lease_reference)
                 revoke_confirmed = True
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # IMPORTANT: an unconfirmed exact revoke remains persisted as revoke_pending.
                 pass
             failure_code = "secret_finalize_failed" if delivered else "secret_delivery_failed"
@@ -111,7 +111,7 @@ class SecretLeaseBroker:
                     correlation_id=correlation_id,
                     occurred_at=request.requested_at,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # IMPORTANT: exact provider revoke was attempted; reconciliation owns ambiguous metadata failure.
                 pass
             raise RuntimeError(failure_code) from exc

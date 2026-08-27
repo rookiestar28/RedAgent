@@ -15,7 +15,7 @@ from redagent_platform.campaign_service.registry import (
 from redagent_platform.campaign_service.repository import CampaignTransitionResult
 from redagent_platform.campaign_service.service import (
     CampaignStartRequest,
-    R123CampaignStartService,
+    CampaignStartService,
 )
 
 
@@ -111,13 +111,13 @@ class QualificationStartReceiptV1:
             raise ValueError("r123_qualification_receipt_state_invalid")
 
 
-class R123QualificationService:
+class CampaignQualificationService:
     """Resolve the fixed fixture then delegate to the canonical compat_123 start service."""
 
     def __init__(
         self,
         fixtures: QualificationFixtureOwner,
-        starter: CampaignStarter | R123CampaignStartService,
+        starter: CampaignStarter | CampaignStartService,
     ) -> None:
         self._fixtures = fixtures
         self._starter = starter
@@ -172,7 +172,7 @@ class StrategyLoopFactsOwner(Protocol):
     async def read(self, *, now: datetime) -> ExecutionReadinessFacts: ...
 
 
-class R123StatusService:
+class CampaignStatusService:
     """Project closed readiness without allowing a disabled path to touch dependencies."""
 
     def __init__(

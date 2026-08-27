@@ -612,7 +612,7 @@ async def _terminate_workflows(client, workflow_ids: list[str], reason: str) -> 
             )
             if exc.status != RPCStatusCode.NOT_FOUND and not already_closed:
                 failures.append(f"{workflow_id}:RPCError:{exc.status.name}")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             failures.append(f"{workflow_id}:{type(exc).__name__}")
     if failures:
         raise AssertionError(f"temporal_test_cleanup_failed:{','.join(failures)}")

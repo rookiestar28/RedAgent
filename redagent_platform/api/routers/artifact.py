@@ -6,31 +6,41 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
+from datetime import timedelta
+from fastapi import (
+    Depends,
+    Request,
+    status,
+)
+from redagent_platform.api.contracts import (
     ApiError,
-    ArtifactAuthorization,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
+    _match_roe_reference,
+    _now,
+)
+from redagent_platform.api.schemas.artifact import (
     ArtifactCancelRequest,
     ArtifactCompileRequest,
     ArtifactDashboardResponse,
-    ArtifactKind,
-    ArtifactPipelineRepository,
     ArtifactPlanResponse,
     ArtifactProfileListResponse,
-    ArtifactRepositoryConflict,
     ArtifactRunCreateRequest,
     ArtifactRunResponse,
-    Depends,
-    Request,
-    RequestGuard,
-    _match_roe_reference,
-    _now,
-    certified_artifact_profiles,
-    compile_artifact_plan,
-    metadata,
-    select,
-    status,
-    timedelta,
 )
+from redagent_platform.artifact_pipeline.compiler import compile_artifact_plan
+from redagent_platform.artifact_pipeline.contracts import (
+    ArtifactAuthorization,
+    ArtifactKind,
+)
+from redagent_platform.artifact_pipeline.profiles import certified_profiles as certified_artifact_profiles
+from redagent_platform.artifact_pipeline.repository import (
+    ArtifactPipelineRepository,
+    ArtifactRepositoryConflict,
+)
+from redagent_platform.persistence.models import metadata
+from sqlalchemy import select
 
 def _public_artifact_profile(profile) -> dict[str, object]:
     return {"profile_id": profile.profile_id, "artifact_kind": profile.artifact_kind.value,

@@ -18,7 +18,7 @@ _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 
 
 @dataclass(frozen=True, slots=True)
-class R123AdapterRequest:
+class CampaignAdapterRequest:
     tenant_id: str
     capability_id: str
     capability_revision: int
@@ -143,12 +143,12 @@ class ClosedAdapter(Protocol):
     adapter_id: str
     adapter_version: str
 
-    async def dispatch(self, request: R123AdapterRequest) -> AdapterTerminalReceipt: ...
+    async def dispatch(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt: ...
 
-    async def lookup(self, request: R123AdapterRequest) -> AdapterTerminalReceipt | None: ...
+    async def lookup(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt | None: ...
 
 
-class ClosedR123Dispatcher:
+class ClosedCampaignDispatcher:
     def __init__(self, adapters: tuple[ClosedAdapter, ...]) -> None:
         if not isinstance(adapters, tuple):
             raise ValueError("r123_adapters_invalid")
@@ -161,14 +161,14 @@ class ClosedR123Dispatcher:
             raise ValueError("r123_adapters_invalid")
         self._adapters = indexed
 
-    async def dispatch(self, request: R123AdapterRequest) -> AdapterTerminalReceipt:
+    async def dispatch(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt:
         binding, adapter = self._resolve(request)
         result = await adapter.dispatch(request)
         if result.invocation_id != request.invocation_id or result.effect_id != request.effect_id:
             raise ValueError("r123_adapter_receipt_binding_mismatch")
         return result
 
-    async def lookup(self, request: R123AdapterRequest) -> AdapterTerminalReceipt | None:
+    async def lookup(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt | None:
         _, adapter = self._resolve(request)
         result = await adapter.lookup(request)
         if result is not None and (
@@ -177,7 +177,7 @@ class ClosedR123Dispatcher:
             raise ValueError("r123_adapter_receipt_binding_mismatch")
         return result
 
-    def _resolve(self, request: R123AdapterRequest) -> tuple[ClosedExecutionBinding, ClosedAdapter]:
+    def _resolve(self, request: CampaignAdapterRequest) -> tuple[ClosedExecutionBinding, ClosedAdapter]:
         binding = _closed_binding(request)
         return binding, self._adapters[(binding.adapter_id, binding.adapter_version)]
 
@@ -185,14 +185,14 @@ class ClosedR123Dispatcher:
 class RunnerLifecycleOwner(Protocol):
     async def begin(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         *,
         occurred_at: datetime,
     ) -> object: ...
 
     async def complete(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         handle: object,
         receipt: AdapterTerminalReceipt,
         *,
@@ -201,7 +201,7 @@ class RunnerLifecycleOwner(Protocol):
 
     async def ambiguity(
         self,
-        request: R123AdapterRequest,
+        request: CampaignAdapterRequest,
         handle: object,
         *,
         failure_code: str,
@@ -210,16 +210,16 @@ class RunnerLifecycleOwner(Protocol):
 
 
 class ClosedDispatcherPort(Protocol):
-    async def dispatch(self, request: R123AdapterRequest) -> AdapterTerminalReceipt: ...
+    async def dispatch(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt: ...
 
-    async def lookup(self, request: R123AdapterRequest) -> AdapterTerminalReceipt | None: ...
+    async def lookup(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt | None: ...
 
 
 class RunnerAmbiguityPersistenceError(RuntimeError):
     """Runner ambiguity persistence failed; campaign ownership must persist fallback state."""
 
 
-class RunnerOwnedR123Dispatcher:
+class RunnerOwnedCampaignDispatcher:
     """Require canonical runner lifecycle ownership around the exact closed adapter."""
 
     def __init__(
@@ -233,7 +233,7 @@ class RunnerOwnedR123Dispatcher:
         self._lifecycle = lifecycle
         self._clock = clock or (lambda: datetime.now(timezone.utc))
 
-    async def dispatch(self, request: R123AdapterRequest) -> AdapterTerminalReceipt:
+    async def dispatch(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt:
         _closed_binding(request)
         occurred_at = self._clock()
         if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
@@ -281,14 +281,14 @@ class RunnerOwnedR123Dispatcher:
             raise
 
     async def lookup(
-        self, request: R123AdapterRequest
+        self, request: CampaignAdapterRequest
     ) -> AdapterTerminalReceipt | None:
         # Read-only reconciliation must not claim a runner lease or advance lifecycle state.
         return await self._dispatcher.lookup(request)
 
 
-def _closed_binding(request: R123AdapterRequest) -> ClosedExecutionBinding:
-    if not isinstance(request, R123AdapterRequest):
+def _closed_binding(request: CampaignAdapterRequest) -> ClosedExecutionBinding:
+    if not isinstance(request, CampaignAdapterRequest):
         raise ValueError("r123_adapter_request_invalid")
     binding = closed_execution_registry().get(request.capability_key)
     if binding is None:
@@ -322,7 +322,7 @@ def _closed_binding(request: R123AdapterRequest) -> ClosedExecutionBinding:
 
 
 def _validate_owned_receipt(
-    request: R123AdapterRequest,
+    request: CampaignAdapterRequest,
     receipt: object,
 ) -> AdapterTerminalReceipt:
     if (

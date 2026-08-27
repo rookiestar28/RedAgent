@@ -8,7 +8,7 @@ from redagent_platform.release_gate import (
     FullGateEvidence,
     MigrationPlanEvidence,
     ProvenanceAttestation,
-    R089ReleaseCandidate,
+    ReleaseQualificationCandidate,
     ReleaseArtifactInventoryItem,
     ReleaseArtifactKind,
     ReleaseGateChecklist,
@@ -19,8 +19,8 @@ from redagent_platform.release_gate import (
     ReviewRecord,
     UserDocTopic,
     UserDocumentationCoverage,
-    build_r034_release_gate_checklist,
-    validate_r089_release_candidate,
+    build_release_gate_checklist,
+    validate_release_qualification_candidate,
     validate_release_gate,
 )
 
@@ -31,7 +31,7 @@ HASH_B = "b" * 64
 
 
 def test_r034_release_gate_baseline_is_accepted():
-    checklist = build_r034_release_gate_checklist()
+    checklist = build_release_gate_checklist()
 
     validation = validate_release_gate(checklist)
 
@@ -40,37 +40,37 @@ def test_r034_release_gate_baseline_is_accepted():
 
 
 def test_open_blocking_item_fails_release_gate():
-    checklist = build_r034_release_gate_checklist()
-    open_item = BlockingItemDisposition(item_id="compat_010", status=BlockingItemStatus.OPEN)
+    checklist = build_release_gate_checklist()
+    open_item = BlockingItemDisposition(item_id="R010", status=BlockingItemStatus.OPEN)
     changed = _replace_checklist(
         checklist,
-        blocking_items=(open_item,) + tuple(item for item in checklist.blocking_items if item.item_id != "compat_010"),
+        blocking_items=(open_item,) + tuple(item for item in checklist.blocking_items if item.item_id != "R010"),
     )
 
     validation = validate_release_gate(changed)
 
     assert validation.accepted is False
-    assert "blocking_item_open:compat_010" in validation.gaps
+    assert "blocking_item_open:R010" in validation.gaps
 
 
 def test_deferred_blocking_item_requires_owner_risk_and_deadline():
-    checklist = build_r034_release_gate_checklist()
-    deferred = BlockingItemDisposition(item_id="compat_011", status=BlockingItemStatus.DEFERRED, owner="", risk="", deadline="")
+    checklist = build_release_gate_checklist()
+    deferred = BlockingItemDisposition(item_id="R011", status=BlockingItemStatus.DEFERRED, owner="", risk="", deadline="")
     changed = _replace_checklist(
         checklist,
-        blocking_items=(deferred,) + tuple(item for item in checklist.blocking_items if item.item_id != "compat_011"),
+        blocking_items=(deferred,) + tuple(item for item in checklist.blocking_items if item.item_id != "R011"),
     )
 
     validation = validate_release_gate(changed)
 
     assert validation.accepted is False
-    assert "deferred_item_owner_required:compat_011" in validation.gaps
-    assert "deferred_item_risk_required:compat_011" in validation.gaps
-    assert "deferred_item_deadline_required:compat_011" in validation.gaps
+    assert "deferred_item_owner_required:R011" in validation.gaps
+    assert "deferred_item_risk_required:R011" in validation.gaps
+    assert "deferred_item_deadline_required:R011" in validation.gaps
 
 
 def test_full_gate_evidence_is_required():
-    checklist = build_r034_release_gate_checklist()
+    checklist = build_release_gate_checklist()
     changed = _replace_checklist(
         checklist,
         full_gate=FullGateEvidence(
@@ -93,7 +93,7 @@ def test_full_gate_evidence_is_required():
 
 
 def test_security_privacy_and_operations_reviews_are_required():
-    checklist = build_r034_release_gate_checklist()
+    checklist = build_release_gate_checklist()
     incomplete = ReviewRecord(area=ReviewArea.PRIVACY, reviewer="", completed=False, evidence_refs=())
     changed = _replace_checklist(
         checklist,
@@ -109,7 +109,7 @@ def test_security_privacy_and_operations_reviews_are_required():
 
 
 def test_user_documentation_requires_all_topics():
-    checklist = build_r034_release_gate_checklist()
+    checklist = build_release_gate_checklist()
     changed = _replace_checklist(
         checklist,
         user_docs=tuple(doc for doc in checklist.user_docs if doc.topic is not UserDocTopic.EXECUTION_SAFETY),
@@ -122,7 +122,7 @@ def test_user_documentation_requires_all_topics():
 
 
 def test_incomplete_user_documentation_fails_release_gate():
-    checklist = build_r034_release_gate_checklist()
+    checklist = build_release_gate_checklist()
     incomplete = UserDocumentationCoverage(topic=UserDocTopic.EVIDENCE_HANDLING, path="docs/sop/USER_OPERATION_GUIDE.md", complete=False)
     changed = _replace_checklist(
         checklist,
@@ -136,7 +136,7 @@ def test_incomplete_user_documentation_fails_release_gate():
 
 
 def test_release_notes_require_all_sections():
-    checklist = build_r034_release_gate_checklist()
+    checklist = build_release_gate_checklist()
     changed = _replace_checklist(
         checklist,
         release_notes=tuple(note for note in checklist.release_notes if note.section is not ReleaseNoteSection.NON_GOALS),
@@ -149,7 +149,7 @@ def test_release_notes_require_all_sections():
 
 
 def test_incomplete_release_notes_fail_release_gate():
-    checklist = build_r034_release_gate_checklist()
+    checklist = build_release_gate_checklist()
     incomplete = ReleaseNotesCoverage(section=ReleaseNoteSection.KNOWN_LIMITATIONS, path="docs/sop/INITIAL_RELEASE_NOTES.md", complete=False)
     changed = _replace_checklist(
         checklist,
@@ -186,7 +186,7 @@ def test_r089_release_candidate_fails_when_full_gate_evidence_is_missing() -> No
         )
     )
 
-    validation = validate_r089_release_candidate(candidate)
+    validation = validate_release_qualification_candidate(candidate)
 
     assert not validation.accepted
     assert "missing_full_gate_command_log_path" in validation.gaps
@@ -201,7 +201,7 @@ def test_r089_release_candidate_blocks_provenance_mismatch() -> None:
         for artifact in artifacts
     )
 
-    validation = validate_r089_release_candidate(
+    validation = validate_release_qualification_candidate(
         r089_candidate(artifacts=artifacts, provenance_attestations=attestations)
     )
 
@@ -210,7 +210,7 @@ def test_r089_release_candidate_blocks_provenance_mismatch() -> None:
 
 
 def test_r089_release_candidate_blocks_uncertified_adapter() -> None:
-    validation = validate_r089_release_candidate(
+    validation = validate_release_qualification_candidate(
         r089_candidate(adapter_certifications=(adapter_result(certified=False),))
     )
 
@@ -220,7 +220,7 @@ def test_r089_release_candidate_blocks_uncertified_adapter() -> None:
 
 
 def test_r089_dependency_posture_warning_does_not_block_clean_release() -> None:
-    validation = validate_r089_release_candidate(
+    validation = validate_release_qualification_candidate(
         r089_candidate(
             dependency_posture=DependencyPostureEvidence(
                 sbom_path=".tmp/sbom/redagent-sbom.json",
@@ -238,7 +238,7 @@ def test_r089_dependency_posture_warning_does_not_block_clean_release() -> None:
 
 
 def test_r089_rollback_plan_requires_restore_compatibility_disabled_features_and_notifications() -> None:
-    validation = validate_r089_release_candidate(
+    validation = validate_release_qualification_candidate(
         r089_candidate(
             rollback_plan=RollbackPlanEvidence(
                 plan_id="rollback-1",
@@ -263,8 +263,8 @@ def test_r089_rollback_plan_requires_restore_compatibility_disabled_features_and
 def test_r089_accepted_release_package_includes_inventory_and_deterministic_hash() -> None:
     candidate = r089_candidate()
 
-    first = validate_r089_release_candidate(candidate)
-    second = validate_r089_release_candidate(candidate)
+    first = validate_release_qualification_candidate(candidate)
+    second = validate_release_qualification_candidate(candidate)
 
     assert first.accepted
     assert first.reason == "release_readiness_accepted"
@@ -276,7 +276,7 @@ def test_r089_accepted_release_package_includes_inventory_and_deterministic_hash
     assert first.package.rollback_plan_id == "rollback-1"
 
 
-def r089_candidate(**overrides: object) -> R089ReleaseCandidate:
+def r089_candidate(**overrides: object) -> ReleaseQualificationCandidate:
     artifacts = release_artifacts()
     values = {
         "release_id": "release-r089",
@@ -321,7 +321,7 @@ def r089_candidate(**overrides: object) -> R089ReleaseCandidate:
         "current_environment_hash": HASH_A,
     }
     values.update(overrides)
-    return R089ReleaseCandidate(**values)  # type: ignore[arg-type]
+    return ReleaseQualificationCandidate(**values)  # type: ignore[arg-type]
 
 
 def release_artifacts() -> tuple[ReleaseArtifactInventoryItem, ...]:

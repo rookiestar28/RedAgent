@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 import pytest
 
 from redagent_platform.campaign_service.registry import closed_execution_registry
-from redagent_platform.runner_service.compat_123_dispatch import (
+from redagent_platform.runner_service.campaign_dispatch import (
     AdapterTerminalReceipt,
-    ClosedR123Dispatcher,
-    R123AdapterRequest,
-    RunnerOwnedR123Dispatcher,
+    ClosedCampaignDispatcher,
+    CampaignAdapterRequest,
+    RunnerOwnedCampaignDispatcher,
     RunnerAmbiguityPersistenceError,
 )
 
@@ -23,10 +23,10 @@ class Adapter:
     def __init__(self, adapter_id: str, adapter_version: str) -> None:
         self.adapter_id = adapter_id
         self.adapter_version = adapter_version
-        self.requests: list[R123AdapterRequest] = []
+        self.requests: list[CampaignAdapterRequest] = []
         self.lookups: list[str] = []
 
-    async def dispatch(self, request: R123AdapterRequest) -> AdapterTerminalReceipt:
+    async def dispatch(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt:
         self.requests.append(request)
         return AdapterTerminalReceipt(
             invocation_id=request.invocation_id,
@@ -40,14 +40,14 @@ class Adapter:
             failure_code=None,
         )
 
-    async def lookup(self, request: R123AdapterRequest) -> AdapterTerminalReceipt | None:
+    async def lookup(self, request: CampaignAdapterRequest) -> AdapterTerminalReceipt | None:
         self.lookups.append(request.invocation_id)
         return None
 
 
-def _request(capability_key: str) -> R123AdapterRequest:
+def _request(capability_key: str) -> CampaignAdapterRequest:
     binding = closed_execution_registry()[capability_key]
-    return R123AdapterRequest(
+    return CampaignAdapterRequest(
         tenant_id="tenant-r123",
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
@@ -66,10 +66,10 @@ def _request(capability_key: str) -> R123AdapterRequest:
     )
 
 
-def _dispatcher() -> tuple[ClosedR123Dispatcher, Adapter, Adapter]:
+def _dispatcher() -> tuple[ClosedCampaignDispatcher, Adapter, Adapter]:
     zap = Adapter("zap-service", "2.17.0-r104.2")
     nuclei = Adapter("nuclei-service", "3.11.1-r105.2")
-    return ClosedR123Dispatcher((zap, nuclei)), zap, nuclei
+    return ClosedCampaignDispatcher((zap, nuclei)), zap, nuclei
 
 
 def test_dispatcher_routes_only_exact_two_noninterchangeable_bindings() -> None:
@@ -203,7 +203,7 @@ class LifecycleOwner:
 def test_runner_owned_dispatcher_wraps_adapter_with_canonical_lifecycle() -> None:
     closed, _, _ = _dispatcher()
     lifecycle = LifecycleOwner()
-    dispatcher = RunnerOwnedR123Dispatcher(closed, lifecycle, clock=lambda: NOW)
+    dispatcher = RunnerOwnedCampaignDispatcher(closed, lifecycle, clock=lambda: NOW)
     request = _request("zap-controlled-runtime@2")
 
     receipt = asyncio.run(dispatcher.dispatch(request))
@@ -256,7 +256,7 @@ class WrongReceiptDispatcher:
 
 def test_runner_owned_dispatcher_records_ambiguity_after_possible_adapter_acceptance() -> None:
     lifecycle = LifecycleOwner()
-    dispatcher = RunnerOwnedR123Dispatcher(
+    dispatcher = RunnerOwnedCampaignDispatcher(
         FailingClosedDispatcher(), lifecycle, clock=lambda: NOW
     )
     request = _request("nuclei-trusted-runtime@2")
@@ -292,7 +292,7 @@ def test_runner_owned_dispatcher_preserves_original_failure_when_ambiguity_write
     expected_message,
 ) -> None:
     lifecycle = LifecycleOwner(ambiguity_fail=True)
-    dispatcher = RunnerOwnedR123Dispatcher(closed, lifecycle, clock=lambda: NOW)
+    dispatcher = RunnerOwnedCampaignDispatcher(closed, lifecycle, clock=lambda: NOW)
     request = _request("nuclei-trusted-runtime@2")
 
     if expected_message is None:
@@ -311,7 +311,7 @@ def test_runner_owned_dispatcher_preserves_original_failure_when_ambiguity_write
 
 def test_runner_owned_dispatcher_rejects_unbound_receipt_before_terminalizing_lifecycle() -> None:
     lifecycle = LifecycleOwner()
-    dispatcher = RunnerOwnedR123Dispatcher(
+    dispatcher = RunnerOwnedCampaignDispatcher(
         WrongReceiptDispatcher(), lifecycle, clock=lambda: NOW
     )
     request = _request("zap-controlled-runtime@2")
@@ -333,7 +333,7 @@ def test_runner_owned_dispatcher_rejects_unbound_receipt_before_terminalizing_li
 def test_runner_owned_lookup_does_not_mutate_runner_lifecycle() -> None:
     closed, zap, _ = _dispatcher()
     lifecycle = LifecycleOwner()
-    dispatcher = RunnerOwnedR123Dispatcher(closed, lifecycle, clock=lambda: NOW)
+    dispatcher = RunnerOwnedCampaignDispatcher(closed, lifecycle, clock=lambda: NOW)
     request = _request("zap-controlled-runtime@2")
 
     assert asyncio.run(dispatcher.lookup(request)) is None

@@ -13,14 +13,14 @@ from fastapi import FastAPI
 from redagent_platform.api.app import create_app
 from redagent_platform.api.schemas import OperatorShellContextData
 from redagent_platform.campaign_service.composition import (
-    build_stock_r123_api_service_factory,
+    build_stock_campaign_api_service_factory,
 )
 from redagent_platform.campaign_service.qualification import (
-    R123QualificationService,
-    R123StatusService,
+    CampaignQualificationService,
+    CampaignStatusService,
 )
 from redagent_platform.campaign_service.registry import StrategyLoopMode, load_strategy_loop_mode
-from redagent_platform.campaign_service.status import R123CampaignStatusOwner
+from redagent_platform.campaign_service.status import CampaignStatusOwner
 from redagent_platform.evidence_service.config import load_evidence_settings
 from redagent_platform.evidence_service.runtime import (
     EvidenceRuntimeError,
@@ -93,11 +93,11 @@ def validate_runtime_tls(
     return str(certificate_file), str(private_key_file)
 
 
-def validate_r123_api_runtime_dependencies(
+def validate_api_runtime_dependencies(
     env: Mapping[str, str],
     *,
     qualification_service: object | None,
-    status_service: R123StatusService,
+    status_service: CampaignStatusService,
     campaign_status_owner: object | None = None,
     service_factory: object | None = None,
 ) -> StrategyLoopMode:
@@ -130,13 +130,13 @@ def build_runtime_app(
     *,
     env: Mapping[str, str] | None = None,
     test_issuer_enabled: bool = False,
-    r123_qualification_service: R123QualificationService | None = None,
-    r123_status_service: R123StatusService | None = None,
-    r123_campaign_status_owner: R123CampaignStatusOwner | None = None,
+    r123_qualification_service: CampaignQualificationService | None = None,
+    r123_status_service: CampaignStatusService | None = None,
+    r123_campaign_status_owner: CampaignStatusOwner | None = None,
 ) -> FastAPI:
     values = dict(os.environ if env is None else env)
     operator_shell_context = derive_operator_shell_context(values)
-    selected_r123_status = r123_status_service or R123StatusService(
+    selected_r123_status = r123_status_service or CampaignStatusService(
         StrategyLoopMode.DISABLED,
         None,
     )
@@ -210,14 +210,14 @@ def build_runtime_app(
         and not explicit_r123_services
     ):
         try:
-            r123_service_factory = build_stock_r123_api_service_factory(
+            r123_service_factory = build_stock_campaign_api_service_factory(
                 workspace,
                 values,
                 evidence_backend=evidence_backend,
             )
         except (EvidenceRuntimeError, ValueError) as exc:
             raise ApiRuntimeError(str(exc)) from exc
-    validate_r123_api_runtime_dependencies(
+    validate_api_runtime_dependencies(
         values,
         qualification_service=r123_qualification_service,
         status_service=selected_r123_status,

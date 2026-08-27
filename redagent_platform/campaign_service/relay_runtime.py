@@ -10,12 +10,12 @@ from typing import Callable, Protocol
 from sqlalchemy import select
 
 from redagent_platform.campaign_service.relay import (
-    R123WorkflowRelay,
+    CampaignWorkflowRelay,
     WorkflowStartGateway,
 )
 from redagent_platform.campaign_service.repository import (
     ClaimedWorkflowStart,
-    R123CampaignRepository,
+    CampaignRepository,
 )
 from redagent_platform.campaign_service.resolver import CampaignContextResolver
 from redagent_platform.persistence.models import metadata
@@ -95,8 +95,8 @@ class PostgresWorkflowRelayRepository:
                 **values
             )
 
-    def _repository(self, session: object, phase: str) -> R123CampaignRepository:
-        return R123CampaignRepository(
+    def _repository(self, session: object, phase: str) -> CampaignRepository:
+        return CampaignRepository(
             session,
             tenant_id=self._tenant_id,
             actor_user_id=self._actor_user_id,
@@ -104,7 +104,7 @@ class PostgresWorkflowRelayRepository:
         )
 
 
-class R123RelayPump:
+class CampaignRelayPump:
     """Claim and deliver a bounded page at a time without cross-tenant business reads."""
 
     def __init__(
@@ -164,7 +164,7 @@ class R123RelayPump:
                 )
                 if len(claims) > self._claim_limit:
                     raise ValueError("r123_relay_claim_page_invalid")
-                relay = R123WorkflowRelay(
+                relay = CampaignWorkflowRelay(
                     resolver=self._resolver,
                     repository=repository,
                     gateway=self._gateway,

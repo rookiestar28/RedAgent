@@ -97,7 +97,7 @@ RELEASE_ACCEPTED_DISPOSITIONS: frozenset[FindingDispositionStatus] = frozenset(
 )
 
 
-def build_r031_baseline_assessment(*, assessed_at: datetime) -> PlatformSecurityAssessment:
+def build_platform_security_baseline_assessment(*, assessed_at: datetime) -> PlatformSecurityAssessment:
     """Return the compat_031 baseline assessment for the current implementation surface."""
     return PlatformSecurityAssessment(
         assessment_id="R031-platform-security-assessment",

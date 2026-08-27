@@ -28,7 +28,7 @@ def test_profile_discovery_fails_closed_when_signed_bundle_verification_is_unava
         del now
         raise ValueError("synthetic_bundle_drift")
 
-    monkeypatch.setattr(nuclei_routes, "_load_r105_bundle", unavailable)
+    monkeypatch.setattr(nuclei_routes, "_load_nuclei_bundle", unavailable)
     asyncio.run(_scenario())
 
 

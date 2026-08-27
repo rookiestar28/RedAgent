@@ -7,19 +7,19 @@ from pathlib import Path
 import pytest
 import yaml
 
-from redagent_platform.nuclei_service.compat_123_adapter import (
+from redagent_platform.nuclei_service.campaign_adapter import (
     NUCLEI_FIXED_ARGV,
     NucleiFixedInvocation,
 )
-from redagent_platform.nuclei_service.compat_123_transport import (
+from redagent_platform.nuclei_service.campaign_transport import (
     NUCLEI_EXECUTION_TIMEOUT_SECONDS,
     NUCLEI_RESPONSE_BYTES_LIMIT,
     NucleiDockerTransport,
     build_nuclei_worker_command,
     nuclei_docker_resources,
 )
-from redagent_platform.zap_service.compat_123_adapter import ZapFixedInvocation
-from redagent_platform.zap_service.compat_123_transport import (
+from redagent_platform.zap_service.campaign_adapter import ZapFixedInvocation
+from redagent_platform.zap_service.campaign_transport import (
     ZAP_EXECUTION_TIMEOUT_SECONDS,
     ZAP_GATEWAY_TIMEOUT_SECONDS,
     ZAP_RESPONSE_BYTES_LIMIT,
@@ -131,8 +131,8 @@ def test_r123_transport_timeouts_do_not_exceed_the_signed_effect_budget() -> Non
 
 
 def test_r123_transports_run_only_current_revision_two_helper_tags() -> None:
-    zap_source = (ROOT / "redagent_platform/zap_service/compat_123_transport.py").read_text()
-    nuclei_source = (ROOT / "redagent_platform/nuclei_service/compat_123_transport.py").read_text()
+    zap_source = (ROOT / "redagent_platform/zap_service/campaign_transport.py").read_text()
+    nuclei_source = (ROOT / "redagent_platform/nuclei_service/campaign_transport.py").read_text()
     assert "redagent/r104-target:1.0.1" in zap_source
     assert "redagent/r104-gateway:1.0.1" in zap_source
     assert "redagent/r105-target:1.0.1" in nuclei_source
@@ -156,7 +156,7 @@ def test_nuclei_dynamic_network_is_attested_under_the_certified_policy_identity(
 
 
 def test_nuclei_transport_uses_manifest_revision_for_runtime_receipt() -> None:
-    source = (ROOT / "redagent_platform/nuclei_service/compat_123_transport.py").read_text()
+    source = (ROOT / "redagent_platform/nuclei_service/campaign_transport.py").read_text()
 
     assert "bundle_revision=bundle.revision" in source
     assert "bundle_revision=bundle.bundle_revision" not in source

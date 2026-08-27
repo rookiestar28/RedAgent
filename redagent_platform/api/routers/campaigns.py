@@ -6,21 +6,17 @@ from fastapi import APIRouter
 
 from redagent_platform.api.dependencies import ApiDependencies
 
-from redagent_platform.api._route_support import (
-    ApiError,
-    CONTRACT_SCHEMA_VERSION,
-    CampaignCreateRequest,
-    CampaignListResponse,
-    CampaignMutationResponse,
-    CampaignResponse,
-    CampaignWorkflowInput,
+from fastapi import (
     Depends,
-    JobWorkflowInput,
-    MutationResult,
-    PaginationQuery,
     Request,
-    RequestGuard,
     Response,
+    status,
+)
+from redagent_platform.api.contracts import (
+    ApiError,
+    RequestGuard,
+)
+from redagent_platform.api.router_primitives import (
     _idempotency,
     _list_response,
     _match_roe_reference,
@@ -28,9 +24,21 @@ from redagent_platform.api._route_support import (
     _now,
     _orchestration,
     _repository,
-    deterministic_campaign_workflow_id,
-    status,
 )
+from redagent_platform.api.schemas.campaigns import (
+    CampaignCreateRequest,
+    CampaignListResponse,
+    CampaignMutationResponse,
+    CampaignResponse,
+)
+from redagent_platform.api.schemas.common import PaginationQuery
+from redagent_platform.orchestration.contracts import (
+    CONTRACT_SCHEMA_VERSION,
+    CampaignWorkflowInput,
+    JobWorkflowInput,
+    deterministic_campaign_workflow_id,
+)
+from redagent_platform.persistence.repository import MutationResult
 
 def register_campaign_routes(app: APIRouter, dependencies: ApiDependencies) -> None:
     enforce_workflow_boundary = dependencies.enforce_workflow_boundary
