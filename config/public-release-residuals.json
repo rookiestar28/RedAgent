@@ -1940,6 +1940,13 @@
       "token": "r123"
     },
     {
+      "count": 2,
+      "path": "mypy-baseline-linux.txt",
+      "reason": "compatibility contract identifier",
+      "sha256": "7e7b6129ec6d992fd7007e5aaad5b33c653d3893fa165132e4586a1353e37ee8",
+      "token": "r123"
+    },
+    {
       "count": 1,
       "path": "package-lock.json",
       "reason": "compatibility contract identifier",

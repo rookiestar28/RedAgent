@@ -19,6 +19,13 @@ STATIC_ANALYSIS_ROOT = ROOT / "config" / "validation" / "backend-static-analysis
 RUFF_BASELINE = STATIC_ANALYSIS_ROOT / "ruff-baseline.json"
 BROAD_EXCEPTION_TRIAGE = STATIC_ANALYSIS_ROOT / "broad-exception-triage.json"
 MYPY_BASELINE = ROOT / "mypy-baseline.txt"
+MYPY_LINUX_BASELINE = ROOT / "mypy-baseline-linux.txt"
+MYPY_PLATFORMS = ("win32", "linux")
+MYPY_BASELINE_FILENAMES = ("mypy-baseline.txt", "mypy-baseline-linux.txt")
+MYPY_TARGETS = (
+    ("win32", MYPY_BASELINE),
+    ("linux", MYPY_LINUX_BASELINE),
+)
 RUFF_SOURCE_PATHS = ("redagent_platform", "scripts", "tests")
 MYPY_SOURCE_PATHS = ("redagent_platform",)
 PRODUCT_SOURCE_PATHS = ("redagent_platform",)
@@ -224,7 +231,11 @@ def _mypy_output(
     repository_root: Path,
     source_paths: Sequence[str],
     config_path: Path | None,
+    *,
+    platform: str,
 ) -> str:
+    if platform not in MYPY_PLATFORMS:
+        raise StaticAnalysisError(f"unsupported Mypy platform: {platform}")
     _require_tool_version("mypy")
     command = [
         sys.executable,
@@ -234,6 +245,8 @@ def _mypy_output(
         "--no-error-summary",
         "--no-pretty",
         "--no-color-output",
+        "--platform",
+        platform,
     ]
     if config_path is not None:
         command.extend(("--config-file", str(config_path)))
@@ -248,7 +261,8 @@ def _mypy_output(
     )
     if completed.returncode not in {0, 1}:
         raise StaticAnalysisError(
-            f"Mypy execution failed with exit {completed.returncode}: {completed.stderr.strip()[:1000]}"
+            f"Mypy {platform} execution failed with exit {completed.returncode}: "
+            f"{completed.stderr.strip()[:1000]}"
         )
     return completed.stdout
 
@@ -290,14 +304,20 @@ def sync_mypy_baseline(
     baseline_path: Path,
     *,
     config_path: Path | None,
+    platform: str,
 ) -> None:
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
     _run_mypy_baseline(
         repository_root,
         baseline_path,
-        _mypy_output(repository_root, source_paths, config_path),
+        _mypy_output(repository_root, source_paths, config_path, platform=platform),
         "sync",
     )
+    # IMPORTANT: mypy-baseline writes host-native newlines; keep ratchets byte-stable across runners.
+    payload = baseline_path.read_bytes()
+    normalized = payload.replace(b"\r\n", b"\n")
+    if normalized != payload:
+        baseline_path.write_bytes(normalized)
 
 
 def run_mypy_gate(
@@ -306,15 +326,84 @@ def run_mypy_gate(
     baseline_path: Path,
     *,
     config_path: Path | None,
+    platform: str,
 ) -> None:
     if not baseline_path.is_file():
         raise StaticAnalysisError("Mypy baseline is unavailable")
     _run_mypy_baseline(
         repository_root,
         baseline_path,
-        _mypy_output(repository_root, source_paths, config_path),
+        _mypy_output(repository_root, source_paths, config_path, platform=platform),
         "filter",
     )
+
+
+def _validated_mypy_targets(
+    repository_root: Path,
+    targets: Sequence[tuple[str, Path]],
+) -> tuple[tuple[str, Path], ...]:
+    normalized = tuple(targets)
+    platforms = tuple(platform for platform, _baseline in normalized)
+    if platforms != MYPY_PLATFORMS:
+        raise StaticAnalysisError(
+            "Mypy target matrix must contain win32 then linux exactly once"
+        )
+    try:
+        root = repository_root.resolve(strict=True)
+    except OSError as exc:
+        raise StaticAnalysisError("Mypy repository root is unavailable") from exc
+    baseline_paths = tuple(baseline.resolve() for _platform, baseline in normalized)
+    if len(set(baseline_paths)) != len(baseline_paths):
+        raise StaticAnalysisError("Mypy target baselines must use distinct paths")
+    expected_paths = tuple((root / filename).resolve() for filename in MYPY_BASELINE_FILENAMES)
+    if (
+        any(not path.is_relative_to(root) for path in baseline_paths)
+        or baseline_paths != expected_paths
+    ):
+        raise StaticAnalysisError(
+            "Mypy targets must use the canonical repo-contained platform baselines"
+        )
+    return normalized
+
+
+def sync_mypy_matrix(
+    repository_root: Path,
+    source_paths: Sequence[str],
+    targets: Sequence[tuple[str, Path]],
+    *,
+    config_path: Path | None,
+) -> None:
+    for platform, baseline_path in _validated_mypy_targets(repository_root, targets):
+        try:
+            sync_mypy_baseline(
+                repository_root,
+                source_paths,
+                baseline_path,
+                config_path=config_path,
+                platform=platform,
+            )
+        except StaticAnalysisError as exc:
+            raise StaticAnalysisError(f"Mypy target {platform} failed: {exc}") from exc
+
+
+def run_mypy_matrix(
+    repository_root: Path,
+    source_paths: Sequence[str],
+    targets: Sequence[tuple[str, Path]],
+    *,
+    config_path: Path | None,
+) -> None:
+    for platform, baseline_path in _validated_mypy_targets(repository_root, targets):
+        try:
+            run_mypy_gate(
+                repository_root,
+                source_paths,
+                baseline_path,
+                config_path=config_path,
+                platform=platform,
+            )
+        except StaticAnalysisError as exc:
+            raise StaticAnalysisError(f"Mypy target {platform} failed: {exc}") from exc
 
 
 def _broad_exception_kind(handler: ast.ExceptHandler) -> str | None:
@@ -450,14 +539,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "lint":
             run_ruff_gate(ROOT, RUFF_SOURCE_PATHS, RUFF_BASELINE)
         elif args.command == "typecheck":
-            run_mypy_gate(ROOT, MYPY_SOURCE_PATHS, MYPY_BASELINE, config_path=ROOT / "pyproject.toml")
+            run_mypy_matrix(
+                ROOT,
+                MYPY_SOURCE_PATHS,
+                MYPY_TARGETS,
+                config_path=ROOT / "pyproject.toml",
+            )
         elif args.command == "sync-lint":
             sync_ruff_baseline(ROOT, RUFF_SOURCE_PATHS, RUFF_BASELINE)
         elif args.command == "sync-typecheck":
-            sync_mypy_baseline(
+            sync_mypy_matrix(
                 ROOT,
                 MYPY_SOURCE_PATHS,
-                MYPY_BASELINE,
+                MYPY_TARGETS,
                 config_path=ROOT / "pyproject.toml",
             )
     except StaticAnalysisError as exc:
