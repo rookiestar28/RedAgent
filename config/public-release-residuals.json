@@ -4729,28 +4729,28 @@
       "count": 1,
       "path": "scripts/run_compat_124_local_golden_windows.ps1",
       "reason": "compatibility contract identifier",
-      "sha256": "1e52e6ec44ddf8ecccf72a7e8ee6c5cfa11ae5acd5b4ced9642bcdbf08345e23",
+      "sha256": "b61581d68f3eeb0058924fa1822321ff56ed49a4c05a53c04fce2c09e5991e36",
       "token": "R123"
     },
     {
       "count": 8,
       "path": "scripts/run_compat_124_local_golden_windows.ps1",
       "reason": "compatibility contract identifier",
-      "sha256": "1e52e6ec44ddf8ecccf72a7e8ee6c5cfa11ae5acd5b4ced9642bcdbf08345e23",
+      "sha256": "b61581d68f3eeb0058924fa1822321ff56ed49a4c05a53c04fce2c09e5991e36",
       "token": "R124"
     },
     {
       "count": 1,
       "path": "scripts/run_compat_124_local_golden_windows.ps1",
       "reason": "compatibility contract identifier",
-      "sha256": "1e52e6ec44ddf8ecccf72a7e8ee6c5cfa11ae5acd5b4ced9642bcdbf08345e23",
+      "sha256": "b61581d68f3eeb0058924fa1822321ff56ed49a4c05a53c04fce2c09e5991e36",
       "token": "r123"
     },
     {
       "count": 14,
       "path": "scripts/run_compat_124_local_golden_windows.ps1",
       "reason": "compatibility contract identifier",
-      "sha256": "1e52e6ec44ddf8ecccf72a7e8ee6c5cfa11ae5acd5b4ced9642bcdbf08345e23",
+      "sha256": "b61581d68f3eeb0058924fa1822321ff56ed49a4c05a53c04fce2c09e5991e36",
       "token": "r124"
     },
     {
@@ -7908,6 +7908,34 @@
       "path": "tests/unit/test_compat_124_campaign_service.py",
       "reason": "compatibility contract identifier",
       "sha256": "b402e1570764055f7cf9eddff463283b1a5335481b7d4ddd2fbb1a88d073b2f5",
+      "token": "r124"
+    },
+    {
+      "count": 1,
+      "path": "tests/unit/test_compat_124_public_golden_wrapper.py",
+      "reason": "public compatibility wrapper regression identifier",
+      "sha256": "18184689f2f2b6e7e12a8adfa4fb2c514e80f01fe08ecb0dcb1080c582a24b33",
+      "token": "R123"
+    },
+    {
+      "count": 1,
+      "path": "tests/unit/test_compat_124_public_golden_wrapper.py",
+      "reason": "public compatibility wrapper regression identifier",
+      "sha256": "18184689f2f2b6e7e12a8adfa4fb2c514e80f01fe08ecb0dcb1080c582a24b33",
+      "token": "R124"
+    },
+    {
+      "count": 1,
+      "path": "tests/unit/test_compat_124_public_golden_wrapper.py",
+      "reason": "public compatibility wrapper regression identifier",
+      "sha256": "18184689f2f2b6e7e12a8adfa4fb2c514e80f01fe08ecb0dcb1080c582a24b33",
+      "token": "r123"
+    },
+    {
+      "count": 2,
+      "path": "tests/unit/test_compat_124_public_golden_wrapper.py",
+      "reason": "public compatibility wrapper regression identifier",
+      "sha256": "18184689f2f2b6e7e12a8adfa4fb2c514e80f01fe08ecb0dcb1080c582a24b33",
       "token": "r124"
     },
     {

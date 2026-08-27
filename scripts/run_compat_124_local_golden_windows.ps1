@@ -26,9 +26,12 @@ if ([int]$Matches.major -lt 18) {
     throw "r124_node_18_or_newer_required"
 }
 
-$referenceChildren = @(Get-ChildItem -Force -LiteralPath (Join-Path $workspace "reference"))
-if ($referenceChildren.Count -ne 1 -or $referenceChildren[0].Name -ne "docs") {
-    throw "r124_external_reference_execution_boundary_invalid"
+$referenceRoot = Join-Path $workspace "reference"
+if (Test-Path -LiteralPath $referenceRoot) {
+    $referenceChildren = @(Get-ChildItem -Force -LiteralPath $referenceRoot)
+    if ($referenceChildren.Count -ne 1 -or $referenceChildren[0].Name -ne "docs" -or -not $referenceChildren[0].PSIsContainer) {
+        throw "r124_external_reference_execution_boundary_invalid"
+    }
 }
 
 $status = @(& git status --porcelain=v1 --untracked-files=all)
@@ -70,8 +73,8 @@ function Invoke-R124GoldenStep {
 }
 
 try {
-    Invoke-R124GoldenStep "raw_id_inventory" {
-        & $python scripts/validate_compat_124_raw_id_inventory.py
+    Invoke-R124GoldenStep "public_boundary_inventory" {
+        & $python scripts/validate_public_release.py
     }
     Invoke-R124GoldenStep "r124_postgres_core" {
         & $python -m pytest tests/integration/test_compat_124_campaign_core.py -q
