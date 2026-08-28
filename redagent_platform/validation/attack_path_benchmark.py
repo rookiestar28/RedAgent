@@ -20,6 +20,13 @@ ACTIVATE_BOUNDED_ATTACK_PATH_PLANNING = "ACTIVATE_BOUNDED_ATTACK_PATH_PLANNING"
 INSUFFICIENT_CURRENT_NEED = "INSUFFICIENT_CURRENT_NEED"
 MAX_CORPUS_BYTES = 256 * 1024
 DEPTH_TWO_BOUND = 2
+COVERAGE_FRACTION_MIN_BASIS_POINTS = 1_000
+COVERAGE_CASE_MIN = 2
+QUALITY_GAP_FRACTION_MIN_BASIS_POINTS = 1_000
+QUALITY_GAP_CASE_MIN = 2
+QUALITY_CASE_SCORE_MAX_BASIS_POINTS = 8_000
+QUALITY_MEAN_SCORE_MAX_EXCLUSIVE_BASIS_POINTS = 9_000
+REALISM_POSITIVE_CASE_MIN = 1
 EXPECTED_CAPABILITY_IDS = (
     "artifact-posture",
     "nuclei-trusted-runtime",
@@ -59,13 +66,13 @@ EXPECTED_OPERATOR_BINDINGS = {
 }
 EXPECTED_THRESHOLDS = {
     "schema_version": THRESHOLD_SCHEMA,
-    "coverage_fraction_min_basis_points": 1_000,
-    "coverage_case_min": 2,
-    "quality_gap_fraction_min_basis_points": 1_000,
-    "quality_gap_case_min": 2,
-    "quality_case_score_max_basis_points": 8_000,
-    "quality_mean_score_max_exclusive_basis_points": 9_000,
-    "realism_positive_case_min": 1,
+    "coverage_fraction_min_basis_points": COVERAGE_FRACTION_MIN_BASIS_POINTS,
+    "coverage_case_min": COVERAGE_CASE_MIN,
+    "quality_gap_fraction_min_basis_points": QUALITY_GAP_FRACTION_MIN_BASIS_POINTS,
+    "quality_gap_case_min": QUALITY_GAP_CASE_MIN,
+    "quality_case_score_max_basis_points": QUALITY_CASE_SCORE_MAX_BASIS_POINTS,
+    "quality_mean_score_max_exclusive_basis_points": QUALITY_MEAN_SCORE_MAX_EXCLUSIVE_BASIS_POINTS,
+    "realism_positive_case_min": REALISM_POSITIVE_CASE_MIN,
 }
 PROVENANCE_CLASSES = frozenset(
     {"synthetic_owned_loopback", "authorized_history_derived"}
@@ -338,10 +345,10 @@ def _is_link_or_reparse(path: Path) -> bool:
     if path.is_symlink():
         return True
     try:
-        attributes = path.lstat().st_file_attributes
-    except (AttributeError, OSError):
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except OSError:
         return False
-    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
 
 
 def load_corpus(path: Path) -> BenchmarkCorpus:
@@ -502,8 +509,7 @@ def run_benchmark(corpus: BenchmarkCorpus) -> dict[str, object]:
                 raise BenchmarkError("quality score invalid")
             quality_scores.append(quality_basis_points)
             if (
-                quality_basis_points
-                <= EXPECTED_THRESHOLDS["quality_case_score_max_basis_points"]
+                quality_basis_points <= QUALITY_CASE_SCORE_MAX_BASIS_POINTS
             ):
                 quality_gap_case_ids.append(case.case_id)
         result: dict[str, object] = {
@@ -537,16 +543,13 @@ def run_benchmark(corpus: BenchmarkCorpus) -> dict[str, object]:
     )
     quality_mean = sum(quality_scores) // quality_eligible if quality_eligible else 0
     coverage_signal = (
-        len(coverage_case_ids) >= EXPECTED_THRESHOLDS["coverage_case_min"]
-        and coverage_fraction
-        >= EXPECTED_THRESHOLDS["coverage_fraction_min_basis_points"]
+        len(coverage_case_ids) >= COVERAGE_CASE_MIN
+        and coverage_fraction >= COVERAGE_FRACTION_MIN_BASIS_POINTS
     )
     quality_signal = (
-        len(quality_gap_case_ids) >= EXPECTED_THRESHOLDS["quality_gap_case_min"]
-        and quality_gap_fraction
-        >= EXPECTED_THRESHOLDS["quality_gap_fraction_min_basis_points"]
-        and quality_mean
-        < EXPECTED_THRESHOLDS["quality_mean_score_max_exclusive_basis_points"]
+        len(quality_gap_case_ids) >= QUALITY_GAP_CASE_MIN
+        and quality_gap_fraction >= QUALITY_GAP_FRACTION_MIN_BASIS_POINTS
+        and quality_mean < QUALITY_MEAN_SCORE_MAX_EXCLUSIVE_BASIS_POINTS
     )
     positive_ids = set(coverage_case_ids) | set(quality_gap_case_ids)
     positive_provenances.extend(case_by_id[item].provenance for item in sorted(positive_ids))

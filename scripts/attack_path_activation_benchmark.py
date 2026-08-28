@@ -30,10 +30,10 @@ def _is_link_or_reparse(path: Path) -> bool:
     if path.is_symlink():
         return True
     try:
-        attributes = path.lstat().st_file_attributes
-    except (AttributeError, OSError):
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except OSError:
         return False
-    return bool(attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
 
 
 def _assert_safe_fixed_path(path: Path, expected: Path, *, must_exist: bool) -> None:
