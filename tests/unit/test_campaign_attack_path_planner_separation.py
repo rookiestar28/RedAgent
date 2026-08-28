@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import fields, replace
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from redagent_platform.campaign_service.planning.search_contracts import (
 from tests.unit.test_campaign_attack_path_planner import search_limits
 from tests.unit.test_campaign_planning_contracts import authority, domain, world
 from redagent_platform.campaign_service.planning.search import plan_attack_path
+from redagent_platform.validation.static_analysis import build_broad_exception_inventory
 
 import pytest
 
@@ -129,3 +131,16 @@ def test_public_planner_sources_contain_no_internal_item_or_planning_trace() -> 
         assert ".planning/" not in lowered
         assert ".planning\\" not in lowered
         assert "roadmap" not in lowered
+
+
+def test_fail_closed_wrapper_has_exact_static_analysis_triage() -> None:
+    manifest = json.loads(
+        (ROOT / "config/validation/backend-static-analysis/broad-exception-triage.json").read_text(encoding="utf-8")
+    )
+    path = "redagent_platform/campaign_service/planning/search.py"
+    classified = [item for item in manifest["sites"] if item["path"] == path]
+    current = [item for item in build_broad_exception_inventory(ROOT, (path,)) if item["path"] == path]
+    assert len(classified) == len(current) == 1
+    assert classified[0]["classification"] == "legitimate_cleanup"
+    assert "INTERNAL_ERROR" in classified[0]["rationale"]
+    assert {key: classified[0][key] for key in ("path", "line", "exception", "fingerprint", "occurrence")} == current[0]
