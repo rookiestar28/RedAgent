@@ -38,7 +38,14 @@ ACTIVE_SCAN_ROOTS = (
 )
 
 RETIRED_ACTIVE_TOKENS = (
-    *(Path(filename).stem for filename in RETIRED_VALIDATION_MODULES if filename != "shadow.py"),
+    *(
+        Path(filename).stem
+        for filename in RETIRED_VALIDATION_MODULES
+        if filename not in {"shadow.py", "campaign_authority.py"}
+    ),
+    # IMPORTANT: ban the retired validation import precisely; campaign_authority is now an active domain contract.
+    "redagent_platform.validation.campaign_authority",
+    "from .campaign_authority",
     "redagent_platform.validation.shadow",
     "from .shadow",
     "run_r118_shadow_qualification",

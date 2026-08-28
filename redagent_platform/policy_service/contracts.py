@@ -18,16 +18,54 @@ _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}$")
 _REFERENCE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$")
 _HASH = re.compile(r"^[0-9a-f]{64}$")
 _REASON = re.compile(r"^[a-z][a-z0-9_]{0,99}$")
-_ALLOWED_ATTRIBUTES = frozenset({
-    "active_revision", "approver_id", "artifact_class", "artifact_status",
-    "capability_status", "classification", "creator_id",
-    "current_gate", "dispatch_blocked", "expected_version", "identity_generation",
-    "job_status", "jit_status", "lease_state", "legal_hold", "membership_generation",
-    "manifest_state", "orchestration_revision", "permission_count", "permission_digest",
-    "purpose", "reference_status", "registration_state", "renewable", "resource_version",
-    "revoke_pending", "roe_status", "runner_generation", "sandbox_status",
-    "cleanup_required", "workload_client_status",
-})
+_ALLOWED_ATTRIBUTES = frozenset(
+    {
+        "active_revision",
+        "approver_id",
+        "artifact_class",
+        "artifact_status",
+        "capability_status",
+        "classification",
+        "creator_id",
+        "current_gate",
+        "dispatch_blocked",
+        "expected_version",
+        "identity_generation",
+        "job_status",
+        "jit_status",
+        "lease_state",
+        "legal_hold",
+        "membership_generation",
+        "manifest_state",
+        "orchestration_revision",
+        "permission_count",
+        "permission_digest",
+        "purpose",
+        "reference_status",
+        "registration_state",
+        "renewable",
+        "resource_version",
+        "revoke_pending",
+        "roe_status",
+        "runner_generation",
+        "sandbox_status",
+        "cleanup_required",
+        "workload_client_status",
+        # CRITICAL: keep authority inputs metadata-only; arbitrary values can bypass the policy schema boundary.
+        "campaign_authority_sha256",
+        "campaign_authority_version",
+        "campaign_capability_id",
+        "campaign_credential_class",
+        "campaign_data_access_class",
+        "campaign_effect_class",
+        "campaign_environment_class",
+        "campaign_kill_switch_epoch",
+        "campaign_lifecycle_epoch",
+        "campaign_lifecycle_state",
+        "campaign_residual_budget_sha256",
+        "campaign_target_id",
+    }
+)
 
 
 class PolicyBoundary(str, Enum):
@@ -65,7 +103,14 @@ class PolicyDecisionInput:
     def __post_init__(self) -> None:
         if not isinstance(self.boundary, PolicyBoundary):
             raise ValueError("policy_boundary_invalid")
-        for value in (self.action, self.tenant_id, self.subject_id, self.resource_type, self.resource_id, self.correlation_id):
+        for value in (
+            self.action,
+            self.tenant_id,
+            self.subject_id,
+            self.resource_type,
+            self.resource_id,
+            self.correlation_id,
+        ):
             _identifier(value)
         _reference(self.policy_reference)
         if self.roe_version_id is not None:
@@ -150,7 +195,9 @@ def canonical_policy_input(request: PolicyDecisionInput) -> bytes:
         "requested_at": request.requested_at.isoformat(),
         "attributes": dict(request.attributes),
     }
-    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode(
+        "utf-8"
+    )
 
 
 def policy_input_hash(request: PolicyDecisionInput) -> str:
