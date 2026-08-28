@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import stat
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,6 +22,10 @@ from redagent_platform.validation.attack_path_benchmark import (
     run_benchmark,
     validate_plan,
 )
+from redagent_platform.validation.attack_path_benchmark import (
+    _is_link_or_reparse as corpus_is_link_or_reparse,
+)
+from scripts import attack_path_activation_benchmark as benchmark_cli
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -149,6 +155,70 @@ def test_corpus_digest_tamper_fails_before_evaluation() -> None:
 
     with pytest.raises(BenchmarkError, match="corpus digest mismatch"):
         parse_corpus(payload)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda value: value["cases"][0].update(  # type: ignore[index,union-attr]
+            {"provenance": "authorized_history_derived"}
+        ),
+        lambda value: value["cases"][0].update(  # type: ignore[index,union-attr]
+            {"case_id": "http-posture-corroborate-from-alpha"}
+        ),
+        lambda value: value["operators"][1].update(  # type: ignore[index,union-attr]
+            {
+                "preconditions": [
+                    "http_target_authorized",
+                    "http_target_scope_confirmed",
+                ]
+            }
+        ),
+        lambda value: value["operators"][1].update(  # type: ignore[index,union-attr]
+            {
+                "effects": [
+                    "http_posture_observed:additional",
+                    "http_posture_observed:nuclei",
+                ]
+            }
+        ),
+    ),
+)
+def test_semantic_corpus_mutation_cannot_self_rehash(mutation) -> None:
+    payload = _payload()
+    mutation(payload)
+    _rehash(payload)
+
+    with pytest.raises(BenchmarkError, match="trusted corpus digest mismatch"):
+        parse_corpus(payload)
+
+
+def test_corpus_and_cli_fail_closed_for_link_reparse_and_nonregular_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+
+    class ReparsePath:
+        @staticmethod
+        def is_symlink() -> bool:
+            return False
+
+        @staticmethod
+        def lstat() -> object:
+            return SimpleNamespace(st_file_attributes=reparse_flag)
+
+    fake_reparse = ReparsePath()
+    assert corpus_is_link_or_reparse(fake_reparse)  # type: ignore[arg-type]
+    assert benchmark_cli._is_link_or_reparse(fake_reparse)  # type: ignore[arg-type]
+
+    with pytest.raises(BenchmarkError, match="regular non-link file"):
+        load_corpus(tmp_path)
+
+    monkeypatch.setattr(benchmark_cli, "_is_link_or_reparse", lambda _path: True)
+    with pytest.raises(BenchmarkError, match="traverses a link or reparse point"):
+        benchmark_cli._assert_safe_fixed_path(
+            benchmark_cli.CORPUS, benchmark_cli.CORPUS, must_exist=True
+        )
 
 
 @pytest.mark.parametrize(

@@ -27,6 +27,9 @@ QUALITY_GAP_CASE_MIN = 2
 QUALITY_CASE_SCORE_MAX_BASIS_POINTS = 8_000
 QUALITY_MEAN_SCORE_MAX_EXCLUSIVE_BASIS_POINTS = 9_000
 REALISM_POSITIVE_CASE_MIN = 1
+EXPECTED_CORPUS_SHA256_V1 = (
+    "a7e0487db2df01131b658e2cb927906d7f2ba75ef3ab35f3a151adff25efb24b"  # pragma: allowlist secret
+)
 EXPECTED_CAPABILITY_IDS = (
     "artifact-posture",
     "nuclei-trusted-runtime",
@@ -265,8 +268,9 @@ def parse_corpus(payload: object) -> BenchmarkCorpus:
     digest = value["corpus_sha256"]
     if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
         raise BenchmarkError("corpus digest invalid")
+    canonical_digest = canonical_sha256(_corpus_body(value))
     # IMPORTANT: authenticate the complete frozen body before interpreting nested semantics.
-    if canonical_sha256(_corpus_body(value)) != digest:
+    if canonical_digest != digest:
         raise BenchmarkError("corpus digest mismatch")
     thresholds = _strict_mapping(
         value["thresholds"],
@@ -305,6 +309,9 @@ def parse_corpus(payload: object) -> BenchmarkCorpus:
     for case in cases:
         if not set((*case.initial_facts, *case.goal_facts)).issubset(fact_universe):
             raise BenchmarkError("case fact outside closed operator domain")
+    # CRITICAL: a payload-declared digest cannot authenticate a coherently rehashed corpus.
+    if canonical_digest != EXPECTED_CORPUS_SHA256_V1:
+        raise BenchmarkError("trusted corpus digest mismatch")
     return BenchmarkCorpus(
         schema_version=CORPUS_SCHEMA,
         corpus_sha256=digest,
