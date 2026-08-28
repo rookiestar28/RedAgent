@@ -76,6 +76,16 @@ def validate_candidate_plan(
     _check_bindings(plan, domain, authority, validated_at, failures)
     definitions = {definition.fact_id: definition for definition in domain.facts}
     state = _initial_state(plan, definitions, failures)
+    # CRITICAL: validate the supplied state before any effect can repair and conceal an invalid starting point.
+    _check_predicates(
+        domain.invariants,
+        state,
+        plan.plan_id,
+        "domain_invariant_violated",
+        "domain_invariant_violated",
+        failures,
+    )
+    _check_forbidden_states(domain, state, plan.plan_id, failures)
     nodes = {node.node_id: node for node in plan.nodes}
     operators = {operator.operator_id: operator for operator in domain.operators}
     incoming: dict[str, list[PlanEdgeV1]] = defaultdict(list)
@@ -120,6 +130,7 @@ def validate_candidate_plan(
             "domain_invariant_violated",
             failures,
         )
+        _check_forbidden_states(domain, state, node.node_id, failures)
         active_nodes.add(node.node_id)
         depth = depth_by_node.get(node.node_id, 1)
         active_depth_weights[depth] += operator.concurrency_weight
@@ -171,12 +182,25 @@ def validate_candidate_plan(
 
 def _estimated_transitions(plan: CandidatePlanV1, domain: PlanningDomainV1) -> int:
     operator_costs = {
-        operator.operator_id: len(operator.preconditions) + len(operator.effects) + len(domain.invariants) + 1
+        operator.operator_id: (
+            len(operator.preconditions)
+            + len(operator.effects)
+            + len(domain.invariants)
+            + len(domain.objective.forbidden_predicates)
+            + 1
+        )
         for operator in domain.operators
     }
     node_cost = sum(operator_costs.get(node.operator_id, 1) for node in plan.nodes)
     edge_cost = sum(len(edge.conditions) + 1 for edge in plan.edges)
-    return len(plan.initial_state.values) + node_cost + edge_cost + len(domain.objective.required_predicates)
+    initial_safety_cost = len(domain.invariants) + len(domain.objective.forbidden_predicates)
+    return (
+        len(plan.initial_state.values)
+        + initial_safety_cost
+        + node_cost
+        + edge_cost
+        + len(domain.objective.required_predicates)
+    )
 
 
 def _check_bindings(
@@ -453,12 +477,20 @@ def _check_objective(
     for predicate in domain.objective.required_predicates:
         if _evaluate_predicate(predicate, state) is not True:
             failures.add(("objective_not_satisfied", domain.objective.objective_id))
+
+
+def _check_forbidden_states(
+    domain: PlanningDomainV1,
+    state: dict[str, ScalarValueV1 | None],
+    subject_id: str,
+    failures: set[tuple[str, str | None]],
+) -> None:
     for predicate in domain.objective.forbidden_predicates:
         forbidden_result = _evaluate_predicate(predicate, state)
         if forbidden_result is True:
-            failures.add(("objective_forbidden_state", domain.objective.objective_id))
+            failures.add(("objective_forbidden_state", subject_id))
         elif forbidden_result is None:
-            failures.add(("objective_forbidden_state_unknown", domain.objective.objective_id))
+            failures.add(("objective_forbidden_state_unknown", subject_id))
 
 
 def _unknown(

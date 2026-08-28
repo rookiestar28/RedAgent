@@ -438,6 +438,71 @@ def test_validator_applies_domain_effects_and_rejects_unsatisfied_goal_or_invari
     assert "domain_invariant_violated" in counterexample_codes(invariant_certificate)
 
 
+def test_initial_domain_invariant_is_checked_before_any_repairing_effect() -> None:
+    repairing_operator = replace(
+        operator(),
+        preconditions=(predicate("posture-collected", ScalarType.BOOLEAN, False),),
+        effects=(
+            FactAssignmentV1("authorized", scalar(ScalarType.BOOLEAN, True)),
+            FactAssignmentV1("posture-collected", scalar(ScalarType.BOOLEAN, True)),
+        ),
+    )
+    current_domain = domain(operators=(repairing_operator,))
+    initial_values = tuple(
+        FactValueV1(item.fact_id, scalar(ScalarType.BOOLEAN, False)) if item.fact_id == "authorized" else item
+        for item in world().values
+    )
+    certificate = validate_candidate_plan(
+        bound_plan(current_domain, initial_state=WorldStateV1(initial_values)),
+        current_domain,
+        authority(),
+        limits=limits(),
+        validated_at=NOW + timedelta(seconds=30),
+    )
+    assert certificate.result is ValidationResult.INVALID
+    assert "domain_invariant_violated" in counterexample_codes(certificate)
+
+
+def test_intermediate_forbidden_state_cannot_be_repaired_into_validity() -> None:
+    disable = replace(
+        operator(),
+        operator_id="disable-authorization",
+        effects=(FactAssignmentV1("authorized", scalar(ScalarType.BOOLEAN, False)),),
+        observation_fact_ids=("authorized",),
+    )
+    restore = replace(
+        operator(),
+        operator_id="restore-authorization",
+        preconditions=(predicate("authorized", ScalarType.BOOLEAN, False),),
+        effects=(
+            FactAssignmentV1("authorized", scalar(ScalarType.BOOLEAN, True)),
+            FactAssignmentV1("posture-collected", scalar(ScalarType.BOOLEAN, True)),
+        ),
+        observation_fact_ids=("authorized", "posture-collected"),
+    )
+    current_domain = domain(operators=(disable, restore), invariants=())
+    template = bound_plan(current_domain).nodes[0]
+    first = replace(template, node_id="node-a", operator_id=disable.operator_id, order=0)
+    second = replace(template, node_id="node-b", operator_id=restore.operator_id, order=1)
+    edge = PlanEdgeV1(
+        schema_version="redagent.plan-edge/v1",
+        edge_id="edge-a-b",
+        source_node_id="node-a",
+        target_node_id="node-b",
+        conditions=(predicate("authorized", ScalarType.BOOLEAN, False),),
+    )
+    current_plan = bound_plan(current_domain, nodes=(first, second), edges=(edge,))
+    certificate = validate_candidate_plan(
+        current_plan,
+        current_domain,
+        authority(),
+        limits=limits(),
+        validated_at=NOW + timedelta(seconds=30),
+    )
+    assert certificate.result is ValidationResult.INVALID
+    assert "objective_forbidden_state" in counterexample_codes(certificate)
+
+
 def test_validator_rejects_unknown_operator_target_argument_and_scope_expansion() -> None:
     current_domain = domain()
     current = bound_plan(current_domain)
@@ -629,6 +694,34 @@ def test_resource_proof_limit_returns_non_admissible_unknown() -> None:
     assert certificate.result is ValidationResult.UNKNOWN
     assert certificate.admissible is False
     assert certificate.bounded_reason == "validation_resource_limit:max_nodes"
+
+
+def test_forbidden_objective_checks_are_charged_to_transition_proof_limit() -> None:
+    forbidden = tuple(
+        sorted(
+            (
+                predicate("finding-count", ScalarType.INTEGER, value, PredicateOperator.GREATER_THAN)
+                for value in range(1, 11)
+            ),
+            key=lambda item: canonical_planning_bytes(item.expected),
+        )
+    )
+    current_domain = domain(
+        objective=PlanningObjectiveV1(
+            objective_id="collect-posture",
+            required_predicates=(predicate("posture-collected", ScalarType.BOOLEAN, True),),
+            forbidden_predicates=forbidden,
+        )
+    )
+    certificate = validate_candidate_plan(
+        bound_plan(current_domain),
+        current_domain,
+        authority(),
+        limits=limits(max_state_transitions=8),
+        validated_at=NOW + timedelta(seconds=30),
+    )
+    assert certificate.result is ValidationResult.UNKNOWN
+    assert certificate.bounded_reason == "validation_resource_limit:max_state_transitions"
 
 
 def test_unsupported_semantics_are_unknown_and_aggregate_rate_is_bounded() -> None:
