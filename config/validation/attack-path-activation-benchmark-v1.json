@@ -1,0 +1,229 @@
+{
+  "schema_version": "redagent.attack-path-activation-benchmark/v1",
+  "thresholds": {
+    "schema_version": "redagent.attack-path-activation-threshold/v1",
+    "coverage_fraction_min_basis_points": 1000,
+    "coverage_case_min": 2,
+    "quality_gap_fraction_min_basis_points": 1000,
+    "quality_gap_case_min": 2,
+    "quality_case_score_max_basis_points": 8000,
+    "quality_mean_score_max_exclusive_basis_points": 9000,
+    "realism_positive_case_min": 1
+  },
+  "capability_ids": [
+    "artifact-posture",
+    "nuclei-trusted-runtime",
+    "zap-controlled-runtime"
+  ],
+  "operators": [
+    {
+      "operator_id": "artifact-posture:repository-snapshot-posture",
+      "capability_id": "artifact-posture",
+      "objective_kind": "repository_snapshot_posture",
+      "preconditions": [
+        "artifact_receipt_current",
+        "repository_snapshot_authorized"
+      ],
+      "effects": [
+        "repository_snapshot_posture_observed"
+      ],
+      "risk_cost": 1
+    },
+    {
+      "operator_id": "nuclei-trusted-runtime:http-posture",
+      "capability_id": "nuclei-trusted-runtime",
+      "objective_kind": "http_posture",
+      "preconditions": [
+        "http_target_authorized"
+      ],
+      "effects": [
+        "http_posture_observed:nuclei"
+      ],
+      "risk_cost": 2
+    },
+    {
+      "operator_id": "nuclei-trusted-runtime:security-header-assertion",
+      "capability_id": "nuclei-trusted-runtime",
+      "objective_kind": "security_header_assertion",
+      "preconditions": [
+        "http_target_authorized"
+      ],
+      "effects": [
+        "security_header_assertion_observed:nuclei"
+      ],
+      "risk_cost": 2
+    },
+    {
+      "operator_id": "zap-controlled-runtime:http-posture",
+      "capability_id": "zap-controlled-runtime",
+      "objective_kind": "http_posture",
+      "preconditions": [
+        "http_target_authorized"
+      ],
+      "effects": [
+        "http_posture_observed:zap"
+      ],
+      "risk_cost": 2
+    },
+    {
+      "operator_id": "zap-controlled-runtime:security-header-assertion",
+      "capability_id": "zap-controlled-runtime",
+      "objective_kind": "security_header_assertion",
+      "preconditions": [
+        "http_target_authorized"
+      ],
+      "effects": [
+        "security_header_assertion_observed:zap"
+      ],
+      "risk_cost": 2
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "http-posture-corroborate-from-nuclei",
+      "objective_kind": "http_posture",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_posture_observed:nuclei",
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "http_posture_observed:nuclei",
+        "http_posture_observed:zap"
+      ]
+    },
+    {
+      "case_id": "http-posture-corroborate-from-zap",
+      "objective_kind": "http_posture",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_posture_observed:zap",
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "http_posture_observed:nuclei",
+        "http_posture_observed:zap"
+      ]
+    },
+    {
+      "case_id": "http-posture-nuclei-observation",
+      "objective_kind": "http_posture",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "http_posture_observed:nuclei"
+      ]
+    },
+    {
+      "case_id": "http-posture-two-source",
+      "objective_kind": "http_posture",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "http_posture_observed:nuclei",
+        "http_posture_observed:zap"
+      ]
+    },
+    {
+      "case_id": "http-posture-zap-observation",
+      "objective_kind": "http_posture",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "http_posture_observed:zap"
+      ]
+    },
+    {
+      "case_id": "repository-snapshot-already-observed",
+      "objective_kind": "repository_snapshot_posture",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "artifact_receipt_current",
+        "repository_snapshot_authorized",
+        "repository_snapshot_posture_observed"
+      ],
+      "goal_facts": [
+        "repository_snapshot_posture_observed"
+      ]
+    },
+    {
+      "case_id": "repository-snapshot-posture",
+      "objective_kind": "repository_snapshot_posture",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "artifact_receipt_current",
+        "repository_snapshot_authorized"
+      ],
+      "goal_facts": [
+        "repository_snapshot_posture_observed"
+      ]
+    },
+    {
+      "case_id": "security-header-corroborate-from-nuclei",
+      "objective_kind": "security_header_assertion",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized",
+        "security_header_assertion_observed:nuclei"
+      ],
+      "goal_facts": [
+        "security_header_assertion_observed:nuclei",
+        "security_header_assertion_observed:zap"
+      ]
+    },
+    {
+      "case_id": "security-header-corroborate-from-zap",
+      "objective_kind": "security_header_assertion",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized",
+        "security_header_assertion_observed:zap"
+      ],
+      "goal_facts": [
+        "security_header_assertion_observed:nuclei",
+        "security_header_assertion_observed:zap"
+      ]
+    },
+    {
+      "case_id": "security-header-nuclei-observation",
+      "objective_kind": "security_header_assertion",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "security_header_assertion_observed:nuclei"
+      ]
+    },
+    {
+      "case_id": "security-header-two-source",
+      "objective_kind": "security_header_assertion",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "security_header_assertion_observed:nuclei",
+        "security_header_assertion_observed:zap"
+      ]
+    },
+    {
+      "case_id": "security-header-zap-observation",
+      "objective_kind": "security_header_assertion",
+      "provenance": "synthetic_owned_loopback",
+      "initial_facts": [
+        "http_target_authorized"
+      ],
+      "goal_facts": [
+        "security_header_assertion_observed:zap"
+      ]
+    }
+  ],
+  "corpus_sha256": "a7e0487db2df01131b658e2cb927906d7f2ba75ef3ab35f3a151adff25efb24b"
+}
