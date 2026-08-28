@@ -285,13 +285,21 @@ class TargetMappingV1:
     routes: tuple[TargetRouteV1, ...]
 
     def __post_init__(self) -> None:
-        if self.schema_version != "redagent.r119-target-mapping/v1":
+        if self.schema_version not in {
+            "redagent.r119-target-mapping/v1",
+            "redagent.artifact-posture-target-mapping/v2",
+        }:
             raise ValueError("r119_target_mapping_schema_invalid")
         _identifier("target_mapping_id", self.mapping_id)
         _positive_int("target_mapping_revision", self.revision)
         if not isinstance(self.status, TargetMappingStatus):
             raise ValueError("r119_target_mapping_status_invalid")
-        if len(self.routes) != 2 or len({route.binding_key_sha256 for route in self.routes}) != 2:
+        expected_routes = (
+            2 if self.schema_version == "redagent.r119-target-mapping/v1" else 3
+        )
+        if len(self.routes) != expected_routes or len(
+            {route.binding_key_sha256 for route in self.routes}
+        ) != expected_routes:
             raise ValueError("r119_target_mapping_routes_invalid")
 
     @property
@@ -785,11 +793,12 @@ class DecisionContextSnapshotV1:
         if self.schema_version not in {
             "redagent.r119-decision-context/v1",
             "redagent.detection-decision-context/v2",
+            "redagent.artifact-posture-decision-context/v2",
         }:
             raise ValueError("r119_snapshot_schema_invalid")
-        if (self.schema_version == "redagent.r119-decision-context/v1") != (
-            not self.detection_observations
-        ):
+        if (
+            self.schema_version == "redagent.detection-decision-context/v2"
+        ) != bool(self.detection_observations):
             raise ValueError("detection_snapshot_schema_mismatch")
         _aware("r119_snapshot_at", self.snapshot_at)
         if not isinstance(self.collection_state, CollectionState):
@@ -837,7 +846,7 @@ class DecisionContextSnapshotV1:
             for field in self.__dataclass_fields__
             if field != "_validation_token"
         }
-        if self.schema_version == "redagent.r119-decision-context/v1":
+        if self.schema_version != "redagent.detection-decision-context/v2":
             body.pop("detection_observations")
         return body
 
@@ -845,6 +854,7 @@ class DecisionContextSnapshotV1:
 class StrategyObjectiveKind(str, Enum):
     HTTP_POSTURE = "http_posture"
     SECURITY_HEADER_ASSERTION = "security_header_assertion"
+    REPOSITORY_SNAPSHOT_POSTURE = "repository_snapshot_posture"
 
 
 class StrategyOutcome(str, Enum):
@@ -863,9 +873,13 @@ class StrategyObjectiveV1:
     kind: StrategyObjectiveKind
     header_code: str | None
     require_corroboration: bool
+    artifact_receipt: TypedReferenceV1 | None = None
 
     def __post_init__(self) -> None:
-        if self.schema_version != "redagent.r121-objective/v1":
+        if self.schema_version not in {
+            "redagent.r121-objective/v1",
+            "redagent.artifact-posture-objective/v2",
+        }:
             raise ValueError("r121_objective_schema_invalid")
         for name, value in (
             ("r121_objective_id", self.objective_id),
@@ -877,11 +891,31 @@ class StrategyObjectiveV1:
             raise ValueError("r121_objective_invalid")
         if not isinstance(self.require_corroboration, bool):
             raise ValueError("r121_objective_corroboration_invalid")
+        if self.schema_version == "redagent.r121-objective/v1" and (
+            self.kind is StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE
+            or self.artifact_receipt is not None
+        ):
+            raise ValueError("r121_objective_schema_invalid")
+        if self.schema_version == "redagent.artifact-posture-objective/v2" and (
+            self.kind is not StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE
+        ):
+            raise ValueError("r121_objective_schema_invalid")
         if self.kind is StrategyObjectiveKind.SECURITY_HEADER_ASSERTION:
             if self.header_code != "x-content-type-options":
                 raise ValueError("r121_objective_header_invalid")
         elif self.header_code is not None:
             raise ValueError("r121_objective_header_forbidden")
+        if self.kind is StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE:
+            if self.require_corroboration:
+                raise ValueError("r121_objective_artifact_corroboration_forbidden")
+        elif self.artifact_receipt is not None:
+            raise ValueError("r121_objective_artifact_receipt_forbidden")
+
+    def canonical_body(self) -> dict[str, object]:
+        body = asdict(self)
+        if self.schema_version == "redagent.r121-objective/v1":
+            body.pop("artifact_receipt")
+        return body
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -956,7 +990,7 @@ class CandidateDispositionV1:
             ("r121_candidate_reason", self.reason),
         ):
             _identifier(name, value)
-        if not isinstance(self.eligible, bool) or self.deterministic_priority not in {1, 2}:
+        if not isinstance(self.eligible, bool) or self.deterministic_priority not in {1, 2, 3}:
             raise ValueError("r121_candidate_disposition_invalid")
 
 
@@ -1036,6 +1070,7 @@ class StrategyDecisionReceiptV1:
         if self.schema_version not in {
             "redagent.r121-strategy-receipt/v1",
             "redagent.detection-strategy-receipt/v2",
+            "redagent.artifact-posture-strategy-receipt/v2",
         }:
             raise ValueError("r121_receipt_schema_invalid")
         if not isinstance(self.objective, StrategyObjectiveV1):
@@ -1057,7 +1092,15 @@ class StrategyDecisionReceiptV1:
             ("r121_receipt_reason", self.reason),
         ):
             _identifier(name, value)
-        if self.decision_table_revision != 1 or len(self.candidates) != 2:
+        expected_table, expected_candidates = (
+            (2, 3)
+            if self.schema_version == "redagent.artifact-posture-strategy-receipt/v2"
+            else (1, 2)
+        )
+        if (
+            self.decision_table_revision != expected_table
+            or len(self.candidates) != expected_candidates
+        ):
             raise ValueError("r121_receipt_table_or_candidates_invalid")
         if canonical_sha256(self.objective) != self.objective_sha256:
             raise ValueError("r121_receipt_objective_hash_mismatch")
@@ -1089,6 +1132,17 @@ class StrategyDecisionReceiptV1:
             self.snapshot.schema_version != "redagent.detection-decision-context/v2"
         ):
             raise ValueError("detection_receipt_schema_mismatch")
+        if self.schema_version == "redagent.artifact-posture-strategy-receipt/v2" and (
+            self.snapshot.schema_version
+            != "redagent.artifact-posture-decision-context/v2"
+            or self.detection_disposition is not None
+            or self.objective.schema_version
+            not in {
+                "redagent.r121-objective/v1",
+                "redagent.artifact-posture-objective/v2",
+            }
+        ):
+            raise ValueError("artifact_posture_receipt_schema_mismatch")
         if self.detection_disposition is not None:
             _sha256("detection_receipt_matrix", self.coverage_matrix_sha256)
         if self.receipt_sha256 != canonical_sha256(self.canonical_body()):
@@ -1100,7 +1154,7 @@ class StrategyDecisionReceiptV1:
             for field in self.__dataclass_fields__
             if field not in {"receipt_sha256", "_validation_token"}
         }
-        if self.schema_version == "redagent.r121-strategy-receipt/v1":
+        if self.schema_version != "redagent.detection-strategy-receipt/v2":
             body.pop("detection_disposition")
             body.pop("coverage_matrix_sha256")
         return body
@@ -1133,7 +1187,10 @@ class PlanRevisionV1:
     def __post_init__(self, _validation_token: object) -> None:
         if _validation_token is not _R121_VALIDATION_TOKEN:
             raise ValueError("r121_plan_factory_required")
-        if self.schema_version != "redagent.r121-plan-revision/v1":
+        if self.schema_version not in {
+            "redagent.r121-plan-revision/v1",
+            "redagent.artifact-posture-plan-revision/v2",
+        }:
             raise ValueError("r121_plan_schema_invalid")
         for name, value in (
             ("r121_plan_id", self.plan_id), ("r121_plan_tenant", self.tenant_id),
@@ -1149,7 +1206,14 @@ class PlanRevisionV1:
             ("plan", self.plan_sha256),
         ):
             _sha256(f"r121_plan_{name}", value)
-        if self.target.kind != "target" or self.revision != 1 or self.decision_table_revision != 1:
+        expected_table = (
+            2 if self.schema_version == "redagent.artifact-posture-plan-revision/v2" else 1
+        )
+        if (
+            self.target.kind != "target"
+            or self.revision != 1
+            or self.decision_table_revision != expected_table
+        ):
             raise ValueError("r121_plan_identity_invalid")
         if self.width != 1 or self.depth not in {1, 2}:
             raise ValueError("r121_plan_bounds_invalid")
@@ -1228,6 +1292,8 @@ def _normalize(value: object) -> object:
     if isinstance(value, DecisionContextSnapshotV1):
         return _normalize(value.canonical_body())
     if isinstance(value, StrategyDecisionReceiptV1):
+        return _normalize(value.canonical_body())
+    if isinstance(value, StrategyObjectiveV1):
         return _normalize(value.canonical_body())
     if hasattr(value, "__dataclass_fields__"):
         return _normalize(asdict(cast(Any, value)))

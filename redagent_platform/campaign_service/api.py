@@ -63,7 +63,7 @@ class CampaignReadinessStatusData(_StrictModel):
     ready: bool
     execution_enabled: bool
     reason: str = Field(min_length=1, max_length=100)
-    capability_ids: tuple[str, ...] = Field(max_length=2)
+    capability_ids: tuple[str, ...] = Field(max_length=3)
 
 
 class CampaignReadinessStatusResponse(_StrictModel):
@@ -179,7 +179,7 @@ class CampaignCoreCandidateData(_StrictModel):
 class CampaignCoreDecisionData(_StrictModel):
     outcome: str = Field(min_length=1, max_length=64)
     reason: str = Field(min_length=1, max_length=200)
-    candidates: tuple[CampaignCoreCandidateData, ...] = Field(max_length=2)
+    candidates: tuple[CampaignCoreCandidateData, ...] = Field(max_length=3)
 
 
 class CampaignCorePlanData(_StrictModel):

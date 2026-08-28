@@ -274,6 +274,8 @@ def test_closed_table_selects_zap_for_posture_and_nuclei_for_header() -> None:
     assert DECISION_TABLE_REVISION == 1
     assert posture_receipt.outcome is StrategyOutcome.SELECT
     assert posture_plan is not None
+    assert posture_receipt.receipt_sha256 == "f4a6b14804fcb1b299eac753c06b5838cc6f6221ac5e567fba4b1a00c08e5a48"
+    assert posture_plan.plan_sha256 == "f034e1c823fe517aba82bda64d2f8feefe2f3af43b7360c17dd1604b15ef978b"
     assert posture_plan.primary.capability_id == "zap-controlled-runtime"
     assert posture_plan.successor is not None
     assert posture_plan.successor.condition == "fresh_inconclusive_or_insufficient_observation"

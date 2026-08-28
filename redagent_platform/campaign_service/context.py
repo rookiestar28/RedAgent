@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 
 from redagent_platform.agent_kernel.contracts import ProjectedTool, ToolKind
 from redagent_platform.agent_kernel.registry import canonical_projected_tool_sha256
+from redagent_platform.artifact_pipeline.contracts import ArtifactKind, ArtifactProfile
+from redagent_platform.artifact_pipeline.profiles import canonical_profile_sha256 as canonical_artifact_profile_sha256
 from redagent_platform.campaign_service.contracts import (
     AuthorityContextV1,
     CapabilityBindingKeyV1,
@@ -67,17 +69,27 @@ _NUCLEI_IDENTITY = (
     "nuclei-certified-profile-v1",
 )
 _NUCLEI_BUNDLE_SHA256 = CURRENT_R105_HTTP_HEADER_BUNDLE_SHA256
+_ARTIFACT_IDENTITY = (
+    "artifact-posture",
+    1,
+    "redagent-canonical-artifact",
+    "1.0.0-r110.1",
+    "artifact-certified-plan-v1",
+)
 _EXPECTED_PROFILE_SHA256 = {
     "zap-controlled-runtime": "0efb350685643918582cf5905413ed867ace8e994867b764778e7f6e21dce4f2",  # pragma: allowlist secret
     "nuclei-trusted-runtime": "e3650cd3d57b7a73092fb7845ed1aa8aaafc50e46061c7a2d65952890a1016f0",  # pragma: allowlist secret
+    "artifact-posture": "1e0e70f9c6b63eb40606e1081cede810c748369b760d642e2b3f87a7effaa3e8",  # pragma: allowlist secret
 }
 _EXPECTED_MANIFEST_SHA256 = {
     "zap-controlled-runtime": "24c1c1a0f18a3bbf473f34107f1636c911e0711b6873988ceaaa4601b0f8c6c3",  # pragma: allowlist secret
     "nuclei-trusted-runtime": "f4a1d955aa81f19b9afe0bf6d55daa6cc78d0533c994875214f859e97b34cd82",  # pragma: allowlist secret
+    "artifact-posture": "968c0367f5f61c6c341b452287881b64b93efda49da657798e33f2e4bece4f86",  # pragma: allowlist secret
 }
 _EXPECTED_PROJECTION_SHA256 = {
     "zap-controlled-runtime": "bafa1c3b2bfe105407a0452408d3cf6e0dce343d331f50f6011ea087aac3eb6d",  # pragma: allowlist secret
     "nuclei-trusted-runtime": "08ff0dc9305bd11903104c09e4c18a5d7589c951a8e6c424bf4c73047b1a81b2",  # pragma: allowlist secret
+    "artifact-posture": "dbc5eef3b0cf3b46681a725d0f81d7d4c8932b9e9e1b30de665d9e63b272930f",  # pragma: allowlist secret
 }
 _EXPECTED_SEMANTICS_SHA256 = {
     "zap-controlled-runtime": "af1297769f1d9af7ca9cbec39dc08bf561d3a2dd322c6936c2c8eff6b862e2f9",  # pragma: allowlist secret
@@ -106,7 +118,8 @@ _EXPECTED_NUCLEI_BUNDLE = (
     "2026-08-24T17:03:42+08:00",
     "2026-09-23T17:03:42+08:00",
 )
-_EXPECTED_BINDINGS = frozenset({_ZAP_IDENTITY[0], _NUCLEI_IDENTITY[0]})
+_FIRST_SLICE_BINDINGS = frozenset({_ZAP_IDENTITY[0], _NUCLEI_IDENTITY[0]})
+_EXPECTED_BINDINGS = frozenset((*_FIRST_SLICE_BINDINGS, _ARTIFACT_IDENTITY[0]))
 _NORMALIZED_OUTPUT_CONTRACTS = {
     "zap-controlled-runtime": {
         ObservationKind.TARGET_REACHABILITY.value: (
@@ -165,6 +178,28 @@ _NORMALIZED_OUTPUT_CONTRACTS = {
             "evidence", "$evidence",
         ),
     },
+    "artifact-posture": {
+        ObservationKind.CAPABILITY_OUTCOME.value: (
+            "redagent-canonical-artifact",
+            "1.0.0-r110.1",
+            "artifact-static-result-v1",
+            "capability-outcome",
+            "terminal-status",
+            "/repository-snapshot/posture",
+            "capability",
+            "$capability",
+        ),
+        ObservationKind.EVIDENCE_IDENTITY.value: (
+            "redagent-canonical-artifact",
+            "1.0.0-r110.1",
+            "artifact-cleanup-v1",
+            "evidence-identity",
+            "finalized-evidence",
+            "/repository-snapshot/posture",
+            "evidence",
+            "$evidence",
+        ),
+    },
 }
 _MAX_FACTS = 256
 
@@ -221,7 +256,7 @@ def build_first_slice_semantics(
         zap_projection.source_capability_id: zap_projection,
         nuclei_projection.source_capability_id: nuclei_projection,
     }
-    if set(projections) != _EXPECTED_BINDINGS:
+    if set(projections) != _FIRST_SLICE_BINDINGS:
         raise ValueError("r119_projection_identity_mismatch")
 
     zap_definition = CapabilitySemanticsDefinitionV1(
@@ -352,11 +387,122 @@ def build_first_slice_semantics(
     )
 
 
+def promote_artifact_posture_semantics(
+    *,
+    first_slice_semantics: tuple[PromotedCapabilitySemanticsV1, ...],
+    artifact_capability: ExecutionCapabilityManifest,
+    artifact_projection: ProjectedTool,
+    profile: ArtifactProfile,
+    promoted_at: datetime,
+    expires_at: datetime,
+) -> tuple[PromotedCapabilitySemanticsV1, ...]:
+    """Add only the exact current R110 repository-snapshot zero-execution binding."""
+    indexed = _index_semantics(first_slice_semantics)
+    if set(indexed) != _FIRST_SLICE_BINDINGS:
+        raise ValueError("artifact_posture_first_slice_required")
+    _validate_window(promoted_at, expires_at)
+    if expires_at > promoted_at + timedelta(days=30):
+        raise ValueError("artifact_posture_semantics_window_exceeded")
+    _validate_capability(
+        artifact_capability,
+        expected=_ARTIFACT_IDENTITY,
+        label="artifact",
+    )
+    if (
+        profile.profile_id != "r110-repository-snapshot-v1"
+        or profile.artifact_kind is not ArtifactKind.REPOSITORY_SNAPSHOT
+        or canonical_artifact_profile_sha256(profile)
+        != _EXPECTED_PROFILE_SHA256["artifact-posture"]
+        or artifact_capability.network_mode.value != "none"
+        or artifact_capability.credential_class.value != "none"
+        or artifact_capability.network_mode.value == "host"
+    ):
+        raise ValueError("artifact_posture_profile_or_execution_boundary_invalid")
+    _validate_projection(
+        artifact_projection,
+        capability=artifact_capability,
+        label="artifact",
+    )
+    definition = _artifact_posture_definition()
+    binding = CapabilityBindingKeyV1(
+        schema_version="redagent.r119-capability-binding/v1",
+        capability_id=artifact_capability.capability_id,
+        capability_revision=artifact_capability.revision,
+        execution_manifest_sha256=canonical_capability_sha256(artifact_capability),
+        adapter_id=artifact_capability.adapter_id,
+        adapter_version=artifact_capability.adapter_version,
+        profile_id=profile.profile_id,
+        profile_revision=1,
+        profile_sha256=canonical_artifact_profile_sha256(profile),
+        bundle_id=None,
+        bundle_revision=None,
+        bundle_sha256=None,
+        semantics_revision=definition.revision,
+        semantics_sha256=definition.semantics_sha256,
+        normalized_output_sha256=canonical_sha256(
+            _NORMALIZED_OUTPUT_CONTRACTS["artifact-posture"]
+        ),
+        projection_revision=1,
+        projection_sha256=canonical_projected_tool_sha256(artifact_projection),
+    )
+    sidecar = PromotedCapabilitySemanticsV1(
+        schema_version="redagent.r119-promoted-semantics/v1",
+        binding_key=binding,
+        definition=definition,
+        promotion_status="promoted",
+        promoted_at=promoted_at,
+        expires_at=expires_at,
+    )
+    return tuple((*first_slice_semantics, sidecar))
+
+
+def _artifact_posture_definition() -> CapabilitySemanticsDefinitionV1:
+    return CapabilitySemanticsDefinitionV1(
+        schema_version="redagent.r119-capability-semantics/v1",
+        semantics_id="artifact-repository-snapshot-posture-v1",
+        revision=1,
+        target_class="repository-snapshot",
+        environment_class="data-only-sandbox",
+        preconditions=(
+            "artifact-receipt-current",
+            "roe-current",
+            "policy-allowed",
+            "repository-snapshot-profile-current",
+        ),
+        observation_kinds=(
+            ObservationKind.CAPABILITY_OUTCOME,
+            ObservationKind.EVIDENCE_IDENTITY,
+        ),
+        effects=("repository-snapshot-posture",),
+        risk_class="zero-execution",
+        noise_class="none",
+        cost_class="bounded-minimal",
+        duration_class="under-one-minute",
+        evidence_schemas=(
+            "artifact-manifest-v1",
+            "artifact-component-v1",
+            "artifact-static-result-v1",
+            "artifact-cleanup-v1",
+        ),
+        cleanup="artifact-zero-execution-cleanup",
+        compensation="revoke-artifact-lease",
+        stop_conditions=(
+            "authority-drift",
+            "artifact-receipt-stale",
+            "evidence-failure",
+            "cleanup-failure",
+        ),
+        freshness_seconds=3600,
+        qualification="artifact-promotion-qualified",
+        deprecation="review-before-source-revision-change",
+    )
+
+
 def build_first_slice_target_mapping(
     semantics: tuple[PromotedCapabilitySemanticsV1, ...],
 ) -> TargetMappingV1:
     indexed = _index_semantics(semantics)
-    if set(indexed) != _EXPECTED_BINDINGS:
+    if set(indexed) != _FIRST_SLICE_BINDINGS:
         raise ValueError("r119_target_mapping_semantics_required")
     routes = (
         TargetRouteV1(
@@ -378,6 +524,31 @@ def build_first_slice_target_mapping(
         schema_version="redagent.r119-target-mapping/v1",
         mapping_id="owned-loopback-http-first-slice",
         revision=1,
+        status=TargetMappingStatus.PROMOTED,
+        routes=routes,
+    )
+
+
+def build_artifact_posture_target_mapping(
+    semantics: tuple[PromotedCapabilitySemanticsV1, ...],
+) -> TargetMappingV1:
+    indexed = _index_semantics(semantics)
+    if set(indexed) != _EXPECTED_BINDINGS:
+        raise ValueError("artifact_posture_target_mapping_semantics_required")
+    first_slice = build_first_slice_target_mapping(
+        tuple(indexed[key] for key in sorted(_FIRST_SLICE_BINDINGS))
+    )
+    routes = (*first_slice.routes, TargetRouteV1(
+        binding_key_sha256=canonical_sha256(indexed["artifact-posture"].binding_key),
+        target_class="repository-snapshot",
+        application_class="canonical-artifact-binding",
+        environment_class="data-only-sandbox",
+        path_class="artifact-posture-data-only",
+    ))
+    return TargetMappingV1(
+        schema_version="redagent.artifact-posture-target-mapping/v2",
+        mapping_id="artifact-posture-three-capability",
+        revision=2,
         status=TargetMappingStatus.PROMOTED,
         routes=routes,
     )
@@ -411,7 +582,10 @@ def build_decision_context_snapshot(
     if collection_state is CollectionState.FAILED and any(current_lanes):
         raise ValueError("r119_failed_collection_has_current_facts")
     indexed_semantics = _index_semantics(semantics)
-    if set(indexed_semantics) != _EXPECTED_BINDINGS:
+    expected_bindings = (
+        _EXPECTED_BINDINGS if len(indexed_semantics) == 3 else _FIRST_SLICE_BINDINGS
+    )
+    if set(indexed_semantics) != expected_bindings:
         raise ValueError("r119_semantics_exact_set_required")
     semantics_sorted = tuple(indexed_semantics[key] for key in sorted(indexed_semantics))
     for sidecar in semantics_sorted:
@@ -420,7 +594,11 @@ def build_decision_context_snapshot(
         if not sidecar.promoted_at <= snapshot_at < sidecar.expires_at:
             raise ValueError("r119_semantics_not_current")
 
-    expected_mapping = build_first_slice_target_mapping(semantics_sorted)
+    expected_mapping = (
+        build_artifact_posture_target_mapping(semantics_sorted)
+        if expected_bindings == _EXPECTED_BINDINGS
+        else build_first_slice_target_mapping(semantics_sorted)
+    )
     if (
         target_mapping.status is not TargetMappingStatus.PROMOTED
         or target_mapping.mapping_sha256 != expected_mapping.mapping_sha256
@@ -429,17 +607,29 @@ def build_decision_context_snapshot(
         raise ValueError("r119_authority_target_mapping_mismatch")
     if not authority.issued_at <= snapshot_at < authority.expires_at:
         raise ValueError("r119_authority_not_current")
+    allowed_authority_classes = {
+        (
+            "owned-http-application",
+            "synthetic-security-header-fixture",
+            "owned-loopback-lab",
+            "owned-loopback-gateway",
+        )
+    }
+    if expected_bindings == _EXPECTED_BINDINGS:
+        allowed_authority_classes.add(
+            (
+                "repository-snapshot",
+                "canonical-artifact-binding",
+                "data-only-sandbox",
+                "no-url",
+            )
+        )
     if (
         authority.target_class,
         authority.application_class,
         authority.environment_class,
         authority.url_class,
-    ) != (
-        "owned-http-application",
-        "synthetic-security-header-fixture",
-        "owned-loopback-lab",
-        "owned-loopback-gateway",
-    ):
+    ) not in allowed_authority_classes:
         raise ValueError("r119_authority_target_class_denied")
 
     capability_section_sha256 = canonical_sha256(semantics_sorted)
@@ -502,6 +692,8 @@ def build_decision_context_snapshot(
             prior_complete_snapshot.conflicts if prior_complete_snapshot is not None else ()
         ),
     )
+    if expected_bindings == _EXPECTED_BINDINGS and current_detection_observations:
+        raise ValueError("artifact_posture_detection_observations_forbidden")
     detection_observations = validate_detection_snapshot_inputs(
         current=current_detection_observations,
         prior=prior_detection_observations,
@@ -530,6 +722,8 @@ def build_decision_context_snapshot(
     snapshot_schema_version = (
         "redagent.detection-decision-context/v2"
         if detection_observations
+        else "redagent.artifact-posture-decision-context/v2"
+        if expected_bindings == _EXPECTED_BINDINGS
         else "redagent.r119-decision-context/v1"
     )
     trusted_section_sha256 = canonical_sha256(trusted_body)
@@ -584,7 +778,7 @@ def _validate_capability(
 def _index_semantics(
     semantics: tuple[PromotedCapabilitySemanticsV1, ...],
 ) -> dict[str, PromotedCapabilitySemanticsV1]:
-    if len(semantics) > 2:
+    if len(semantics) > 3:
         raise ValueError("r119_semantics_count_exceeded")
     output: dict[str, PromotedCapabilitySemanticsV1] = {}
     binding_hashes: set[str] = set()
@@ -593,15 +787,41 @@ def _index_semantics(
         binding_hash = canonical_sha256(item.binding_key)
         if capability_id not in _EXPECTED_BINDINGS:
             raise ValueError("r119_semantics_capability_denied")
-        label = "zap" if capability_id == _ZAP_IDENTITY[0] else "nuclei"
+        label = (
+            "zap"
+            if capability_id == _ZAP_IDENTITY[0]
+            else "nuclei"
+            if capability_id == _NUCLEI_IDENTITY[0]
+            else "artifact"
+        )
         # CRITICAL: direct dataclass construction must not bypass the promoted semantic lock.
-        if item.definition.semantics_sha256 != _EXPECTED_SEMANTICS_SHA256[capability_id]:
+        expected_definition_sha256 = (
+            _artifact_posture_definition().semantics_sha256
+            if capability_id == "artifact-posture"
+            else _EXPECTED_SEMANTICS_SHA256[capability_id]
+        )
+        if item.definition.semantics_sha256 != expected_definition_sha256:
             raise ValueError(f"r119_{label}_semantics_digest_mismatch")
         if item.binding_key.normalized_output_sha256 != canonical_sha256(
             _NORMALIZED_OUTPUT_CONTRACTS[capability_id]
         ):
             raise ValueError(f"r119_{label}_normalized_output_digest_mismatch")
-        if binding_hash != _EXPECTED_BINDING_SHA256[capability_id]:
+        if capability_id == "artifact-posture":
+            binding = item.binding_key
+            if (
+                binding.capability_revision != 1
+                or binding.execution_manifest_sha256
+                != _EXPECTED_MANIFEST_SHA256[capability_id]
+                or binding.adapter_id != _ARTIFACT_IDENTITY[2]
+                or binding.adapter_version != _ARTIFACT_IDENTITY[3]
+                or binding.profile_id != "r110-repository-snapshot-v1"
+                or binding.profile_revision != 1
+                or binding.profile_sha256 != _EXPECTED_PROFILE_SHA256[capability_id]
+                or binding.bundle_id is not None
+                or binding.projection_sha256 != _EXPECTED_PROJECTION_SHA256[capability_id]
+            ):
+                raise ValueError("r119_artifact_binding_digest_mismatch")
+        elif binding_hash != _EXPECTED_BINDING_SHA256[capability_id]:
             raise ValueError(f"r119_{label}_binding_digest_mismatch")
         if item.expires_at > item.promoted_at + timedelta(days=30):
             raise ValueError("r119_semantics_window_exceeded")

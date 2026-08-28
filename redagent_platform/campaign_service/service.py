@@ -1167,7 +1167,7 @@ class CampaignStartRequest:
         ):
             _required(f"campaign_start_{name}", getattr(self, name), 200)
         if self.objective_kind not in {
-            "http_posture", "security_header_assertion",
+            "http_posture", "security_header_assertion", "repository_snapshot_posture",
         }:
             raise ValueError("campaign_start_objective_invalid")
         if self.objective_kind == "security_header_assertion":
@@ -1179,6 +1179,8 @@ class CampaignStartRequest:
             raise ValueError("campaign_start_corroboration_invalid")
         if self.risk_profile != "tier1_passive":
             raise ValueError("campaign_start_risk_profile_denied")
+        if self.objective_kind == "repository_snapshot_posture" and self.require_corroboration:
+            raise ValueError("campaign_start_artifact_corroboration_forbidden")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1192,6 +1194,7 @@ class CampaignCoreAuthorizedResource:
     eligible: bool
     unavailable_reason: str | None
     parent_id: str | None = None
+    target_class: str = "owned-http"
 
     def __post_init__(self) -> None:
         _required("r124_resource_id", self.resource_id, 200)
@@ -1209,6 +1212,8 @@ class CampaignCoreAuthorizedResource:
             raise ValueError("r124_resource_ineligible_reason_required")
         if self.parent_id is not None:
             _required("r124_resource_parent", self.parent_id, 200)
+        if self.target_class not in {"owned-http", "repository-snapshot"}:
+            raise ValueError("r124_resource_target_class_invalid")
 
 
 class CampaignCoreAuthorizedOptionOwner(Protocol):
@@ -1270,6 +1275,11 @@ class CampaignCoreService:
             "security_header_assertion",
             "x-content-type-options",
             True,
+        ),
+        "Assess repository snapshot posture": (
+            "repository_snapshot_posture",
+            None,
+            False,
         ),
     }
 
@@ -1425,6 +1435,9 @@ class CampaignCoreService:
         ):
             raise ValueError("risk_profile_unsupported")
         objective_kind, header_code, corroboration = objective_contract
+        artifact_objective = objective_kind == "repository_snapshot_posture"
+        if artifact_objective != (target.target_class == "repository-snapshot"):
+            raise ValueError("objective_target_class_mismatch")
         receipt = await self._starter.start(
             CampaignStartRequest(
                 tenant_id=tenant_id,
@@ -1707,6 +1720,14 @@ class CampaignStartMaterial:
         if self.context_schema == "redagent.r119-decision-context/v1":
             if self.decision_schema != "redagent.r121-strategy-receipt/v1":
                 raise ValueError("campaign_start_decision_schema_invalid")
+        elif (
+            self.context_schema,
+            self.decision_schema,
+        ) == (
+            "redagent.artifact-posture-decision-context/v2",
+            "redagent.artifact-posture-strategy-receipt/v2",
+        ):
+            pass
         elif not detection_feedback_contracts.detection_campaign_schema_pair_is_valid(
             self.context_schema, self.decision_schema
         ):
@@ -1734,6 +1755,7 @@ class CampaignPlanningFacts:
     authority: AuthorityContextV1
     projections: tuple[ProjectedTool, ...]
     detection_adaptation: detection_feedback_contracts.DetectionAdaptationRequestV1 | None = None
+    artifact_receipt: TypedReferenceV1 | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -1742,6 +1764,13 @@ class CampaignPlanningFacts:
             or not isinstance(self.projections, tuple)
             or not self.projections
             or not all(isinstance(item, ProjectedTool) for item in self.projections)
+            or (
+                self.artifact_receipt is not None
+                and (
+                    not isinstance(self.artifact_receipt, TypedReferenceV1)
+                    or self.artifact_receipt.kind != "artifact-receipt"
+                )
+            )
             or (
                 self.detection_adaptation is not None
                 and not isinstance(
@@ -1830,8 +1859,15 @@ class DeterministicCampaignStartPlanner:
             or facts.snapshot.target_mapping_sha256 != r119.target_mapping_sha256
         ):
             raise ValueError("campaign_planning_authority_mismatch")
+        artifact_objective = (
+            request.objective_kind == StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE.value
+        )
         objective = StrategyObjectiveV1(
-            schema_version="redagent.r121-objective/v1",
+            schema_version=(
+                "redagent.artifact-posture-objective/v2"
+                if artifact_objective
+                else "redagent.r121-objective/v1"
+            ),
             objective_id=(
                 "objective-"
                 + hashlib.sha256(campaign_id.encode("utf-8")).hexdigest()[:24]
@@ -1846,6 +1882,7 @@ class DeterministicCampaignStartPlanner:
             kind=StrategyObjectiveKind(request.objective_kind),
             header_code=request.header_code,
             require_corroboration=request.require_corroboration,
+            artifact_receipt=facts.artifact_receipt if artifact_objective else None,
         )
         receipt, plan = decide_strategy(
             objective=objective,
@@ -1854,10 +1891,10 @@ class DeterministicCampaignStartPlanner:
             projections=facts.projections,
             budget=StrategyBudgetV1(
                 max_elapsed_seconds=60,
-                max_operations=2,
+                max_operations=1 if artifact_objective else 2,
                 max_targets=1,
                 max_evidence_bytes=1_048_576,
-                max_depth=2,
+                max_depth=1 if artifact_objective else 2,
             ),
             signals=StrategySignalsV1(),
             model_proposal=None,
@@ -2331,7 +2368,7 @@ def binding_from_campaign_context(
     if not isinstance(context_payload, dict):
         raise ValueError("campaign_context_binding_inventory_invalid")
     raw_bindings = context_payload.get("bindings")
-    if not isinstance(raw_bindings, list) or len(raw_bindings) != 2:
+    if not isinstance(raw_bindings, list) or len(raw_bindings) not in {2, 3}:
         raise ValueError("campaign_context_binding_inventory_invalid")
     try:
         bindings = tuple(
@@ -2341,9 +2378,13 @@ def binding_from_campaign_context(
         )
     except (TypeError, ValueError) as exc:
         raise ValueError("campaign_context_binding_inventory_invalid") from exc
-    if len(bindings) != 2 or {
-        item.capability_id for item in bindings
-    } != {"zap-controlled-runtime", "nuclei-trusted-runtime"}:
+    capability_ids = {item.capability_id for item in bindings}
+    expected_ids = (
+        {"zap-controlled-runtime", "nuclei-trusted-runtime"}
+        if len(bindings) == 2
+        else {"artifact-posture", "zap-controlled-runtime", "nuclei-trusted-runtime"}
+    )
+    if len(bindings) != len(raw_bindings) or capability_ids != expected_ids:
         raise ValueError("campaign_context_binding_inventory_invalid")
     selected = tuple(item for item in bindings if item.capability_id == capability_id)
     if len(selected) != 1:

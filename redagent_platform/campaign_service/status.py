@@ -664,7 +664,7 @@ def _public_effect(row: object) -> dict[str, object]:
 
 
 def _public_candidates(value: object) -> list[dict[str, object]]:
-    if not isinstance(value, list) or len(value) > 2:
+    if not isinstance(value, list) or len(value) > 3:
         raise ValueError("r124_candidate_projection_invalid")
     projected: list[dict[str, object]] = []
     for candidate in value:
@@ -703,7 +703,11 @@ def _public_plan(plan: object) -> dict[str, object]:
             str(successor.get("condition")) if isinstance(successor, dict) else None
         ),
         "depth": int(plan.get("depth", 1)),
-        "risk": "Tier 1 passive, owned-loopback only",
+        "risk": (
+            "Tier 1, data-only zero execution"
+            if primary.get("capability_id") == "artifact-posture"
+            else "Tier 1 passive, owned-loopback only"
+        ),
         "cost": (
             f"At most {int(budget.get('max_operations', 2))} operations in "
             f"{int(budget.get('max_elapsed_seconds', 300))} seconds"
@@ -716,6 +720,7 @@ def _public_plan(plan: object) -> dict[str, object]:
 
 def _human_capability(value: object) -> str:
     return {
+        "artifact-posture": "Repository snapshot posture assessment",
         "zap-controlled-runtime": "Primary web posture assessment",
         "nuclei-trusted-runtime": "Independent corroboration assessment",
     }.get(str(value), "Unavailable reviewed capability")

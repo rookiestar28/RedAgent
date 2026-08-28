@@ -354,6 +354,7 @@ async function runCampaignCommand(
       const objectives = [
         "Assess HTTP security posture",
         "Verify X-Content-Type-Options",
+        "Assess repository snapshot posture",
       ] as const;
       const objective = await selectText(terminal, "Objective", objectives);
       const risks = await client.listCampaignCoreRiskOptions(engagement.binding, target.binding);

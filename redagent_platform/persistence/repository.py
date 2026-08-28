@@ -11,6 +11,7 @@ from uuid import uuid4
 from sqlalchemy import insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from redagent_platform.campaign_service.registry import closed_execution_binding_for
 from redagent_platform.orchestration.contracts import (
     ActivityCommand,
     ActivityResult,
@@ -816,9 +817,13 @@ class ControlPlaneRepository:
                 effects.c.effect_id == normalized_effect,
             )
         )
+        try:
+            expected_capability = closed_execution_binding_for(capability_id).capability_key
+        except ValueError as exc:
+            raise RecordConflict("r123_runner_job_capability_mismatch") from exc
         if not isinstance(effect_payload, dict) or effect_payload.get(
             "capability_id"
-        ) != f"{capability_id}@2":
+        ) != expected_capability:
             raise RecordConflict("r123_runner_job_capability_mismatch")
         stable = hashlib.sha256(
             f"{self.tenant_id}\0{normalized_campaign}\0{normalized_effect}".encode("utf-8")

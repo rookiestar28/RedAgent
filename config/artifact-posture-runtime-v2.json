@@ -1,0 +1,15 @@
+{
+  "archive_extraction_allowed": false,
+  "credential_allowed": false,
+  "external_adapter_execution": false,
+  "network_allowed": false,
+  "package_lifecycle_allowed": false,
+  "production_qualified": false,
+  "profile_id": "r110-repository-snapshot-v1",
+  "project_config_allowed": false,
+  "qualification_file_sha256": "7c944195c264a3f157a3918df385dd8f39b5a55d46280850429a5b607077376b",
+  "qualification_receipt_sha256": "09134f48c5d601f15849a0d420f2da0cbd356264c1464f31d25e89d663456735",
+  "schema": "redagent.artifact-posture-runtime-lock/v2",
+  "source_sha256": "6e9d74681ef67282f9644f13736aada2387aeb0c5edfd1a9085f42aa4dac947d",
+  "subprocess_allowed": false
+}

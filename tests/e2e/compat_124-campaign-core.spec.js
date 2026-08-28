@@ -62,6 +62,27 @@ test("compat_124 attention and recovery surfaces expose guidance without raw-ID 
   await expect(page.getByText("opaque-attention-binding")).toHaveCount(0);
 });
 
+test("R129 repository posture uses only server-projected opaque selections", async ({ page }) => {
+  let startRequest;
+  await campaignRoutes(page, async (request) => { startRequest = request; });
+  await page.goto("/campaigns/new");
+
+  await page.getByLabel("Authorized engagement").selectOption("opaque-engagement-a");
+  await page.getByLabel("Authorized target").selectOption("opaque-artifact-binding");
+  await page.getByLabel("Objective").selectOption("Assess repository snapshot posture");
+  await page.getByLabel("Risk profile").selectOption("opaque-risk-tier1");
+  await page.getByRole("button", { name: "Start authorized campaign" }).click();
+
+  expect(await startRequest.postDataJSON()).toEqual({
+    engagement_binding: "opaque-engagement-a",
+    target_binding: "opaque-artifact-binding",
+    objective: "Assess repository snapshot posture",
+    risk_profile: "opaque-risk-tier1",
+  });
+  await expect(page.getByRole("main").getByLabel(/repository|artifact receipt|path|url|command|credential/i)).toHaveCount(0);
+  await expect(page.getByText("Stop remains available.")).toBeVisible();
+});
+
 test("compat_124 create denial keeps CSRF feedback actionable without exposing raw IDs", async ({ page }) => {
   await campaignRoutes(page, async () => ({
     body: {
@@ -109,6 +130,7 @@ async function campaignRoutes(page, onStart = async () => {}) {
       return json(route, optionPage([
         option("opaque-target-a", "HTTP fixture alpha"),
         option("opaque-target-b", "HTTP fixture beta"),
+        option("opaque-artifact-binding", "Repository snapshot: canonical data-only binding"),
       ]));
     }
     if (path === "/api/v1/campaign-core/options/risk-profiles") {

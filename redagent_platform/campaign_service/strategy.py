@@ -37,11 +37,17 @@ from redagent_platform.campaign_service.detection_feedback import (
 
 
 DECISION_TABLE_REVISION = 1
+ARTIFACT_DECISION_TABLE_REVISION = 2
 _ZAP = "zap-controlled-runtime"
 _NUCLEI = "nuclei-trusted-runtime"
+_ARTIFACT = "artifact-posture"
 _EXPECTED = {
     _ZAP: ("target_allowlist", "http_header", "high"),
     _NUCLEI: ("target_allowlist", "none", "high"),
+}
+_EXPECTED_WITH_ARTIFACT = {
+    **_EXPECTED,
+    _ARTIFACT: ("none", "none", "high"),
 }
 _GLOBAL_STOPS = ("objective-satisfied", "budget-exhausted")
 
@@ -68,6 +74,19 @@ def decide_strategy(
     )
     semantics = {item.binding_key.capability_id: item for item in snapshot.semantics}
     projected = {item.source_capability_id: item for item in projections}
+    if _ARTIFACT in semantics:
+        if detection_adaptation is not None:
+            raise ValueError("artifact_posture_detection_adaptation_forbidden")
+        return _decide_artifact_policy_revision(
+            objective=objective,
+            snapshot=snapshot,
+            authority=authority,
+            projected=projected,
+            semantics=semantics,
+            budget=budget,
+            signals=signals,
+            model_proposal=model_proposal,
+        )
     detection_disposition = None
     coverage_matrix_sha256 = None
     detection_flagged: frozenset[str] = frozenset()
@@ -363,7 +382,11 @@ def _build_selected_plan(
             ),
         )
     plan_values: dict[str, object] = {
-        "schema_version": "redagent.r121-plan-revision/v1",
+        "schema_version": (
+            "redagent.artifact-posture-plan-revision/v2"
+            if receipt.decision_table_revision == ARTIFACT_DECISION_TABLE_REVISION
+            else "redagent.r121-plan-revision/v1"
+        ),
         "plan_id": f"plan-{receipt.receipt_sha256[:24]}",
         "revision": 1,
         "tenant_id": objective.tenant_id,
@@ -377,7 +400,7 @@ def _build_selected_plan(
         "policy_sha256": authority.policy_sha256,
         "roe_version_id": authority.roe_version_id,
         "roe_sha256": authority.roe_sha256,
-        "decision_table_revision": DECISION_TABLE_REVISION,
+        "decision_table_revision": receipt.decision_table_revision,
         "width": 1,
         "depth": 2 if successor is not None else 1,
         "primary": primary,
@@ -512,8 +535,14 @@ def _validate_inputs(
     if expected_trusted != snapshot.trusted_section_sha256:
         raise ValueError("r121_snapshot_trusted_digest_mismatch")
     semantics = {item.binding_key.capability_id: item for item in snapshot.semantics}
-    if set(semantics) != set(_EXPECTED) or len(snapshot.semantics) != 2:
+    expected = _EXPECTED_WITH_ARTIFACT if _ARTIFACT in semantics else _EXPECTED
+    if set(semantics) != set(expected) or len(snapshot.semantics) != len(expected):
         raise ValueError("r121_semantics_set_mismatch")
+    if (
+        objective.kind is StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE
+        and _ARTIFACT not in semantics
+    ):
+        raise ValueError("artifact_posture_semantics_required")
     freshness = min(item.definition.freshness_seconds for item in snapshot.semantics)
     if now - snapshot.snapshot_at >= timedelta(seconds=freshness):
         raise ValueError("r121_snapshot_stale")
@@ -526,11 +555,11 @@ def _validate_inputs(
             raise ValueError("r121_semantics_not_current")
     _validate_fact_currency(snapshot=snapshot, semantics=semantics, now=now)
     projected = {item.source_capability_id: item for item in projections}
-    if set(projected) != set(_EXPECTED) or len(projections) != 2:
+    if set(projected) != set(expected) or len(projections) != len(expected):
         raise ValueError("r121_projection_set_mismatch")
     for capability_id, sidecar in semantics.items():
         tool = projected[capability_id]
-        expected_network, expected_credential, expected_approval = _EXPECTED[capability_id]
+        expected_network, expected_credential, expected_approval = expected[capability_id]
         if (
             tool.tool_kind is not ToolKind.PROPOSAL
             or tool.source_capability_revision != sidecar.binding_key.capability_revision
@@ -710,6 +739,161 @@ def _build_receipt(
     return _validated_strategy_receipt(
         **values,
         receipt_sha256=canonical_sha256(digest_body),
+    )
+
+
+def _decide_artifact_policy_revision(
+    *,
+    objective: StrategyObjectiveV1,
+    snapshot: DecisionContextSnapshotV1,
+    authority: AuthorityContextV1,
+    projected: dict[str, ProjectedTool],
+    semantics: dict[str, PromotedCapabilitySemanticsV1],
+    budget: StrategyBudgetV1,
+    signals: StrategySignalsV1,
+    model_proposal: ModelStrategyProposalV1 | None,
+) -> tuple[StrategyDecisionReceiptV1, PlanRevisionV1 | None]:
+    preferred = {
+        StrategyObjectiveKind.HTTP_POSTURE: _ZAP,
+        StrategyObjectiveKind.SECURITY_HEADER_ASSERTION: _NUCLEI,
+        StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE: _ARTIFACT,
+    }[objective.kind]
+    outcome = StrategyOutcome.SELECT
+    matched_rule = {
+        StrategyObjectiveKind.HTTP_POSTURE: "select-http-posture-v2",
+        StrategyObjectiveKind.SECURITY_HEADER_ASSERTION: "select-header-assertion-v2",
+        StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE: "select-repository-posture-v2",
+    }[objective.kind]
+    reason = "primary_selected"
+    selected: str | None = canonical_sha256(semantics[preferred].binding_key)
+
+    if signals.stop_reason is not None:
+        outcome = StrategyOutcome.STOP
+        matched_rule = "operational-stop-v2"
+        reason = signals.stop_reason
+        selected = None
+    elif not _budget_allows_primary(budget):
+        outcome = StrategyOutcome.STOP
+        matched_rule = "budget-stop-v2"
+        reason = "budget_exhausted"
+        selected = None
+    elif objective.kind is StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE:
+        artifact_receipt = objective.artifact_receipt
+        if artifact_receipt is None:
+            outcome = StrategyOutcome.STOP
+            matched_rule = "artifact-receipt-required-v2"
+            reason = "artifact_receipt_missing"
+            selected = None
+        elif artifact_receipt.kind == "artifact-receipt-inconclusive":
+            outcome = StrategyOutcome.SKIP
+            matched_rule = "artifact-receipt-current-v2"
+            reason = "artifact_receipt_inconclusive"
+            selected = None
+        elif artifact_receipt.kind in {
+            "artifact-receipt-stale",
+            "artifact-receipt-denied",
+        }:
+            outcome = StrategyOutcome.STOP
+            matched_rule = "artifact-receipt-current-v2"
+            reason = (
+                "artifact_receipt_"
+                + artifact_receipt.kind.removeprefix("artifact-receipt-")
+            )
+            selected = None
+        elif artifact_receipt.kind != "artifact-receipt":
+            outcome = StrategyOutcome.STOP
+            matched_rule = "artifact-receipt-current-v2"
+            reason = "artifact_receipt_denied"
+            selected = None
+        elif (
+            artifact_receipt.sha256
+            != semantics[_ARTIFACT].binding_key.execution_manifest_sha256
+        ):
+            outcome = StrategyOutcome.STOP
+            matched_rule = "artifact-receipt-current-v2"
+            reason = "artifact_receipt_mismatch"
+            selected = None
+
+    priorities = {
+        capability_id: priority
+        for priority, capability_id in enumerate(
+            (
+                (_ARTIFACT, _ZAP, _NUCLEI)
+                if objective.kind is StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE
+                else (_ZAP, _NUCLEI, _ARTIFACT)
+                if objective.kind is StrategyObjectiveKind.HTTP_POSTURE
+                else (_NUCLEI, _ZAP, _ARTIFACT)
+            ),
+            start=1,
+        )
+    }
+    dispositions = tuple(
+        sorted(
+            (
+                CandidateDispositionV1(
+                    binding_key_sha256=canonical_sha256(sidecar.binding_key),
+                    capability_id=capability_id,
+                    eligible=(outcome is StrategyOutcome.SELECT and capability_id == preferred),
+                    deterministic_priority=priorities[capability_id],
+                    matched_rule=matched_rule,
+                    reason=(
+                        "selected_candidate"
+                        if outcome is StrategyOutcome.SELECT and capability_id == preferred
+                        else reason
+                        if capability_id == preferred
+                        else "objective_incompatible"
+                    ),
+                )
+                for capability_id, sidecar in semantics.items()
+            ),
+            key=lambda item: item.binding_key_sha256,
+        )
+    )
+    values: dict[str, object] = {
+        "schema_version": "redagent.artifact-posture-strategy-receipt/v2",
+        "objective": objective,
+        "objective_sha256": canonical_sha256(objective),
+        "snapshot": snapshot,
+        "snapshot_sha256": snapshot.snapshot_sha256,
+        "capability_section_sha256": snapshot.capability_section_sha256,
+        "trusted_section_sha256": snapshot.trusted_section_sha256,
+        "authority_sha256": snapshot.authority_sha256,
+        "target_mapping_sha256": snapshot.target_mapping_sha256,
+        "policy_revision": authority.policy_revision,
+        "policy_sha256": authority.policy_sha256,
+        "roe_version_id": authority.roe_version_id,
+        "roe_sha256": authority.roe_sha256,
+        "decision_table_revision": ARTIFACT_DECISION_TABLE_REVISION,
+        "candidates": dispositions,
+        "outcome": outcome,
+        "matched_rule": matched_rule,
+        "reason": reason,
+        "selected_binding_sha256": selected,
+        "detection_disposition": None,
+        "coverage_matrix_sha256": None,
+    }
+    digest_body = dict(values)
+    digest_body.pop("detection_disposition")
+    digest_body.pop("coverage_matrix_sha256")
+    receipt = _validated_strategy_receipt(
+        **values,
+        receipt_sha256=canonical_sha256(digest_body),
+    )
+    _validate_model_proposal(model_proposal, receipt)
+    if outcome is not StrategyOutcome.SELECT:
+        _validate_strategy_result_structure(receipt=receipt, plan=None)
+        return receipt, None
+    return _build_selected_plan(
+        objective=objective,
+        snapshot=snapshot,
+        authority=authority,
+        projected=projected,
+        semantics=semantics,
+        budget=budget,
+        receipt=receipt,
+        preferred=preferred,
+        successor_capability=None,
+        successor_condition="fresh_inconclusive_or_insufficient_observation",
     )
 
 

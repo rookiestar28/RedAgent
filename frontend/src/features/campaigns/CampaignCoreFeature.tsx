@@ -37,6 +37,7 @@ type Props = {
 const OBJECTIVES = [
   "Assess HTTP security posture",
   "Verify X-Content-Type-Options",
+  "Assess repository snapshot posture",
 ] as const;
 
 // IMPORTANT: keep the default client stable across renders or effects refetch forever.

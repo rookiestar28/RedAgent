@@ -47,6 +47,16 @@ class Options:
                 unavailable_reason=None,
                 parent_id="engagement-internal-1",
             ),
+            CampaignCoreAuthorizedResource(
+                resource_id="artifact-binding-internal-1",
+                label="Repository snapshot: canonical data-only binding",
+                revision="1:11",
+                freshness="current",
+                eligible=True,
+                unavailable_reason=None,
+                parent_id="engagement-internal-1",
+                target_class="repository-snapshot",
+            ),
         )
 
     async def list_engagements(self, **_values):
@@ -184,6 +194,53 @@ def test_start_resolves_bindings_server_side_and_preserves_transport_idempotency
         "etag": '"campaign-server-generated:1"',
         "replayed": False,
     }
+
+
+def test_repository_objective_accepts_only_opaque_repository_snapshot_target() -> None:
+    starter = Starter()
+    service = CampaignCoreService(Options(), starter)
+    engagement = asyncio.run(service.list_engagement_options(
+        tenant_id="tenant-r124", principal_id="operator-r124", limit=50,
+        cursor=None, now=NOW,
+    ))["data"][0]["binding"]
+    targets = asyncio.run(service.list_target_options(
+        tenant_id="tenant-r124", principal_id="operator-r124",
+        engagement_binding=engagement, limit=50, cursor=None, now=NOW,
+    ))
+    http_target, artifact_target = (item["binding"] for item in targets["data"])
+    risk = asyncio.run(service.list_risk_profile_options(
+        tenant_id="tenant-r124", principal_id="operator-r124",
+        engagement_binding=engagement, target_binding=artifact_target,
+        limit=50, cursor=None, now=NOW,
+    ))["data"][0]["binding"]
+
+    intent = type("Intent", (), {
+        "engagement_binding": engagement,
+        "target_binding": artifact_target,
+        "objective": "Assess repository snapshot posture",
+        "risk_profile": risk,
+    })()
+    asyncio.run(service.start_campaign(
+        intent,
+        tenant_id="tenant-r124",
+        principal_id="operator-r124",
+        idempotency_key="artifact-campaign-key",
+        now=NOW,
+    ))
+
+    request = starter.calls[0][0]
+    assert request.target_id == "artifact-binding-internal-1"
+    assert request.objective_kind == "repository_snapshot_posture"
+    assert not hasattr(request, "artifact_receipt")
+    intent.target_binding = http_target
+    with pytest.raises(ValueError, match="objective_target_class_mismatch"):
+        asyncio.run(service.start_campaign(
+            intent,
+            tenant_id="tenant-r124",
+            principal_id="operator-r124",
+            idempotency_key="artifact-campaign-wrong-target",
+            now=NOW,
+        ))
 
 
 def test_stale_forged_wrong_parent_and_arbitrary_objective_fail_before_start() -> None:

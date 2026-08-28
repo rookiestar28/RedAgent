@@ -1,5 +1,9 @@
 """First compat_110 certified canonical-data-only profiles."""
 
+from dataclasses import asdict
+from enum import Enum
+import hashlib
+import json
 from types import MappingProxyType
 from typing import Mapping
 
@@ -19,3 +23,25 @@ def certified_profiles() -> Mapping[str, ArtifactProfile]:
             max_depth=4, max_expansion_ratio=10, timeout_seconds=20),
     )
     return MappingProxyType({item.profile_id: item for item in profiles})
+
+
+def canonical_profile_sha256(profile: ArtifactProfile) -> str:
+    if not isinstance(profile, ArtifactProfile):
+        raise ValueError("artifact_profile_invalid")
+    encoded = json.dumps(
+        _normalize(asdict(profile)),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _normalize(value: object) -> object:
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {str(key): _normalize(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_normalize(item) for item in value]
+    return value

@@ -1,0 +1,5 @@
+{
+  "algorithm": "ECDSA_P256_SHA256",
+  "public_key_sha256": "15f9610dcb38e20ea24d0f0dbe968d881c69a91e585e63a0410ac826ef906ac5",
+  "schema": "redagent.artifact-posture-promotion-anchor/v1"
+}

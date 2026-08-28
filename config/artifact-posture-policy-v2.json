@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {"case_id": "authorized-repository-select", "expected": "select:artifact-posture"},
+    {"case_id": "missing-receipt-deny", "expected": "deny:artifact_receipt_missing"},
+    {"case_id": "stale-receipt-deny", "expected": "deny:artifact_receipt_stale"},
+    {"case_id": "denied-receipt-deny", "expected": "deny:artifact_receipt_denied"},
+    {"case_id": "inconclusive-receipt-skip", "expected": "skip:artifact_receipt_inconclusive"},
+    {"case_id": "http-artifact-ineligible", "expected": "select:zap-controlled-runtime"},
+    {"case_id": "header-artifact-ineligible", "expected": "select:nuclei-trusted-runtime"}
+  ],
+  "corpus_sha256": "68b0a7a86045dd3c78fec97fbfbb6ff882e96cdb6a245c975d58a15c53d38fd1",
+  "decision_table_revision": 2,
+  "profile_id": "r110-repository-snapshot-v1",
+  "schema": "redagent.artifact-posture-policy-corpus/v2",
+  "zero_execution": true
+}

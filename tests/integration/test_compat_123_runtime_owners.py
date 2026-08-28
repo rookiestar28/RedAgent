@@ -45,6 +45,10 @@ def test_r123_postgres_authority_provider_reads_existing_owners_and_mints_nothin
     asyncio.run(_canonical_authority_provider_scenario())
 
 
+def test_r129_postgres_authority_provider_resolves_only_current_artifact_binding() -> None:
+    asyncio.run(_artifact_authority_provider_scenario())
+
+
 def test_r123_postgres_envelope_verifier_rereads_current_persisted_bindings() -> None:
     asyncio.run(_envelope_verifier_scenario())
 
@@ -351,6 +355,88 @@ async def _canonical_authority_provider_scenario() -> None:
                 metadata.tables["policy_decisions"].update()
                 .where(metadata.tables["policy_decisions"].c.tenant_id == tenant_id)
                 .values(allowed=False)
+            )
+        assert await provider.read_current_authority(request) is None
+    finally:
+        await engine.dispose()
+
+
+async def _artifact_authority_provider_scenario() -> None:
+    engine, sessions = _database()
+    suffix = uuid4().hex
+    tenant_id = f"tenant-r129-authority-{suffix}"
+    actor_id = f"user-r129-authority-{suffix}"
+    engagement_id = f"eng-r129-authority-{suffix}"
+    regular_target_id = f"target-r129-placeholder-{suffix}"
+    binding_id = f"artifact-binding-r129-{suffix}"
+    roe_id = f"roe-r129-authority-{suffix}"
+    runner_id = f"runner-r129-{suffix}"
+    try:
+        await _bootstrap_control_plane(
+            sessions,
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            engagement_id=engagement_id,
+            target_id=regular_target_id,
+            roe_id=roe_id,
+        )
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant_id)
+            await session.execute(
+                update(metadata.tables["roe_versions"])
+                .where(metadata.tables["roe_versions"].c.id == roe_id)
+                .values(document={"scope": [binding_id], "active_testing": True})
+            )
+            await session.execute(insert(metadata.tables["artifact_bindings"]).values(
+                id=f"artifact-binding-record-{suffix}",
+                binding_id=binding_id,
+                artifact_kind="repository_snapshot",
+                artifact_sha256="a" * 64,
+                manifest_sha256="b" * 64,
+                declared_files=1,
+                declared_bytes=128,
+                classification="internal",
+                binding_state="active-canonical-fixture",
+                expires_at=NOW + timedelta(minutes=5),
+                **_owned(tenant_id),
+            ))
+        await _bootstrap_authority_dependencies(
+            sessions,
+            tenant_id=tenant_id,
+            actor_id=actor_id,
+            target_id=binding_id,
+            runner_id=runner_id,
+            suffix=suffix,
+            artifact_adapter=True,
+        )
+
+        provider = PostgresCanonicalAuthorityProvider(
+            sessions,
+            clock=lambda: NOW + timedelta(seconds=5),
+        )
+        request = ResolutionRequest(
+            tenant_id=tenant_id,
+            principal_id=actor_id,
+            engagement_id=engagement_id,
+            target_id=binding_id,
+        )
+        snapshot = await provider.read_current_authority(request)
+        assert snapshot is not None
+        assert snapshot.target_id == binding_id
+        assert snapshot.target_value == binding_id
+        assert snapshot.target_resolution_mode == "canonical-artifact-binding"
+        assert snapshot.credential_class == "none"
+        assert snapshot.credential_reference is None
+        assert snapshot.runner_id == runner_id
+        assert snapshot.lease_id == binding_id
+        assert snapshot.lease_expires_at == NOW + timedelta(minutes=5)
+
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant_id)
+            await session.execute(
+                update(metadata.tables["artifact_bindings"])
+                .where(metadata.tables["artifact_bindings"].c.binding_id == binding_id)
+                .values(binding_state="revoked")
             )
         assert await provider.read_current_authority(request) is None
     finally:
@@ -719,6 +805,7 @@ async def _bootstrap_authority_dependencies(
     target_id: str,
     runner_id: str,
     suffix: str,
+    artifact_adapter: bool = False,
 ) -> None:
     async with sessions() as session, session.begin():
         await _set_tenant(session, tenant_id)
@@ -803,6 +890,12 @@ async def _bootstrap_authority_dependencies(
             reviewer_user_id=actor_id,
             **owned,
         ))
+        adapter_allowlist = [
+            "zap-service:2.17.0-r104.2",
+            "nuclei-service:3.11.1-r105.2",
+        ]
+        if artifact_adapter:
+            adapter_allowlist.append("redagent-canonical-artifact:1.0.0-r110.1")
         await session.execute(insert(metadata.tables["runner_registrations"]).values(
             id=runner_registration_record,
             runner_id=runner_id,
@@ -812,10 +905,7 @@ async def _bootstrap_authority_dependencies(
             spiffe_id=spiffe_id,
             certificate_fingerprint="3" * 64,
             certificate_serial=f"authority-serial-{suffix}",
-            adapter_allowlist=[
-                "zap-service:2.17.0-r104.2",
-                "nuclei-service:3.11.1-r105.2",
-            ],
+            adapter_allowlist=adapter_allowlist,
             image_allowlist=[
                 CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"],
                 CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"],

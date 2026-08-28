@@ -9,7 +9,7 @@ import json
 from typing import Protocol
 from uuid import uuid4
 
-from sqlalchemy import and_, insert, select, text
+from sqlalchemy import insert, select, text
 
 from redagent_platform.campaign_service.activity_coordinator import (
     ContainmentCommit,
@@ -32,6 +32,7 @@ from redagent_platform.campaign_service.repository import (
 from redagent_platform.campaign_service.registry import (
     ExecutionReadinessFacts,
     StrategyLoopMode,
+    closed_execution_binding_for,
     closed_execution_registry,
     evaluate_strategy_loop_readiness,
 )
@@ -128,8 +129,9 @@ class ResolverActivitySafetyGate:
         now: datetime,
     ) -> tuple[bool, bool]:
         # CRITICAL: the workflow payload is not an execution registry or authority source.
-        capability_key = f"{capability_id}@2"
-        if capability_key not in closed_execution_registry():
+        try:
+            capability_key = closed_execution_binding_for(capability_id).capability_key
+        except ValueError:
             return False, False
         resolution = await self._resolver.resolve(
             ResolutionRequest(
@@ -146,7 +148,11 @@ class ResolverActivitySafetyGate:
             now=now,
         )
         readiness = evaluate_strategy_loop_readiness(
-            StrategyLoopMode.TWO_CAPABILITY,
+            (
+                StrategyLoopMode.THREE_CAPABILITY
+                if capability_id == "artifact-posture"
+                else StrategyLoopMode.TWO_CAPABILITY
+            ),
             facts,
         )
         infrastructure_available = (

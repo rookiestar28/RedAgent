@@ -314,6 +314,15 @@ def _target_digest(target_id: str) -> str:
     }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+def _artifact_target_digest(target_id: str) -> str:
+    return hashlib.sha256(json.dumps({
+        "target_id": target_id,
+        "revision": 1,
+        "target_type": "repository",
+        "normalized_value": target_id,
+    }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def test_start_request_has_no_runtime_identity_or_idempotency_input() -> None:
     names = {field.name for field in fields(CampaignStartRequest)}
     forbidden = {
@@ -322,6 +331,32 @@ def test_start_request_has_no_runtime_identity_or_idempotency_input() -> None:
         "approval_id", "effect_id", "idempotency_key", "adapter_id", "runner_id",
     }
     assert names.isdisjoint(forbidden)
+
+
+def test_resolver_accepts_only_exact_server_owned_artifact_binding_shape() -> None:
+    artifact = replace(
+        _snapshot(),
+        target_id="artifact-binding-r129",
+        target_value="artifact-binding-r129",
+        target_sha256=_artifact_target_digest("artifact-binding-r129"),
+        target_resolution_mode="canonical-artifact-binding",
+    )
+    request = ResolutionRequest(
+        tenant_id=artifact.tenant_id,
+        principal_id=artifact.principal_id,
+        engagement_id=artifact.engagement_id,
+        target_id=artifact.target_id,
+    )
+
+    allowed = asyncio.run(CampaignContextResolver(AuthorityProvider(artifact)).resolve(
+        request, now=NOW,
+    ))
+    denied = asyncio.run(CampaignContextResolver(AuthorityProvider(
+        replace(artifact, target_value="https://example.invalid/repository")
+    )).resolve(request, now=NOW))
+
+    assert allowed.allowed is True
+    assert denied.allowed is False and denied.reason == "target_digest_mismatch"
 
 
 def test_start_resolves_current_authority_generates_identities_and_commits_once() -> None:

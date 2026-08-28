@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
 
+from redagent_platform.artifact_pipeline.campaign_adapter import ArtifactCampaignAdapter
 from redagent_platform.campaign_service.activity_coordinator import CampaignActivityCoordinator
 from redagent_platform.campaign_service.activity_store import (
     ActivityReadinessFactsOwner,
@@ -35,12 +36,13 @@ from redagent_platform.campaign_service.runtime import (
     PostgresEnvelopeAuthorityVerifier,
     PostgresQualificationFixtureOwner,
     PostgresRunnerIdentityOwner,
+    local_artifact_promotion_readiness,
     local_campaign_promotion_readiness,
 )
 from redagent_platform.campaign_service.registry import (
     ExecutionReadinessFacts,
     StrategyLoopMode,
-    closed_execution_registry,
+    closed_execution_binding_for,
     evaluate_strategy_loop_readiness,
     load_strategy_loop_mode,
 )
@@ -120,8 +122,10 @@ class CampaignWorkerReadinessFactsOwner:
         now: datetime,
     ) -> ExecutionReadinessFacts:
         del tenant_id
-        if f"{capability_id}@2" not in closed_execution_registry():
-            raise ValueError("r123_readiness_capability_denied")
+        try:
+            closed_execution_binding_for(capability_id)
+        except ValueError as exc:
+            raise ValueError("r123_readiness_capability_denied") from exc
         database_ready = False
         try:
             async with self._sessions() as session:
@@ -156,6 +160,9 @@ class CampaignWorkerReadinessFactsOwner:
             kill_switch_ready=database_ready,
             zap_adapter_ready=zap_promotion and self._image_probe("zap"),
             nuclei_adapter_ready=nuclei_promotion and self._image_probe("nuclei"),
+            artifact_adapter_ready=local_artifact_promotion_readiness(
+                self._workspace, now=now
+            ),
         )
 
     def _locked_images_ready(self, adapter: str) -> bool:
@@ -429,6 +436,7 @@ def build_campaign_activity_coordinator(
     )
     closed = ClosedCampaignDispatcher(
         (
+            ArtifactCampaignAdapter(workspace, result_writer),
             ZapCampaignAdapter(ZapDockerTransport(workspace), result_writer),
             NucleiCampaignAdapter(NucleiDockerTransport(workspace), result_writer),
         )

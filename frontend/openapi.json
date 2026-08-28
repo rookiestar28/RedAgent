@@ -12230,7 +12230,7 @@
             "items": {
               "type": "string"
             },
-            "maxItems": 2,
+            "maxItems": 3,
             "title": "Capability Ids",
             "type": "array"
           },
@@ -12810,7 +12810,7 @@
             "items": {
               "$ref": "#/components/schemas/R124CandidateData"
             },
-            "maxItems": 2,
+            "maxItems": 3,
             "title": "Candidates",
             "type": "array"
           },

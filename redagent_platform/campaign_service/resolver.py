@@ -164,12 +164,24 @@ class CampaignContextResolver:
             return _deny("authority_expired")
         if now >= snapshot.lease_expires_at:
             return _deny("authority_lease_expired")
-        if snapshot.target_resolution_mode != "owned-loopback":
+        if snapshot.target_resolution_mode not in {
+            "owned-loopback",
+            "canonical-artifact-binding",
+        }:
             return _deny("target_resolution_mode_denied")
         if snapshot.target_sha256 != _target_digest(snapshot):
             return _deny("target_digest_mismatch")
-        if not _is_exact_owned_loopback_target(snapshot.target_value):
+        if (
+            snapshot.target_resolution_mode == "owned-loopback"
+            and not _is_exact_owned_loopback_target(snapshot.target_value)
+        ):
             return _deny("owned_loopback_target_denied")
+        if (
+            snapshot.target_resolution_mode == "canonical-artifact-binding"
+            and snapshot.target_value != snapshot.target_id
+        ):
+            # CRITICAL: repository campaigns accept only the server-resolved opaque binding.
+            return _deny("artifact_binding_target_denied")
         if snapshot.credential_class != "none" or snapshot.credential_reference is not None:
             return _deny("credential_class_denied")
         return ResolutionResult(allowed=True, reason="resolved", bindings=snapshot)
@@ -183,7 +195,11 @@ def _target_digest(snapshot: CanonicalAuthoritySnapshot) -> str:
     document = {
         "target_id": snapshot.target_id,
         "revision": snapshot.target_revision,
-        "target_type": "url",
+        "target_type": (
+            "repository"
+            if snapshot.target_resolution_mode == "canonical-artifact-binding"
+            else "url"
+        ),
         "normalized_value": snapshot.target_value,
     }
     canonical = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()

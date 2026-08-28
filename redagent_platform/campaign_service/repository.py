@@ -157,6 +157,7 @@ class PostgresCampaignCoreAuthorizedOptionOwner:
         engagements = metadata.tables["engagements"]
         targets = metadata.tables["targets"]
         roe_versions = metadata.tables["roe_versions"]
+        artifact_bindings = metadata.tables["artifact_bindings"]
         async with self._sessions() as session, session.begin():
             await session.execute(
                 select(text("set_config('redagent.tenant_id', :tenant_id, true)"))
@@ -184,6 +185,16 @@ class PostgresCampaignCoreAuthorizedOptionOwner:
                         .limit(1)
                         .scalar_subquery()
                         .label("target_id"),
+                        select(artifact_bindings.c.binding_id)
+                        .where(
+                            artifact_bindings.c.tenant_id == tenant_id,
+                            artifact_bindings.c.artifact_kind == "repository_snapshot",
+                            artifact_bindings.c.binding_state == "active-canonical-fixture",
+                            artifact_bindings.c.expires_at > now,
+                        )
+                        .limit(1)
+                        .scalar_subquery()
+                        .label("artifact_binding_id"),
                         select(roe_versions.c.revision)
                         .where(
                             roe_versions.c.tenant_id == tenant_id,
@@ -210,13 +221,18 @@ class PostgresCampaignCoreAuthorizedOptionOwner:
                 label=str(row["name"]),
                 revision=str(row["version"]),
                 freshness="current" if row["roe_revision"] is not None else "stale",
-                eligible=row["target_id"] is not None and row["roe_revision"] is not None,
+                eligible=(
+                    row["target_id"] is not None or row["artifact_binding_id"] is not None
+                ) and row["roe_revision"] is not None,
                 unavailable_reason=(
                     None
-                    if row["target_id"] is not None and row["roe_revision"] is not None
+                    if (
+                        row["target_id"] is not None
+                        or row["artifact_binding_id"] is not None
+                    ) and row["roe_revision"] is not None
                     else (
                         "no_authorized_target"
-                        if row["target_id"] is None
+                        if row["target_id"] is None and row["artifact_binding_id"] is None
                         else "no_approved_roe"
                     )
                 ),
@@ -239,6 +255,7 @@ class PostgresCampaignCoreAuthorizedOptionOwner:
             raise ValueError("r124_option_now_invalid")
         targets = metadata.tables["targets"]
         roe_versions = metadata.tables["roe_versions"]
+        artifact_bindings = metadata.tables["artifact_bindings"]
         async with self._sessions() as session, session.begin():
             await session.execute(
                 select(text("set_config('redagent.tenant_id', :tenant_id, true)"))
@@ -279,11 +296,28 @@ class PostgresCampaignCoreAuthorizedOptionOwner:
                     .limit(501)
                 )
             ).mappings().all()
-        if len(rows) > 500:
+            artifact_rows = (
+                await session.execute(
+                    select(
+                        artifact_bindings.c.binding_id,
+                        artifact_bindings.c.version,
+                        artifact_bindings.c.expires_at,
+                    )
+                    .where(
+                        artifact_bindings.c.tenant_id == tenant_id,
+                        artifact_bindings.c.artifact_kind == "repository_snapshot",
+                        artifact_bindings.c.binding_state == "active-canonical-fixture",
+                        artifact_bindings.c.expires_at > now,
+                    )
+                    .order_by(artifact_bindings.c.binding_id)
+                    .limit(501)
+                )
+            ).mappings().all()
+        if len(rows) + len(artifact_rows) > 500:
             raise ValueError("r124_target_inventory_unbounded")
         from redagent_platform.campaign_service.service import CampaignCoreAuthorizedResource
 
-        return tuple(
+        regular = tuple(
             CampaignCoreAuthorizedResource(
                 resource_id=str(row["id"]),
                 parent_id=engagement_id,
@@ -295,6 +329,20 @@ class PostgresCampaignCoreAuthorizedOptionOwner:
             )
             for row in rows
         )
+        artifacts = tuple(
+            CampaignCoreAuthorizedResource(
+                resource_id=str(row["binding_id"]),
+                parent_id=engagement_id,
+                label="Repository snapshot: canonical data-only binding",
+                revision=f'{row["version"]}:{approved_revision or 0}',
+                freshness="current" if approved_revision is not None else "stale",
+                eligible=approved_revision is not None,
+                unavailable_reason=None if approved_revision is not None else "no_approved_roe",
+                target_class="repository-snapshot",
+            )
+            for row in artifact_rows
+        )
+        return (*regular, *artifacts)
 
 
 async def campaign_core_principal_is_active(
@@ -1513,12 +1561,12 @@ class CampaignRepository:
         if effect["cleanup_receipt_id"] is not None and effect["cleanup_receipt_id"] != normalized_cleanup:
             raise CampaignRecordConflict("effect_trusted_cleanup_mismatch")
         capability = effect["effect_intent_payload"].get("capability_id")
-        if not isinstance(capability, str) or not capability.endswith("@2"):
+        if not isinstance(capability, str):
             raise CampaignRecordConflict("effect_trusted_capability_invalid")
-        capability_id = capability[:-2]
         closed_binding = closed_execution_registry().get(capability)
         if closed_binding is None:
             raise CampaignRecordConflict("effect_trusted_capability_invalid")
+        capability_id = closed_binding.capability_id
         execution = (
             await self.session.execute(
                 select(
@@ -1541,7 +1589,7 @@ class CampaignRepository:
         if execution is None or (
             execution["campaign_id"] != effect["campaign_id"]
             or execution["capability_id"] != capability_id
-            or execution["capability_revision"] != 2
+            or execution["capability_revision"] != closed_binding.capability_revision
             or execution["outcome"] != "succeeded"
             or execution["final_phase"] != "cleanup"
             or execution["cleanup_completed"] is not True

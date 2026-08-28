@@ -104,6 +104,37 @@ describe("compat_124 portable campaign core", () => {
     expect(screen.getByText(/refresh current authority/i)).toBeVisible();
   });
 
+  it("offers the repository snapshot objective without raw repository or receipt input", async () => {
+    const api = client();
+    vi.mocked(api.listCampaignCoreTargetOptions).mockResolvedValue({
+      data: [{
+        binding: "opaque-artifact-binding",
+        label: "Repository snapshot: canonical data-only binding",
+        revision: "1:11",
+        freshness: "current",
+        eligible: true,
+      }],
+      page: { limit: 50, next_cursor: null },
+    });
+    const user = userEvent.setup();
+    render(<CampaignCoreFeature client={api} />);
+
+    await user.selectOptions(await screen.findByLabelText("Authorized engagement"), "opaque-eng-a");
+    await user.selectOptions(await screen.findByLabelText("Authorized target"), "opaque-artifact-binding");
+    await user.selectOptions(screen.getByLabelText("Objective"), "Assess repository snapshot posture");
+    await user.selectOptions(await screen.findByLabelText("Risk profile"), "opaque-risk");
+    await user.click(screen.getByRole("button", { name: "Start authorized campaign" }));
+
+    await waitFor(() => expect(api.startCampaignCore).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target_binding: "opaque-artifact-binding",
+        objective: "Assess repository snapshot posture",
+      }),
+      expect.any(String),
+    ));
+    expect(screen.queryByLabelText(/repository|artifact receipt|path|url/i)).toBeNull();
+  });
+
   it("presents bounded status truth without displaying the transport campaign identifier", async () => {
     const user = userEvent.setup();
     const readClient: CampaignReadClient = {

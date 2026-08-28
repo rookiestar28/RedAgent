@@ -179,7 +179,7 @@ class ProposalSafetyCeilingV1:
         _integer("proposal_roe_revocation_epoch", self.roe_revocation_epoch, 0, 2_147_483_647)
         if (
             not isinstance(self.allowed_capabilities, tuple)
-            or not 1 <= len(self.allowed_capabilities) <= 2
+            or not 1 <= len(self.allowed_capabilities) <= 3
             or not all(isinstance(value, CapabilityExecutionCeilingV1) for value in self.allowed_capabilities)
             or len({value.capability_id for value in self.allowed_capabilities}) != len(self.allowed_capabilities)
         ):

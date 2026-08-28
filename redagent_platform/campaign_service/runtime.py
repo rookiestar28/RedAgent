@@ -8,23 +8,29 @@ from enum import Enum
 import hashlib
 import json
 from pathlib import Path
-from typing import Callable, Mapping
+from typing import Any, Callable, Mapping, cast
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import and_, func, select
 
 from redagent_platform.agent_kernel.qualification import build_projection_catalog
+from redagent_platform.artifact_pipeline.capability import build_artifact_capability
+from redagent_platform.artifact_pipeline.profiles import certified_profiles as certified_artifact_profiles
+from redagent_platform.artifact_pipeline.promotion import verify_current_artifact_promotion
 from redagent_platform.campaign_service.context import (
+    build_artifact_posture_target_mapping,
     build_decision_context_snapshot,
     build_first_slice_semantics,
     build_first_slice_target_mapping,
     canonical_sha256,
+    promote_artifact_posture_semantics,
 )
 from redagent_platform.campaign_service.contracts import (
     AuthorityContextV1,
     CollectionState,
     PlanRevisionV1,
     StrategyDecisionReceiptV1,
+    StrategyObjectiveKind,
     StrategyObjectiveV1,
     TypedReferenceV1,
 )
@@ -62,6 +68,10 @@ from redagent_platform.nuclei_service.promotion import (
 )
 from redagent_platform.persistence.models import metadata
 from redagent_platform.runner_service.identity import PeerCertificateIdentity
+from redagent_platform.runner_service.contracts import (
+    ExecutionCapabilityManifest,
+    canonical_capability_sha256,
+)
 from redagent_platform.zap_service.capability import build_zap_capability_manifest
 from redagent_platform.zap_service.contracts import CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM
 from redagent_platform.zap_service.promotion import verify_current_zap_promotion
@@ -73,6 +83,10 @@ _MAX_MEMBERSHIP_AGE = timedelta(minutes=5)
 _EXPECTED_ADAPTERS = frozenset({
     "zap-service:2.17.0-r104.2",
     "nuclei-service:3.11.1-r105.2",
+})
+_EXPECTED_ARTIFACT_ADAPTERS = frozenset({
+    *_EXPECTED_ADAPTERS,
+    "redagent-canonical-artifact:1.0.0-r110.1",
 })
 _EXPECTED_IMAGES = frozenset({
     CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"],
@@ -99,6 +113,16 @@ def local_campaign_promotion_readiness(
     except (OSError, ValueError):
         nuclei_ready = False
     return zap_ready, nuclei_ready
+
+
+def local_artifact_promotion_readiness(workspace: Path, *, now: datetime) -> bool:
+    """Verify the exact current-source artifact promotion without runtime I/O."""
+    _aware(now)
+    try:
+        verify_current_artifact_promotion(workspace.resolve(), now=now)
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 def _verify_current_zap(root: Path, *, now: datetime):
@@ -189,13 +213,29 @@ class LocalCampaignPlanningFactsOwner:
             platform="linux/amd64",
             artifact_receipt_id=nuclei.receipt_id,
         )
-        projections = build_projection_catalog((zap_capability, nuclei_capability))
+        artifact_objective = request.objective_kind == StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE.value
+        artifact_promotion = None
+        artifact_capability = None
+        capabilities: tuple[ExecutionCapabilityManifest, ...] = (
+            zap_capability,
+            nuclei_capability,
+        )
+        if artifact_objective:
+            if authority.target_resolution_mode != "canonical-artifact-binding":
+                raise ValueError("artifact_campaign_target_resolution_denied")
+            artifact_promotion = verify_current_artifact_promotion(self._workspace, now=now)
+            artifact_capability = build_artifact_capability(
+                artifact_receipt_id=artifact_promotion.receipt.receipt_id,
+                source_digest=artifact_promotion.receipt.image_digest,
+            )
+            capabilities = (*capabilities, artifact_capability)
+        projections = build_projection_catalog(capabilities)
         projection_by_capability = {
             item.source_capability_id: item for item in projections
         }
         promoted_at = max(zap.verified_at, nuclei.verified_at, bundle.promoted_at)
         expires_at = min(zap.expires_at, nuclei.expires_at, bundle.expires_at)
-        semantics = build_first_slice_semantics(
+        first_slice_semantics = build_first_slice_semantics(
             zap_capability=zap_capability,
             nuclei_capability=nuclei_capability,
             nuclei_bundle=bundle,
@@ -204,7 +244,38 @@ class LocalCampaignPlanningFactsOwner:
             promoted_at=promoted_at,
             expires_at=expires_at,
         )
+        semantics = first_slice_semantics
         mapping = build_first_slice_target_mapping(semantics)
+        target_classes = (
+            "owned-http-application",
+            "synthetic-security-header-fixture",
+            "owned-loopback-lab",
+            "owned-loopback-gateway",
+        )
+        artifact_receipt = None
+        if artifact_objective:
+            assert artifact_capability is not None and artifact_promotion is not None
+            expires_at = min(expires_at, artifact_promotion.receipt.expires_at)
+            semantics = promote_artifact_posture_semantics(
+                first_slice_semantics=first_slice_semantics,
+                artifact_capability=artifact_capability,
+                artifact_projection=projection_by_capability["artifact-posture"],
+                profile=certified_artifact_profiles()["r110-repository-snapshot-v1"],
+                promoted_at=artifact_promotion.receipt.verified_at,
+                expires_at=artifact_promotion.receipt.expires_at,
+            )
+            mapping = build_artifact_posture_target_mapping(semantics)
+            target_classes = (
+                "repository-snapshot",
+                "canonical-artifact-binding",
+                "data-only-sandbox",
+                "no-url",
+            )
+            artifact_receipt = TypedReferenceV1(
+                kind="artifact-receipt",
+                reference_id=artifact_promotion.receipt.receipt_id,
+                sha256=canonical_capability_sha256(artifact_capability),
+            )
         r119_authority = AuthorityContextV1(
             schema_version="redagent.r119-authority-context/v1",
             tenant_id=request.tenant_id,
@@ -216,10 +287,10 @@ class LocalCampaignPlanningFactsOwner:
                 sha256=authority.target_sha256,
             ),
             target_mapping_sha256=mapping.mapping_sha256,
-            target_class="owned-http-application",
-            application_class="synthetic-security-header-fixture",
-            environment_class="owned-loopback-lab",
-            url_class="owned-loopback-gateway",
+            target_class=target_classes[0],
+            application_class=target_classes[1],
+            environment_class=target_classes[2],
+            url_class=target_classes[3],
             roe_version_id=authority.roe_version_id,
             roe_sha256=authority.roe_sha256,
             roe_status=authority.roe_status,
@@ -245,7 +316,12 @@ class LocalCampaignPlanningFactsOwner:
             prior_complete_snapshot=None,
             snapshot_at=now,
         )
-        return CampaignPlanningFacts(snapshot, r119_authority, projections)
+        return CampaignPlanningFacts(
+            snapshot,
+            r119_authority,
+            projections,
+            artifact_receipt=artifact_receipt,
+        )
 
 
 class PolicyBoundCampaignAuthorizationOwner:
@@ -281,6 +357,13 @@ class PolicyBoundCampaignAuthorizationOwner:
         )
         if expiry <= now:
             raise ValueError("r123_authorization_expired")
+        artifact_objective = objective.kind is StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE
+        target_resolution_mode = (
+            "canonical-artifact-binding" if artifact_objective else "owned-loopback"
+        )
+        execution_mode = "data-only-zero-execution" if artifact_objective else "passive-read-only"
+        egress_profile = "none" if artifact_objective else "owned-loopback-only"
+        sandbox_class = "artifact-r110-data-only" if artifact_objective else "container-non-root-read-only"
         allowed = tuple(
             CapabilityExecutionCeilingV1(
                 capability_id=item.binding_key.capability_id,
@@ -295,13 +378,13 @@ class PolicyBoundCampaignAuthorizationOwner:
                 bundle_revision=item.binding_key.bundle_revision,
                 bundle_sha256=item.binding_key.bundle_sha256,
                 semantics_sha256=item.binding_key.semantics_sha256,
-                execution_mode="passive-read-only",
+                execution_mode=execution_mode,
                 arguments_schema_sha256=canonical_sha256({
                     "schema": "redagent.r123-closed-adapter-arguments/v1",
                     "capability_id": item.binding_key.capability_id,
                 }),
                 arguments_ceiling_sha256=canonical_sha256({
-                    "target_resolution_mode": "owned-loopback",
+                    "target_resolution_mode": target_resolution_mode,
                     "credential_class": "none",
                     "width": 1,
                 }),
@@ -311,13 +394,13 @@ class PolicyBoundCampaignAuthorizationOwner:
         )
         budget = EffectBudgetV1(
             duration_seconds=60,
-            request_count=60,
+            request_count=1 if artifact_objective else 60,
             concurrency=1,
             data_bytes=1024 * 1024,
             evidence_bytes=1024 * 1024,
             impact_count=0,
             replan_count=1,
-            plan_depth=2,
+            plan_depth=1 if artifact_objective else 2,
         )
         obligations = SafetyObligationsV1(
             evidence_required=True,
@@ -355,8 +438,8 @@ class PolicyBoundCampaignAuthorizationOwner:
             credential_class="none",
             credential_reference_id=None,
             destination=authority.target_value,
-            egress_profile="owned-loopback-only",
-            sandbox_class="container-non-root-read-only",
+            egress_profile=egress_profile,
+            sandbox_class=sandbox_class,
             runner_class="r123-closed-runner",
             risk_ceiling="tier1-passive-read-only",
             budget=budget,
@@ -375,7 +458,7 @@ class PolicyBoundCampaignAuthorizationOwner:
             workload_identity=authority.runner_workload_identity,
             target_sha256=authority.target_sha256,
             destination=authority.target_value,
-            sandbox_class="container-non-root-read-only",
+            sandbox_class=sandbox_class,
             runner_class="r123-closed-runner",
             reservation_id=authority.reservation_id,
             lease_id=authority.lease_id,
@@ -593,17 +676,20 @@ class PostgresCanonicalAuthorityProvider:
             )
             if policy is None:
                 return None
-            lab = await _read_current_lab_lease(
-                session,
-                tenant_id=request.tenant_id,
-                target_id=request.target_id,
-                target_value=str(base["target_value"]),
-                roe_id=str(roe["roe_id"]),
-                policy_decision_id=str(policy["policy_decision_id"]),
-                now=observed_at,
-            )
-            if lab is None:
-                return None
+            artifact_target = base["target_type"] == "repository_snapshot"
+            lab = None
+            if not artifact_target:
+                lab = await _read_current_lab_lease(
+                    session,
+                    tenant_id=request.tenant_id,
+                    target_id=request.target_id,
+                    target_value=str(base["target_value"]),
+                    roe_id=str(roe["roe_id"]),
+                    policy_decision_id=str(policy["policy_decision_id"]),
+                    now=observed_at,
+                )
+                if lab is None:
+                    return None
             quota = await _read_current_quota(
                 session,
                 tenant_id=request.tenant_id,
@@ -611,30 +697,46 @@ class PostgresCanonicalAuthorityProvider:
             )
             if quota is None or _quota_remaining(quota) <= 0:
                 return None
+            runner_id = None
+            if not artifact_target:
+                assert lab is not None
+                runner_id = str(lab["runner_id"])
             runner = await _read_current_runner(
                 session,
                 tenant_id=request.tenant_id,
-                runner_id=str(lab["runner_id"]),
+                runner_id=runner_id,
                 policy_revision=str(policy["policy_revision"]),
                 now=observed_at,
+                artifact_target=artifact_target,
             )
-            if runner is None or not _runner_row_exact(runner):
+            if runner is None or not _runner_row_exact(runner, artifact_target=artifact_target):
                 return None
             stop_requested = await _read_stop_requested(
                 session,
                 tenant_id=request.tenant_id,
             )
-        expires_at = min(
+        authority_expiries = [
             policy["valid_until"],
-            lab["lease_expires_at"],
-            lab["attestation_expires_at"],
-            lab["bundle_expires_at"],
             quota["reservation_expires_at"],
             quota["policy_active_until"],
             quota["window_end"],
             runner["registration_expires_at"],
             runner["identity_not_after"],
-        )
+        ]
+        if artifact_target:
+            authority_expiries.append(base["binding_expires_at"])
+            lease_id = request.target_id
+            lease_expires_at = base["binding_expires_at"]
+        else:
+            assert lab is not None
+            authority_expiries.extend((
+                lab["lease_expires_at"],
+                lab["attestation_expires_at"],
+                lab["bundle_expires_at"],
+            ))
+            lease_id = str(lab["lease_id"])
+            lease_expires_at = lab["lease_expires_at"]
+        expires_at = min(authority_expiries)
         return CanonicalAuthoritySnapshot(
             tenant_id=request.tenant_id,
             principal_id=request.principal_id,
@@ -666,11 +768,13 @@ class PostgresCanonicalAuthorityProvider:
             target_sha256=_digest({
                 "target_id": request.target_id,
                 "revision": base["target_revision"],
-                "target_type": base["target_type"],
+                "target_type": "repository" if artifact_target else base["target_type"],
                 "normalized_value": base["target_value"],
             }),
             target_value=str(base["target_value"]),
-            target_resolution_mode="owned-loopback",
+            target_resolution_mode=(
+                "canonical-artifact-binding" if artifact_target else "owned-loopback"
+            ),
             credential_class="none",
             credential_reference=None,
             quota_reference=str(quota["quota_policy_id"]),
@@ -679,8 +783,8 @@ class PostgresCanonicalAuthorityProvider:
             runner_workload_identity=str(runner["spiffe_id"]),
             runner_ready=True,
             reservation_id=str(quota["reservation_id"]),
-            lease_id=str(lab["lease_id"]),
-            lease_expires_at=lab["lease_expires_at"],
+            lease_id=lease_id,
+            lease_expires_at=lease_expires_at,
             stop_requested=stop_requested,
             observed_at=observed_at,
             expires_at=expires_at,
@@ -956,7 +1060,36 @@ async def _read_base_authority(session: object, request: ResolutionRequest, now:
             .limit(2)
         )
     ).mappings().all()
-    return rows[0] if len(rows) == 1 else None
+    if len(rows) == 1:
+        return rows[0]
+    if rows:
+        return None
+    artifact_bindings = metadata.tables["artifact_bindings"]
+    artifact_rows = (
+        await cast(Any, session).execute(
+            select(
+                engagements.c.version.label("engagement_version"),
+                artifact_bindings.c.version.label("target_revision"),
+                artifact_bindings.c.artifact_kind.label("target_type"),
+                artifact_bindings.c.binding_id.label("target_value"),
+                artifact_bindings.c.expires_at.label("binding_expires_at"),
+            )
+            .select_from(engagements.join(
+                artifact_bindings,
+                artifact_bindings.c.tenant_id == engagements.c.tenant_id,
+            ))
+            .where(
+                engagements.c.tenant_id == request.tenant_id,
+                engagements.c.id == request.engagement_id,
+                artifact_bindings.c.binding_id == request.target_id,
+                artifact_bindings.c.artifact_kind == "repository_snapshot",
+                artifact_bindings.c.binding_state == "active-canonical-fixture",
+                artifact_bindings.c.expires_at > now,
+            )
+            .limit(2)
+        )
+    ).mappings().all()
+    return artifact_rows[0] if len(artifact_rows) == 1 else None
 
 
 async def _read_current_roe(session: object, *, tenant_id: str, engagement_id: str):
@@ -1190,13 +1323,32 @@ async def _read_current_runner(
     session: object,
     *,
     tenant_id: str,
-    runner_id: str,
+    runner_id: str | None,
     policy_revision: str,
     now: datetime,
+    artifact_target: bool = False,
 ):
     classes = metadata.tables["runner_classes"]
     registrations = metadata.tables["runner_registrations"]
     identities = metadata.tables["runner_identities"]
+    conditions = [
+        registrations.c.tenant_id == tenant_id,
+        registrations.c.environment == "local-conformance",
+        registrations.c.network_plane == "owned-loopback",
+        registrations.c.required_policy_revision == policy_revision,
+        registrations.c.registration_state == "active",
+        registrations.c.registered_at <= now,
+        registrations.c.expires_at > now,
+        registrations.c.revoked_at.is_(None),
+        registrations.c.last_seen_at >= now - _MAX_MEMBERSHIP_AGE,
+        classes.c.class_id == "r123-closed-runner",
+        classes.c.class_status == "active",
+        identities.c.identity_state == "observed",
+        identities.c.not_before <= now,
+        identities.c.not_after > now,
+    ]
+    if runner_id is not None:
+        conditions.append(registrations.c.runner_id == runner_id)
     rows = (
         await session.execute(
             select(
@@ -1228,28 +1380,15 @@ async def _read_current_runner(
                     ),
                 )
             )
-            .where(
-                registrations.c.tenant_id == tenant_id,
-                registrations.c.runner_id == runner_id,
-                registrations.c.environment == "local-conformance",
-                registrations.c.network_plane == "owned-loopback",
-                registrations.c.required_policy_revision == policy_revision,
-                registrations.c.registration_state == "active",
-                registrations.c.registered_at <= now,
-                registrations.c.expires_at > now,
-                registrations.c.revoked_at.is_(None),
-                registrations.c.last_seen_at >= now - _MAX_MEMBERSHIP_AGE,
-                classes.c.class_id == "r123-closed-runner",
-                classes.c.class_status == "active",
-                identities.c.identity_state == "observed",
-                identities.c.not_before <= now,
-                identities.c.not_after > now,
-            )
+            .where(*conditions)
             .order_by(registrations.c.generation.desc())
             .limit(2)
         )
     ).mappings().all()
-    return rows[0] if len(rows) == 1 else None
+    exact = tuple(
+        row for row in rows if _runner_row_exact(row, artifact_target=artifact_target)
+    )
+    return exact[0] if len(exact) == 1 else None
 
 
 async def _read_stop_requested(session: object, *, tenant_id: str) -> bool:
@@ -1290,12 +1429,14 @@ def _quota_remaining(row: object) -> int:
     )
 
 
-def _runner_row_exact(row: object) -> bool:
+def _runner_row_exact(row: object, *, artifact_target: bool = False) -> bool:
     return (
         row["spiffe_id"] == row["identity_spiffe_id"]
         and row["certificate_fingerprint"] == row["identity_fingerprint"]
         and row["certificate_serial"] == row["identity_serial"]
-        and set(row["adapter_allowlist"] or ()) == _EXPECTED_ADAPTERS
+        and set(row["adapter_allowlist"] or ()) == (
+            _EXPECTED_ARTIFACT_ADAPTERS if artifact_target else _EXPECTED_ADAPTERS
+        )
         and set(row["image_allowlist"] or ()) == _EXPECTED_IMAGES
         and row["credential_classes"] == ["none"]
     )

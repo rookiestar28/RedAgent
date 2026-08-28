@@ -26,6 +26,7 @@ def _facts(**overrides: bool) -> ExecutionReadinessFacts:
         "kill_switch_ready": True,
         "zap_adapter_ready": True,
         "nuclei_adapter_ready": True,
+        "artifact_adapter_ready": True,
     }
     values.update(overrides)
     return ExecutionReadinessFacts(**values)
@@ -44,9 +45,11 @@ def test_closed_registry_contains_only_exact_noninterchangeable_first_slice_bind
     registry = closed_execution_registry()
 
     assert tuple(registry) == (
+        "artifact-posture@1",
         "nuclei-trusted-runtime@2",
         "zap-controlled-runtime@2",
     )
+    artifact = registry["artifact-posture@1"]
     zap = registry["zap-controlled-runtime@2"]
     nuclei = registry["nuclei-trusted-runtime@2"]
     assert (zap.adapter_id, zap.adapter_version, zap.profile_id, zap.profile_revision) == (
@@ -56,6 +59,19 @@ def test_closed_registry_contains_only_exact_noninterchangeable_first_slice_bind
         1,
     )
     assert zap.bundle_id is None and zap.bundle_revision is None
+    assert (
+        artifact.adapter_id,
+        artifact.adapter_version,
+        artifact.profile_id,
+        artifact.profile_revision,
+        artifact.bundle_id,
+    ) == (
+        "redagent-canonical-artifact",
+        "1.0.0-r110.1",
+        "r110-repository-snapshot-v1",
+        1,
+        None,
+    )
     assert (
         nuclei.adapter_id,
         nuclei.adapter_version,
@@ -123,6 +139,27 @@ def test_enabled_mode_requires_and_reports_exact_two_capability_registry() -> No
     assert result.execution_enabled is True
     assert result.reason == "strategy_loop_two_capability_ready"
     assert result.capability_ids == (
+        "nuclei-trusted-runtime@2",
+        "zap-controlled-runtime@2",
+    )
+
+
+def test_three_capability_mode_requires_artifact_and_reports_exact_registry() -> None:
+    missing = evaluate_strategy_loop_readiness(
+        StrategyLoopMode.THREE_CAPABILITY,
+        _facts(artifact_adapter_ready=False),
+    )
+    ready = evaluate_strategy_loop_readiness(
+        StrategyLoopMode.THREE_CAPABILITY,
+        _facts(),
+    )
+
+    assert missing.reason == "strategy_loop_dependency_missing:artifact_adapter_ready"
+    assert missing.ready is False and missing.execution_enabled is False
+    assert ready.ready is True and ready.execution_enabled is True
+    assert ready.reason == "strategy_loop_three_capability_ready"
+    assert ready.capability_ids == (
+        "artifact-posture@1",
         "nuclei-trusted-runtime@2",
         "zap-controlled-runtime@2",
     )

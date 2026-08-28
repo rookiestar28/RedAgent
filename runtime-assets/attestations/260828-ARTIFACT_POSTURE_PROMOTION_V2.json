@@ -1,0 +1,18 @@
+{
+  "author": "artifact-posture-implementer",
+  "credential_allowed": false,
+  "expires_at": "2026-09-27T00:00:00Z",
+  "external_adapter_execution": false,
+  "network_allowed": false,
+  "production_qualified": false,
+  "profile_id": "r110-repository-snapshot-v1",
+  "promoted_at": "2026-08-28T00:00:00Z",
+  "public_key_sha256": "15f9610dcb38e20ea24d0f0dbe968d881c69a91e585e63a0410ac826ef906ac5",
+  "qualification_file_sha256": "7c944195c264a3f157a3918df385dd8f39b5a55d46280850429a5b607077376b",
+  "qualification_receipt_sha256": "09134f48c5d601f15849a0d420f2da0cbd356264c1464f31d25e89d663456735",
+  "reviewer": "artifact-posture-independent-review",
+  "runtime_lock_sha256": "692dc9887d96339234bd9657ad593f9003300cdaac9f870325c128660d30a581",
+  "schema": "redagent.artifact-posture-promotion/v2",
+  "source_sha256": "6e9d74681ef67282f9644f13736aada2387aeb0c5edfd1a9085f42aa4dac947d",
+  "subprocess_allowed": false
+}

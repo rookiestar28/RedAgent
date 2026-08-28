@@ -153,11 +153,15 @@ class ClosedCampaignDispatcher:
         if not isinstance(adapters, tuple):
             raise ValueError("r123_adapters_invalid")
         indexed = {(item.adapter_id, item.adapter_version): item for item in adapters}
-        expected = {
+        expected_two = {
             ("zap-service", "2.17.0-r104.2"),
             ("nuclei-service", "3.11.1-r105.2"),
         }
-        if set(indexed) != expected or len(adapters) != 2:
+        expected_three = {
+            *expected_two,
+            ("redagent-canonical-artifact", "1.0.0-r110.1"),
+        }
+        if set(indexed) not in (expected_two, expected_three):
             raise ValueError("r123_adapters_invalid")
         self._adapters = indexed
 
@@ -179,7 +183,10 @@ class ClosedCampaignDispatcher:
 
     def _resolve(self, request: CampaignAdapterRequest) -> tuple[ClosedExecutionBinding, ClosedAdapter]:
         binding = _closed_binding(request)
-        return binding, self._adapters[(binding.adapter_id, binding.adapter_version)]
+        adapter = self._adapters.get((binding.adapter_id, binding.adapter_version))
+        if adapter is None:
+            raise ValueError("r123_adapter_not_composed")
+        return binding, adapter
 
 
 class RunnerLifecycleOwner(Protocol):
