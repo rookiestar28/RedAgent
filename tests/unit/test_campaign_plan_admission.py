@@ -27,6 +27,10 @@ from redagent_platform.campaign_service.admission_contracts import (
     PlanEnvelopeSubsetProofV1,
     assert_campaign_reservation_transition,
 )
+from redagent_platform.campaign_service.admission_repository import (
+    AdmissionConflict,
+    CampaignAdmissionRepository,
+)
 from redagent_platform.campaign_service.authority_envelope import (
     CampaignAuthorityLifecycleState,
     CampaignAuthorityLifecycleV2,
@@ -36,7 +40,7 @@ from redagent_platform.campaign_service.authority_envelope import (
 )
 from redagent_platform.campaign_service.planning.contracts import ValidationResult
 from redagent_platform.campaign_service.planning.search import plan_attack_path
-from redagent_platform.policy_service.contracts import PolicyBoundary
+from redagent_platform.policy_service.contracts import PolicyBoundary, policy_input_hash
 from redagent_platform.policy_service.fakes import DeterministicFakePolicyProvider
 from tests.unit.test_campaign_attack_path_planner import search_limits
 from tests.unit.test_campaign_planning_contracts import (
@@ -387,6 +391,96 @@ def test_service_verifies_certificate_then_policy_and_builds_atomic_command() ->
     assert store.command.authorized_budget == authority_budget(signed.authority)
     assert store.command.reserved_budget == calculate_plan_budget(revision, current_domain)
     assert store.command.policy_decision.allowed is True
+
+
+def test_repository_rebinds_policy_engagement_time_epochs_permission_and_lease() -> None:
+    signed, lifecycle, trusted = _signed_authority()
+    current_domain = domain()
+    revision = _revision(current_domain=current_domain)
+    certificate = validate_candidate_plan(
+        revision.candidate_plan,
+        current_domain,
+        signed.authority,
+        limits=limits(),
+        validated_at=NOW + timedelta(seconds=1),
+    )
+    store = _Store()
+    service = CampaignPlanAdmissionService(
+        policy=AdmissionPolicyAdapter(
+            _CountingProvider(),
+            required_revision=signed.authority.policy_revision,
+            trusted_bundle_sha256=signed.authority.policy_bundle_sha256,
+        ),
+        store=store,
+        trusted_keys=trusted,
+        validation_limits=limits(),
+        trusted_validator_version=certificate.validator_version,
+        trusted_validator_sha256=certificate.validator_sha256,
+        lease_seconds=20,
+    )
+    asyncio.run(
+        service.admit_plan(
+            signed_authority=signed,
+            lifecycle=lifecycle,
+            revision=revision,
+            domain=current_domain,
+            certificate=certificate,
+            campaign_id="campaign-a",
+            subject_id="operator-a",
+            roles=("campaign-operator",),
+            permissions=("campaign:admit",),
+            correlation_id="correlation-binding",
+            idempotency_key="admit-binding",
+            now=NOW + timedelta(seconds=2),
+        )
+    )
+    command = store.command
+    assert command is not None
+    repository = object.__new__(CampaignAdmissionRepository)
+    repository.tenant_id = command.policy_request.tenant_id
+
+    def with_request(request):
+        return replace(
+            command,
+            policy_request=request,
+            policy_decision=replace(command.policy_decision, input_hash=policy_input_hash(request)),
+        )
+
+    requests = [
+        replace(
+            command.policy_request,
+            roe_version_id="different-engagement",
+            attributes=dict(command.policy_request.attributes),
+        ),
+        replace(
+            command.policy_request,
+            requested_at=command.issued_at + timedelta(microseconds=1),
+            attributes=dict(command.policy_request.attributes),
+        ),
+        replace(
+            command.policy_request,
+            permissions=("campaign:read",),
+            attributes=dict(command.policy_request.attributes),
+        ),
+    ]
+    for attribute in (
+        "campaign_lifecycle_epoch",
+        "campaign_policy_revocation_epoch",
+        "campaign_roe_revocation_epoch",
+        "campaign_kill_switch_epoch",
+    ):
+        changed = dict(command.policy_request.attributes)
+        changed[attribute] = int(changed[attribute]) + 1
+        requests.append(replace(command.policy_request, attributes=changed))
+
+    for request in requests:
+        with pytest.raises(AdmissionConflict, match="plan_admission_command_binding_mismatch"):
+            repository._assert_command(with_request(request))
+
+    with pytest.raises(AdmissionConflict, match="plan_admission_command_binding_mismatch"):
+        repository._assert_command(
+            replace(command, lease_expires_at=command.policy_decision.valid_until + timedelta(microseconds=1))
+        )
 
 
 def test_service_persists_unknown_certificate_denial_without_policy_call() -> None:

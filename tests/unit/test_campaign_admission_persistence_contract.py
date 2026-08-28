@@ -62,6 +62,38 @@ def test_admission_metadata_is_closed_tenant_owned_and_bounded() -> None:
     )
 
 
+def test_admission_metadata_uses_tenant_bound_composite_relationships() -> None:
+    expected = {
+        "campaigns": {"uq_campaign_tenant_identity"},
+        "campaign_budget_ledgers": {
+            "uq_campaign_budget_ledger_tenant_identity",
+            "fk_campaign_budget_ledger_tenant_campaign",
+        },
+        "campaign_budget_reservations": {
+            "uq_campaign_budget_reservation_tenant_identity",
+            "fk_campaign_budget_reservation_tenant_campaign",
+            "fk_campaign_budget_reservation_tenant_ledger",
+        },
+        "campaign_budget_events": {
+            "fk_campaign_budget_event_tenant_campaign",
+            "fk_campaign_budget_event_tenant_ledger",
+            "fk_campaign_budget_event_tenant_reservation",
+        },
+        "plan_admission_receipts": {
+            "fk_plan_admission_receipt_tenant_campaign",
+            "fk_plan_admission_receipt_tenant_reservation",
+        },
+    }
+    for table_name, constraint_names in expected.items():
+        actual = {constraint.name for constraint in metadata.tables[table_name].constraints}
+        assert constraint_names.issubset(actual)
+
+    source = MIGRATION.read_text(encoding="utf-8")
+    for constraint_names in expected.values():
+        for constraint_name in constraint_names:
+            assert constraint_name in source
+
+
 def test_migration_enforces_rls_immutability_states_and_vector_bounds() -> None:
     source = MIGRATION.read_text(encoding="utf-8")
     for name in (

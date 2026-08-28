@@ -43,6 +43,14 @@ def test_concurrent_admission_never_over_reserves_campaign_budget() -> None:
     asyncio.run(_concurrent_scenario())
 
 
+def test_admission_rejects_cross_tenant_campaign_without_partial_writes() -> None:
+    asyncio.run(_cross_tenant_scenario())
+
+
+def test_admission_rejects_policy_command_substitutions_without_partial_writes() -> None:
+    asyncio.run(_command_substitution_scenario())
+
+
 async def _atomic_scenario() -> None:
     engine, sessions = _database()
     suffix = uuid4().hex
@@ -153,7 +161,13 @@ async def _atomic_scenario() -> None:
 
         await _assert_admission_rls(engine, tenant=tenant, suffix=suffix)
 
-        over = _command(tenant=tenant, campaign=campaign, suffix=f"{suffix}-over", amount=110)
+        over = _command(
+            tenant=tenant,
+            campaign=campaign,
+            suffix=f"{suffix}-over",
+            amount=110,
+            engagement_suffix=suffix,
+        )
         async with sessions() as session, session.begin():
             repo = CampaignAdmissionRepository(
                 session, tenant_id=tenant, actor_user_id=actor, correlation_id=f"over-{suffix}"
@@ -186,7 +200,13 @@ async def _concurrent_scenario() -> None:
                     correlation_id=f"race-{label}-{suffix}",
                 )
                 return await repo.admit(
-                    _command(tenant=tenant, campaign=campaign, suffix=f"{suffix}-{label}", amount=60)
+                    _command(
+                        tenant=tenant,
+                        campaign=campaign,
+                        suffix=f"{suffix}-{label}",
+                        amount=60,
+                        engagement_suffix=suffix,
+                    )
                 )
 
         results = await asyncio.gather(admit("a"), admit("b"), return_exceptions=True)
@@ -196,6 +216,153 @@ async def _concurrent_scenario() -> None:
         async with sessions() as session, session.begin():
             await _set_tenant(session, tenant)
             assert await _count(session, "campaign_budget_reservations", tenant) == 1
+    finally:
+        await engine.dispose()
+
+
+async def _cross_tenant_scenario() -> None:
+    engine, sessions = _database()
+    suffix = uuid4().hex
+    tenant_a = f"tenant-r158-a-{suffix}"
+    actor_a = f"user-r158-a-{suffix}"
+    campaign_a = f"campaign-r158-a-{suffix}"
+    suffix_b = f"{suffix}-b"
+    tenant_b = f"tenant-r158-b-{suffix}"
+    actor_b = f"user-r158-b-{suffix}"
+    campaign_b = f"campaign-r158-b-{suffix}"
+    try:
+        await _bootstrap(sessions, tenant=tenant_a, actor=actor_a, campaign=campaign_a, suffix=suffix)
+        await _bootstrap(sessions, tenant=tenant_b, actor=actor_b, campaign=campaign_b, suffix=suffix_b)
+        commands = (
+            _command(tenant=tenant_a, campaign=campaign_b, suffix=suffix_b, amount=20),
+            _command(tenant=tenant_a, campaign=campaign_a, suffix=f"{suffix}-wrong-engagement", amount=20),
+        )
+        table_names = (
+            "campaign_budget_ledgers",
+            "campaign_budget_reservations",
+            "campaign_budget_events",
+            "plan_admission_receipts",
+            "policy_decisions",
+            "policy_boundary_receipts",
+            "audit_events",
+            "outbox_events",
+        )
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant_a)
+            before = {name: await _count(session, name, tenant_a) for name in table_names}
+        for command in commands:
+            async with sessions() as session, session.begin():
+                repo = CampaignAdmissionRepository(
+                    session,
+                    tenant_id=tenant_a,
+                    actor_user_id=actor_a,
+                    correlation_id=f"campaign-binding-{suffix}",
+                )
+                with pytest.raises(AdmissionConflict, match="plan_admission_campaign_binding_mismatch"):
+                    await repo.admit(command)
+
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant_a)
+            with pytest.raises(DBAPIError, match="fk_campaign_budget_ledger_tenant_campaign"):
+                async with session.begin_nested():
+                    await session.execute(
+                        insert(metadata.tables["campaign_budget_ledgers"]).values(
+                            id=f"budget-ledger-cross-{suffix}",
+                            campaign_id=campaign_b,
+                            envelope_sha256="a" * 64,
+                            duration_seconds=1,
+                            requests=1,
+                            rate_per_minute=1,
+                            concurrency=1,
+                            risk_micropoints=1,
+                            cost_microunits=1,
+                            evidence_bytes=1,
+                            data_bytes=1,
+                            tenant_id=tenant_a,
+                            version=1,
+                            created_at=NOW,
+                            updated_at=NOW,
+                        )
+                    )
+
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant_a)
+            for table_name in table_names:
+                assert await _count(session, table_name, tenant_a) == before[table_name]
+    finally:
+        await engine.dispose()
+
+
+async def _command_substitution_scenario() -> None:
+    engine, sessions = _database()
+    suffix = uuid4().hex
+    tenant = f"tenant-r158-bind-{suffix}"
+    actor = f"user-r158-bind-{suffix}"
+    campaign = f"campaign-r158-bind-{suffix}"
+    table_names = (
+        "campaign_budget_ledgers",
+        "campaign_budget_reservations",
+        "campaign_budget_events",
+        "plan_admission_receipts",
+        "policy_decisions",
+        "policy_boundary_receipts",
+        "audit_events",
+        "outbox_events",
+    )
+    try:
+        await _bootstrap(sessions, tenant=tenant, actor=actor, campaign=campaign, suffix=suffix)
+        command = _command(tenant=tenant, campaign=campaign, suffix=suffix, amount=20)
+
+        def with_request(request: PolicyDecisionInput) -> AdmissionReservationCommandV1:
+            return replace(
+                command,
+                policy_request=request,
+                policy_decision=replace(command.policy_decision, input_hash=policy_input_hash(request)),
+            )
+
+        substitutions = [
+            with_request(
+                replace(
+                    command.policy_request,
+                    roe_version_id="different-engagement",
+                    attributes=dict(command.policy_request.attributes),
+                )
+            ),
+            with_request(
+                replace(
+                    command.policy_request,
+                    requested_at=command.issued_at + timedelta(microseconds=1),
+                    attributes=dict(command.policy_request.attributes),
+                )
+            ),
+        ]
+        for attribute in (
+            "campaign_lifecycle_epoch",
+            "campaign_policy_revocation_epoch",
+            "campaign_roe_revocation_epoch",
+            "campaign_kill_switch_epoch",
+        ):
+            changed = dict(command.policy_request.attributes)
+            changed[attribute] = int(changed[attribute]) + 1
+            substitutions.append(with_request(replace(command.policy_request, attributes=changed)))
+
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant)
+            before = {name: await _count(session, name, tenant) for name in table_names}
+        for substituted in substitutions:
+            async with sessions() as session, session.begin():
+                repo = CampaignAdmissionRepository(
+                    session,
+                    tenant_id=tenant,
+                    actor_user_id=actor,
+                    correlation_id=f"binding-{suffix}",
+                )
+                with pytest.raises(AdmissionConflict, match="plan_admission_command_binding_mismatch"):
+                    await repo.admit(substituted)
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant)
+            for table_name in table_names:
+                assert await _count(session, table_name, tenant) == before[table_name]
     finally:
         await engine.dispose()
 
@@ -244,8 +411,16 @@ async def _assert_admission_rls(engine, *, tenant: str, suffix: str) -> None:
             await transaction.rollback()
 
 
-def _command(*, tenant: str, campaign: str, suffix: str, amount: int) -> AdmissionReservationCommandV1:
+def _command(
+    *,
+    tenant: str,
+    campaign: str,
+    suffix: str,
+    amount: int,
+    engagement_suffix: str | None = None,
+) -> AdmissionReservationCommandV1:
     residual = _budget(100)
+    engagement = f"eng-{engagement_suffix or suffix}"[:100]
     policy_request = PolicyDecisionInput(
         boundary=PolicyBoundary.WORKFLOW,
         action="campaign.plan.admit",
@@ -256,7 +431,7 @@ def _command(*, tenant: str, campaign: str, suffix: str, amount: int) -> Admissi
         resource_type="campaign_plan",
         resource_id=campaign,
         policy_reference="policy-a",
-        roe_version_id=f"eng-{suffix}"[:100],
+        roe_version_id=engagement,
         correlation_id=f"corr-{suffix}"[:100],
         requested_at=NOW,
         attributes={
@@ -285,7 +460,7 @@ def _command(*, tenant: str, campaign: str, suffix: str, amount: int) -> Admissi
     )
     return AdmissionReservationCommandV1(
         campaign_id=campaign,
-        engagement_id=f"eng-{suffix}"[:100],
+        engagement_id=engagement,
         signed_authority_sha256="f" * 64,
         authority_sha256="a" * 64,
         domain_sha256="c" * 64,
@@ -306,7 +481,7 @@ def _command(*, tenant: str, campaign: str, suffix: str, amount: int) -> Admissi
         roe_revocation_epoch=3,
         kill_switch_epoch=4,
         issued_at=NOW,
-        lease_expires_at=NOW + timedelta(minutes=1),
+        lease_expires_at=NOW + timedelta(seconds=20),
     )
 
 

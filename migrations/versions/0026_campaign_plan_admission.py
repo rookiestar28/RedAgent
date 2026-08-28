@@ -35,13 +35,20 @@ def _vector_columns() -> tuple[sa.Column, ...]:
 
 
 def upgrade() -> None:
+    op.create_unique_constraint("uq_campaign_tenant_identity", "campaigns", ["tenant_id", "id"])
     op.create_table(
         "campaign_budget_ledgers",
         sa.Column("id", sa.String(64), primary_key=True),
-        sa.Column("campaign_id", sa.String(64), sa.ForeignKey("campaigns.id"), nullable=False),
+        sa.Column("campaign_id", sa.String(64), nullable=False),
         sa.Column("envelope_sha256", sa.String(64), nullable=False),
         *_vector_columns(),
         *_owned_columns(),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "campaign_id"),
+            ("campaigns.tenant_id", "campaigns.id"),
+            name="fk_campaign_budget_ledger_tenant_campaign",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_campaign_budget_ledger_tenant_identity"),
         sa.UniqueConstraint("tenant_id", "campaign_id", name="uq_campaign_budget_ledger_tenant_campaign"),
         sa.CheckConstraint(
             " AND ".join(f"{name} BETWEEN 0 AND 1000000000000000000" for name in _VECTOR_FIELDS),
@@ -51,8 +58,8 @@ def upgrade() -> None:
     op.create_table(
         "campaign_budget_reservations",
         sa.Column("id", sa.String(64), primary_key=True),
-        sa.Column("ledger_id", sa.String(64), sa.ForeignKey("campaign_budget_ledgers.id"), nullable=False),
-        sa.Column("campaign_id", sa.String(64), sa.ForeignKey("campaigns.id"), nullable=False),
+        sa.Column("ledger_id", sa.String(64), nullable=False),
+        sa.Column("campaign_id", sa.String(64), nullable=False),
         sa.Column("plan_sha256", sa.String(64), nullable=False),
         sa.Column("request_sha256", sa.String(64), nullable=False),
         sa.Column("idempotency_key", sa.String(200), nullable=False),
@@ -62,6 +69,17 @@ def upgrade() -> None:
         sa.Column("reconciliation_code", sa.String(100)),
         *_vector_columns(),
         *_owned_columns(),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "campaign_id"),
+            ("campaigns.tenant_id", "campaigns.id"),
+            name="fk_campaign_budget_reservation_tenant_campaign",
+        ),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "ledger_id"),
+            ("campaign_budget_ledgers.tenant_id", "campaign_budget_ledgers.id"),
+            name="fk_campaign_budget_reservation_tenant_ledger",
+        ),
+        sa.UniqueConstraint("tenant_id", "id", name="uq_campaign_budget_reservation_tenant_identity"),
         sa.UniqueConstraint("tenant_id", "campaign_id", "plan_sha256", name="uq_campaign_budget_reservation_plan"),
         sa.UniqueConstraint(
             "tenant_id",
@@ -81,9 +99,9 @@ def upgrade() -> None:
     op.create_table(
         "campaign_budget_events",
         sa.Column("id", sa.String(64), primary_key=True),
-        sa.Column("ledger_id", sa.String(64), sa.ForeignKey("campaign_budget_ledgers.id"), nullable=False),
-        sa.Column("reservation_id", sa.String(64), sa.ForeignKey("campaign_budget_reservations.id")),
-        sa.Column("campaign_id", sa.String(64), sa.ForeignKey("campaigns.id"), nullable=False),
+        sa.Column("ledger_id", sa.String(64), nullable=False),
+        sa.Column("reservation_id", sa.String(64)),
+        sa.Column("campaign_id", sa.String(64), nullable=False),
         sa.Column("event_type", sa.String(100), nullable=False),
         sa.Column("previous_state", sa.String(32)),
         sa.Column("next_state", sa.String(32), nullable=False),
@@ -91,12 +109,27 @@ def upgrade() -> None:
         sa.Column("after_residual_sha256", sa.String(64), nullable=False),
         sa.Column("receipt_sha256", sa.String(64)),
         *_owned_columns(),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "campaign_id"),
+            ("campaigns.tenant_id", "campaigns.id"),
+            name="fk_campaign_budget_event_tenant_campaign",
+        ),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "ledger_id"),
+            ("campaign_budget_ledgers.tenant_id", "campaign_budget_ledgers.id"),
+            name="fk_campaign_budget_event_tenant_ledger",
+        ),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "reservation_id"),
+            ("campaign_budget_reservations.tenant_id", "campaign_budget_reservations.id"),
+            name="fk_campaign_budget_event_tenant_reservation",
+        ),
     )
     op.create_table(
         "plan_admission_receipts",
         sa.Column("id", sa.String(64), primary_key=True),
-        sa.Column("campaign_id", sa.String(64), sa.ForeignKey("campaigns.id"), nullable=False),
-        sa.Column("reservation_id", sa.String(64), sa.ForeignKey("campaign_budget_reservations.id")),
+        sa.Column("campaign_id", sa.String(64), nullable=False),
+        sa.Column("reservation_id", sa.String(64)),
         sa.Column("policy_decision_id", sa.String(64)),
         sa.Column("policy_boundary_receipt_id", sa.String(64)),
         sa.Column("outcome", sa.String(32), nullable=False),
@@ -106,6 +139,16 @@ def upgrade() -> None:
         sa.Column("receipt_sha256", sa.String(64), nullable=False),
         sa.Column("receipt_payload", sa.JSON(), nullable=False),
         *_owned_columns(),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "campaign_id"),
+            ("campaigns.tenant_id", "campaigns.id"),
+            name="fk_plan_admission_receipt_tenant_campaign",
+        ),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "reservation_id"),
+            ("campaign_budget_reservations.tenant_id", "campaign_budget_reservations.id"),
+            name="fk_plan_admission_receipt_tenant_reservation",
+        ),
         sa.UniqueConstraint(
             "tenant_id", "campaign_id", "idempotency_key", name="uq_plan_admission_receipt_idempotency"
         ),
@@ -170,3 +213,4 @@ def downgrade() -> None:
     op.drop_table("campaign_budget_events")
     op.drop_table("campaign_budget_reservations")
     op.drop_table("campaign_budget_ledgers")
+    op.execute("ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS uq_campaign_tenant_identity")

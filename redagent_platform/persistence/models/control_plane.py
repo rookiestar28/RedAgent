@@ -108,6 +108,7 @@ Table(
     Column("attention_reason", String(100)),
     Column("terminal_receipt_sha256", String(64)),
     *_owned_columns(),
+    UniqueConstraint("tenant_id", "id", name="uq_campaign_tenant_identity"),
     UniqueConstraint("tenant_id", "workflow_id"),
 )
 

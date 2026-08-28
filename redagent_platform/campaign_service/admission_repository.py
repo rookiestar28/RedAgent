@@ -106,6 +106,10 @@ class CampaignAdmissionRepository:
         if existing is not None:
             return _receipt_from_payload(existing["receipt_payload"])
 
+        await self.lock_campaign_binding(
+            campaign_id=command.campaign_id,
+            engagement_id=command.engagement_id,
+        )
         ledger = await self.lock_ledger(
             campaign_id=command.campaign_id,
             envelope_sha256=command.authority_sha256,
@@ -244,6 +248,23 @@ class CampaignAdmissionRepository:
             )
         )
         return receipt
+
+    async def lock_campaign_binding(self, *, campaign_id: str, engagement_id: str) -> None:
+        campaigns = metadata.tables["campaigns"]
+        # CRITICAL: a globally valid campaign ID is not tenant authority; lock the exact tenant/engagement row.
+        binding = (
+            await self.session.execute(
+                select(campaigns.c.id)
+                .where(
+                    campaigns.c.tenant_id == self.tenant_id,
+                    campaigns.c.id == campaign_id,
+                    campaigns.c.engagement_id == engagement_id,
+                )
+                .with_for_update()
+            )
+        ).one_or_none()
+        if binding is None:
+            raise AdmissionConflict("plan_admission_campaign_binding_mismatch")
 
     async def lock_ledger(
         self,
@@ -553,18 +574,28 @@ class CampaignAdmissionRepository:
 
     def _assert_command(self, command: AdmissionReservationCommandV1) -> None:
         request = command.policy_request
+        attributes = request.attributes
         if (
             request.tenant_id != self.tenant_id
             or request.resource_id != command.campaign_id
             or request.action != "campaign.plan.admit"
+            or request.permissions != ("campaign:admit",)
             or request.boundary.value != "workflow"
+            or request.roe_version_id != command.engagement_id
+            or request.requested_at != command.issued_at
             or policy_input_hash(request) != command.policy_decision.input_hash
-            or request.attributes.get("campaign_authority_sha256") != command.authority_sha256
-            or request.attributes.get("campaign_policy_bundle_sha256") != command.policy_bundle_sha256
-            or request.attributes.get("campaign_domain_sha256") != command.domain_sha256
-            or request.attributes.get("campaign_plan_sha256") != command.plan_sha256
-            or request.attributes.get("campaign_certificate_sha256") != command.certificate_sha256
-            or request.attributes.get("campaign_subset_proof_sha256") != command.subset_proof_sha256
+            or attributes.get("campaign_authority_sha256") != command.authority_sha256
+            or attributes.get("campaign_policy_bundle_sha256") != command.policy_bundle_sha256
+            or attributes.get("campaign_domain_sha256") != command.domain_sha256
+            or attributes.get("campaign_plan_sha256") != command.plan_sha256
+            or attributes.get("campaign_certificate_sha256") != command.certificate_sha256
+            or attributes.get("campaign_subset_proof_sha256") != command.subset_proof_sha256
+            or attributes.get("campaign_lifecycle_epoch") != command.lifecycle_epoch
+            or attributes.get("campaign_policy_revocation_epoch") != command.policy_revocation_epoch
+            or attributes.get("campaign_roe_revocation_epoch") != command.roe_revocation_epoch
+            or attributes.get("campaign_kill_switch_epoch") != command.kill_switch_epoch
+            or command.lease_expires_at <= command.issued_at
+            or command.lease_expires_at > command.policy_decision.valid_until
         ):
             raise AdmissionConflict("plan_admission_command_binding_mismatch")
 
