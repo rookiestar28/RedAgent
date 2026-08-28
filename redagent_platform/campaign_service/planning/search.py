@@ -54,13 +54,15 @@ from redagent_platform.campaign_service.planning.search_contracts import (
 PLANNER_VERSION = "redagent.attack-path-planner.v1"
 TOTAL_ORDER_VERSION = "redagent.attack-path-order.v1"
 PLANNER_TICKS_PER_SECOND = 10_000
-PLANNER_SHA256 = hashlib.sha256(b"redagent.attack-path-planner/v1:closed-domain-best-first-width-one-dag").hexdigest()
+PLANNER_SHA256 = hashlib.sha256(
+    b"redagent.attack-path-planner/v1:closed-domain-best-first-resource-pareto-width-one-dag"
+).hexdigest()
 # CRITICAL: keep this module model-free and validator-free; proposals gain no authority here.
 
 _ActionKey: TypeAlias = tuple[str, str, str, str]
 _PathKey: TypeAlias = tuple[_ActionKey, ...]
 _Rank: TypeAlias = tuple[int, int, int, int, _PathKey, str]
-_BestStateKey: TypeAlias = tuple[int, int, int, _PathKey]
+_DominanceVector: TypeAlias = tuple[int, int, int, int, int, int, int, int, int, int]
 _Truth: TypeAlias = bool | None
 
 
@@ -92,6 +94,13 @@ class _SearchNode:
     path: tuple[_Action, ...]
     path_key: _PathKey
     resources: _Resources
+
+
+@dataclass(frozen=True, slots=True)
+class _StateLabel:
+    resources: _Resources
+    depth: int
+    path_key: _PathKey
 
 
 @dataclass(slots=True)
@@ -250,13 +259,13 @@ def _search_attack_path(
         initial_sha = canonical_initial.state_sha256
         initial_rank = _rank(domain, initial_node, ticks)
         frontier: list[tuple[_Rank, int, _SearchNode]] = [(initial_rank, 0, initial_node)]
-        best_by_state: dict[str, _BestStateKey] = {initial_sha: _best_state_key(initial_node)}
+        labels_by_state: dict[str, tuple[_StateLabel, ...]] = {initial_sha: (_state_label(initial_node),)}
         width_by_depth: Counter[int] = Counter({0: 1})
         generation_serial = 0
         hit_bound = False
         first_bound_reason: str | None = None
         effective_frontier = min(limits.max_frontier, authority.bounds.max_frontier)
-        initial_memory = _memory_units(best_by_state, frontier, len(actions))
+        initial_memory = _memory_units(labels_by_state, frontier, len(actions))
         metrics.maximum_memory_units_observed = max(
             metrics.maximum_memory_units_observed,
             initial_memory,
@@ -276,13 +285,14 @@ def _search_attack_path(
         while frontier:
             rank, _, current = heapq.heappop(frontier)
             state_sha = current.state.state_sha256
-            if best_by_state.get(state_sha) != _best_state_key(current):
+            current_label = _state_label(current)
+            if current_label not in labels_by_state.get(state_sha, ()):
                 metrics.deduplicated_states += 1
                 continue
             if current.path and _goal_satisfied(domain, current.state, ticks):
                 # CRITICAL: charge proposal construction before allocation; success cannot bypass hard bounds.
                 completion_memory = (
-                    _memory_units(best_by_state, frontier, len(actions))
+                    _memory_units(labels_by_state, frontier, len(actions))
                     + len(current.path)
                     + len(current.path)
                     + max(len(current.path) - 1, 0)
@@ -367,9 +377,13 @@ def _search_attack_path(
                 path_key = (*current.path_key, action.key)
                 successor = _SearchNode(successor_state, path, path_key, resources)
                 successor_sha = successor_state.state_sha256
-                successor_best = _best_state_key(successor)
-                previous_best = best_by_state.get(successor_sha)
-                if previous_best is not None and previous_best <= successor_best:
+                successor_label = _state_label(successor)
+                retained_labels = _retain_nondominated_labels(
+                    labels_by_state.get(successor_sha, ()),
+                    successor_label,
+                    ticks,
+                )
+                if retained_labels is None:
                     metrics.deduplicated_states += 1
                     metrics.prune("state_deduplicated")
                     continue
@@ -389,13 +403,13 @@ def _search_attack_path(
                         metrics,
                         None,
                     )
-                best_by_state[successor_sha] = successor_best
+                labels_by_state[successor_sha] = retained_labels
                 width_by_depth[depth] += 1
                 generation_serial += 1
                 heapq.heappush(frontier, (_rank(domain, successor, ticks), generation_serial, successor))
                 metrics.maximum_frontier_observed = max(metrics.maximum_frontier_observed, len(frontier))
                 metrics.maximum_depth_observed = max(metrics.maximum_depth_observed, depth)
-                memory_units = _memory_units(best_by_state, frontier, len(actions))
+                memory_units = _memory_units(labels_by_state, frontier, len(actions))
                 metrics.maximum_memory_units_observed = max(
                     metrics.maximum_memory_units_observed,
                     memory_units,
@@ -499,12 +513,27 @@ def _enumerate_actions(
     has_unsupported = False
     for operator in domain.operators:
         ticks.charge()
+        if not _operator_is_authority_permitted(operator, authority):
+            metrics.prune("operator_outside_authority")
+            continue
+        environments = tuple(
+            sorted(
+                set(operator.supported_environments) & set(authority.allowed_environment_classes),
+                key=lambda item: item.value,
+            )
+        )
+        if not environments:
+            metrics.prune("operator_environment_outside_authority")
+            continue
+        eligible_targets = tuple(
+            target_id for target_id in authority.target_ids if _target_is_bindable(operator.parameters, target_id)
+        )
+        if not eligible_targets:
+            metrics.prune("operator_target_outside_authority")
+            continue
         if operator.unsupported_condition_ids:
             has_unsupported = True
             metrics.prune("unsupported_operator_semantics")
-            continue
-        if not _operator_is_authority_permitted(operator, authority):
-            metrics.prune("operator_outside_authority")
             continue
         open_required = tuple(
             spec for spec in operator.parameters if spec.required and not spec.binds_target and not spec.allowed_values
@@ -515,13 +544,7 @@ def _enumerate_actions(
             continue
         finite_specs = tuple(spec for spec in operator.parameters if spec.required and not spec.binds_target)
         finite_domains = tuple(spec.allowed_values for spec in finite_specs)
-        environments = tuple(
-            sorted(
-                set(operator.supported_environments) & set(authority.allowed_environment_classes),
-                key=lambda item: item.value,
-            )
-        )
-        for target_id in authority.target_ids:
+        for target_id in eligible_targets:
             for environment in environments:
                 for selected_values in product(*finite_domains):
                     # CRITICAL: stop before constructing variant limit + 1; eager products can exhaust memory.
@@ -564,6 +587,15 @@ def _operator_is_authority_permitted(
         and operator.effect_class not in authority.forbidden_effect_classes
         and operator.data_access_class in authority.allowed_data_access_classes
         and operator.credential_class in authority.allowed_credential_classes
+    )
+
+
+def _target_is_bindable(specs: tuple[TypedParameterSpecV1, ...], target_id: str) -> bool:
+    target_value = ScalarValueV1(ScalarType.STRING, target_id)
+    return all(
+        not spec.binds_target
+        or (spec.value_type is ScalarType.STRING and (not spec.allowed_values or target_value in spec.allowed_values))
+        for spec in specs
     )
 
 
@@ -616,13 +648,52 @@ def _rank(domain: PlanningDomainV1, node: _SearchNode, ticks: _TickBudget) -> _R
     )
 
 
-def _best_state_key(node: _SearchNode) -> _BestStateKey:
+def _state_label(node: _SearchNode) -> _StateLabel:
+    return _StateLabel(node.resources, len(node.path), node.path_key)
+
+
+def _dominance_vector(label: _StateLabel) -> _DominanceVector:
+    resources = label.resources
     return (
-        node.resources.risk_micropoints,
-        node.resources.cost_microunits,
-        len(node.path),
-        node.path_key,
+        resources.duration_seconds,
+        resources.requests,
+        resources.rate_per_minute,
+        resources.concurrency,
+        resources.retries_per_node,
+        resources.risk_micropoints,
+        resources.cost_microunits,
+        resources.evidence_bytes,
+        resources.data_bytes,
+        label.depth,
     )
+
+
+def _label_dominates(left: _StateLabel, right: _StateLabel) -> bool:
+    left_vector = _dominance_vector(left)
+    right_vector = _dominance_vector(right)
+    if not all(left_value <= right_value for left_value, right_value in zip(left_vector, right_vector, strict=True)):
+        return False
+    return left_vector != right_vector or left.path_key <= right.path_key
+
+
+def _label_order_key(label: _StateLabel) -> tuple[_DominanceVector, _PathKey]:
+    return _dominance_vector(label), label.path_key
+
+
+def _retain_nondominated_labels(
+    existing: tuple[_StateLabel, ...],
+    candidate: _StateLabel,
+    ticks: _TickBudget,
+) -> tuple[_StateLabel, ...] | None:
+    retained: list[_StateLabel] = []
+    # CRITICAL: retain every authority-resource Pareto label; one lexical winner can erase the only feasible path.
+    for incumbent in existing:
+        ticks.charge()
+        if _label_dominates(incumbent, candidate):
+            return None
+        if not _label_dominates(candidate, incumbent):
+            retained.append(incumbent)
+    return tuple(sorted((*retained, candidate), key=_label_order_key))
 
 
 def _predicates_all_true(
@@ -714,11 +785,12 @@ def _resources_within_authority(
 
 
 def _memory_units(
-    best_by_state: dict[str, _BestStateKey],
+    labels_by_state: dict[str, tuple[_StateLabel, ...]],
     frontier: list[tuple[_Rank, int, _SearchNode]],
     action_count: int,
 ) -> int:
-    return action_count + len(best_by_state) + len(frontier) + sum(len(item[2].path) for item in frontier)
+    retained_labels = sum(len(labels) for labels in labels_by_state.values())
+    return action_count + retained_labels + len(frontier) + sum(len(item[2].path) for item in frontier)
 
 
 def _build_revision(

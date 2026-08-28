@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, fields, replace
+from datetime import timedelta
 import os
 from pathlib import Path
 import subprocess
@@ -8,6 +9,7 @@ import sys
 
 import pytest
 
+from redagent_platform.campaign_service.authority_envelope import CampaignEnvironmentClass
 from redagent_platform.campaign_service.planning.contracts import (
     FactAssignmentV1,
     FactDefinitionV1,
@@ -180,6 +182,133 @@ def test_supported_state_space_exhaustion_is_no_plan() -> None:
     result = plan_attack_path(domain(operators=(inert,)), authority(), world(), search_limits())
     assert result.outcome is AttackPathPlannerOutcome.NO_PLAN
     assert result.revision is None
+    assert result.receipt.detail_code == "reachable_state_space_exhausted"
+
+
+def test_state_dedup_preserves_nondominated_authority_resource_profiles() -> None:
+    long_low_risk = replace(
+        operator(),
+        operator_id="alpha-long-low-risk",
+        effects=(FactAssignmentV1("junction-reached", scalar(ScalarType.BOOLEAN, True)),),
+        observation_fact_ids=("junction-reached",),
+        max_duration_seconds=10,
+        max_risk_micropoints=1,
+    )
+    short_higher_risk = replace(
+        operator(),
+        operator_id="zeta-short-higher-risk",
+        effects=(FactAssignmentV1("junction-reached", scalar(ScalarType.BOOLEAN, True)),),
+        observation_fact_ids=("junction-reached",),
+        max_duration_seconds=1,
+        max_risk_micropoints=2,
+    )
+    finish = replace(
+        operator(),
+        operator_id="finish-posture",
+        preconditions=(predicate("junction-reached", ScalarType.BOOLEAN, True),),
+        max_duration_seconds=2,
+        max_risk_micropoints=1,
+    )
+    current_domain = domain(
+        facts=tuple(
+            sorted(
+                (*domain().facts, FactDefinitionV1("junction-reached", ScalarType.BOOLEAN, ())),
+                key=lambda item: item.fact_id,
+            )
+        ),
+        operators=tuple(sorted((finish, long_low_risk, short_higher_risk), key=lambda item: item.operator_id)),
+    )
+    initial = WorldStateV1(
+        tuple(
+            sorted(
+                (*world().values, FactValueV1("junction-reached", scalar(ScalarType.BOOLEAN, False))),
+                key=lambda item: item.fact_id,
+            )
+        )
+    )
+    current_authority = replace(
+        authority(),
+        expires_at=NOW + timedelta(seconds=11),
+        bounds=replace(authority().bounds, max_duration_seconds=11),
+    )
+
+    result = plan_attack_path(current_domain, current_authority, initial, search_limits())
+
+    assert result.outcome is AttackPathPlannerOutcome.PLAN_FOUND
+    assert result.revision is not None
+    assert tuple(node.operator_id for node in result.revision.candidate_plan.nodes) == (
+        "zeta-short-higher-risk",
+        "finish-posture",
+    )
+    certificate = validate_candidate_plan(
+        result.revision.candidate_plan,
+        current_domain,
+        current_authority,
+        limits=validation_limits(),
+        validated_at=NOW + timedelta(seconds=5),
+    )
+    assert certificate.result is ValidationResult.VALID
+
+
+def test_state_dominance_covers_every_resource_depth_and_equal_resource_path_tie() -> None:
+    import redagent_platform.campaign_service.planning.search as search_module
+
+    resource_fields = tuple(field.name for field in fields(search_module._Resources))
+    assert resource_fields == (
+        "duration_seconds",
+        "requests",
+        "rate_per_minute",
+        "concurrency",
+        "retries_per_node",
+        "risk_micropoints",
+        "cost_microunits",
+        "evidence_bytes",
+        "data_bytes",
+    )
+    base = search_module._StateLabel(search_module._Resources(), 0, ())
+    for resource_field in resource_fields:
+        worse = replace(base, resources=replace(base.resources, **{resource_field: 1}))
+        assert search_module._label_dominates(base, worse)
+        assert not search_module._label_dominates(worse, base)
+    deeper = replace(base, depth=1)
+    assert search_module._label_dominates(base, deeper)
+    assert not search_module._label_dominates(deeper, base)
+
+    lower_path = replace(base, path_key=(("alpha", "target-a", "synthetic_loopback", "0" * 64),))
+    higher_path = replace(base, path_key=(("zeta", "target-a", "synthetic_loopback", "0" * 64),))
+    assert search_module._label_dominates(lower_path, higher_path)
+    assert not search_module._label_dominates(higher_path, lower_path)
+
+
+def test_unauthorized_opaque_operator_does_not_pollute_supported_exhaustion() -> None:
+    opaque = replace(operator(), unsupported_condition_ids=("opaque-condition",))
+    result = plan_attack_path(
+        domain(operators=(opaque,)),
+        authority(capability_ids=("other-capability",)),
+        world(),
+        search_limits(),
+    )
+    assert result.outcome is AttackPathPlannerOutcome.NO_PLAN
+    assert result.receipt.detail_code == "reachable_state_space_exhausted"
+
+
+def test_environment_ineligible_open_parameter_does_not_pollute_supported_exhaustion() -> None:
+    open_parameter = TypedParameterSpecV1(
+        name="mode",
+        value_type=ScalarType.STRING,
+        required=True,
+        allowed_values=(),
+        minimum=None,
+        maximum=None,
+        binds_target=False,
+    )
+    unavailable = replace(
+        operator(),
+        parameters=(open_parameter, operator().parameters[0]),
+        supported_environments=(CampaignEnvironmentClass.OWNED_DISPOSABLE_LAB,),
+    )
+    result = plan_attack_path(domain(operators=(unavailable,)), authority(), world(), search_limits())
+    assert result.outcome is AttackPathPlannerOutcome.NO_PLAN
     assert result.receipt.detail_code == "reachable_state_space_exhausted"
 
 

@@ -41,7 +41,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-f886029f-6c066cb4-672f624e-4c074513-bbb6a1d7-942efb0a-81eb7799-31315ad9",
-      "line": 154,
+      "line": 163,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/planning/search.py",
       "rationale": "The top-level pure planner boundary converts any unexpected internal failure into a redacted INTERNAL_ERROR result with no partial proposal; narrowing would omit valid fail-closed boundary failures."
