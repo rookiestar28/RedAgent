@@ -55,7 +55,7 @@ PLANNER_VERSION = "redagent.attack-path-planner.v1"
 TOTAL_ORDER_VERSION = "redagent.attack-path-order.v1"
 PLANNER_TICKS_PER_SECOND = 10_000
 PLANNER_SHA256 = hashlib.sha256(
-    b"redagent.attack-path-planner/v1:closed-domain-best-first-resource-pareto-width-one-dag"
+    b"redagent.attack-path-planner/v1:closed-domain-best-first-resource-pareto-range-valid-opaque-width-one-dag"
 ).hexdigest()
 # CRITICAL: keep this module model-free and validator-free; proposals gain no authority here.
 
@@ -531,10 +531,6 @@ def _enumerate_actions(
         if not eligible_targets:
             metrics.prune("operator_target_outside_authority")
             continue
-        if operator.unsupported_condition_ids:
-            has_unsupported = True
-            metrics.prune("unsupported_operator_semantics")
-            continue
         open_required = tuple(
             spec for spec in operator.parameters if spec.required and not spec.binds_target and not spec.allowed_values
         )
@@ -544,6 +540,7 @@ def _enumerate_actions(
             continue
         finite_specs = tuple(spec for spec in operator.parameters if spec.required and not spec.binds_target)
         finite_domains = tuple(spec.allowed_values for spec in finite_specs)
+        opaque_variant_found = False
         for target_id in eligible_targets:
             for environment in environments:
                 for selected_values in product(*finite_domains):
@@ -560,6 +557,13 @@ def _enumerate_actions(
                     if arguments is None:
                         metrics.prune("target_parameter_value_denied")
                         continue
+                    # CRITICAL: opaque semantics count only after a finite, range-valid variant exists;
+                    # moving this check earlier pollutes an otherwise conclusive NO_PLAN result.
+                    if operator.unsupported_condition_ids:
+                        has_unsupported = True
+                        metrics.prune("unsupported_operator_semantics")
+                        opaque_variant_found = True
+                        break
                     prospective_memory = len(actions) + 2
                     if prospective_memory > limits.max_memory_units:
                         return (
@@ -574,6 +578,10 @@ def _enumerate_actions(
                         metrics.maximum_memory_units_observed,
                         prospective_memory,
                     )
+                if opaque_variant_found:
+                    break
+            if opaque_variant_found:
+                break
     return tuple(sorted(actions, key=lambda item: item.key)), has_unsupported, None
 
 

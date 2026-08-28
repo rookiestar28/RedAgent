@@ -312,6 +312,30 @@ def test_environment_ineligible_open_parameter_does_not_pollute_supported_exhaus
     assert result.receipt.detail_code == "reachable_state_space_exhausted"
 
 
+def test_opaque_operator_without_a_range_valid_finite_variant_does_not_pollute_no_plan() -> None:
+    invalid_only = TypedParameterSpecV1(
+        name="mode",
+        value_type=ScalarType.INTEGER,
+        required=True,
+        allowed_values=(scalar(ScalarType.INTEGER, 100),),
+        minimum=0,
+        maximum=10,
+        binds_target=False,
+    )
+    opaque = replace(
+        operator(),
+        parameters=(invalid_only, operator().parameters[0]),
+        unsupported_condition_ids=("opaque-condition",),
+    )
+    result = plan_attack_path(domain(operators=(opaque,)), authority(), world(), search_limits())
+    assert result.outcome is AttackPathPlannerOutcome.NO_PLAN
+    assert result.receipt.detail_code == "reachable_state_space_exhausted"
+    assert result.receipt.enumerated_action_variants == 1
+    assert ("target_parameter_value_denied", 1) in tuple(
+        (item.reason, item.count) for item in result.receipt.pruned_reasons
+    )
+
+
 @pytest.mark.parametrize(
     ("current_domain", "initial", "detail"),
     (
