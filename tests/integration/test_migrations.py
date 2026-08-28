@@ -52,7 +52,7 @@ async def _migration_scenario() -> None:
             assert upgraded.returncode == 0, upgraded.stderr
             current = _alembic(secret_file, "current")
             assert current.returncode == 0
-            assert "0025_r123_closed_loop (head)" in current.stdout
+            assert "0026_campaign_plan_admission (head)" in current.stdout
 
             async with engine.begin() as connection:
                 revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
@@ -89,63 +89,108 @@ async def _migration_scenario() -> None:
                         "'nuclei_template_revisions','nuclei_bundle_reviews','nuclei_bundle_promotions',"
                         "'nuclei_profile_revisions','nuclei_compiled_plans','nuclei_runs',"
                         "'nuclei_gateway_decisions','nuclei_normalized_results','nuclei_result_rejections',"
-                            "'nuclei_cancellation_receipts','nuclei_cleanup_receipts',"
-                            "'api_diff_engine_artifacts','api_diff_spec_revisions','api_diff_operation_manifests',"
-                            "'api_diff_identity_matrices','api_diff_sequence_grammars','api_diff_reviews',"
-                            "'api_diff_promotions','api_diff_profiles','api_diff_target_attestations',"
-                            "'api_diff_plans','api_diff_cases','api_diff_runs','api_diff_resource_ledger',"
-                            "'api_diff_gateway_decisions','api_diff_observations','api_diff_replay_artifacts',"
-                            "'api_diff_cancellation_receipts','api_diff_cleanup_receipts',"
-                            "'network_engine_artifacts','network_adapter_declarations','network_profiles',"
-                            "'network_topology_attestations','network_target_sets','network_plans',"
-                            "'network_plan_tuples','network_runs','network_gateway_decisions',"
-                            "'network_observations','network_cancellation_receipts','network_cleanup_receipts',"
-                            "'cloud_adapter_artifacts','cloud_provider_profiles','cloud_operation_manifests',"
-                            "'cloud_identity_bindings','cloud_control_packs','cloud_offline_artifacts',"
-                            "'cloud_collection_plans','cloud_collection_runs','cloud_snapshot_pages',"
-                            "'cloud_snapshot_resources','cloud_check_results','cloud_cleanup_receipts',"
-                            "'identity_adapter_artifacts','identity_provider_profiles','identity_operation_manifests',"
-                            "'identity_tenant_bindings','identity_baseline_artifacts','identity_collection_plans',"
-                            "'identity_collection_runs','identity_snapshot_pages','identity_snapshot_resources',"
-                            "'identity_baseline_evaluations','identity_exception_annotations','identity_exception_approvals',"
-                            "'identity_graph_approvals','identity_graph_nodes','identity_graph_edges','identity_cleanup_receipts',"
-                            "'artifact_adapter_artifacts','artifact_pipeline_profiles','artifact_rule_bundles','artifact_database_snapshots',"
-                            "'artifact_bindings','artifact_analysis_plans','artifact_analysis_runs','artifact_manifest_entries',"
-                            "'artifact_components','artifact_license_observations','artifact_vulnerability_observations','artifact_vex_annotations',"
-                            "'artifact_credential_findings','artifact_static_findings','artifact_mobile_observations','artifact_cleanup_receipts',"
-                            "'purple_adapter_artifacts','purple_abilities','purple_ability_phases','purple_detection_expectations',"
-                            "'purple_lab_bindings','purple_approvals','purple_execution_plans','purple_runs','purple_snapshots',"
-                            "'purple_action_receipts','purple_telemetry_events','purple_cleanup_receipts','purple_teardown_receipts',"
-                            "'purple_rehearsal_receipts','human_adapter_artifacts','human_campaign_manifests',"
-                            "'human_consent_rosters','human_suppression_lists','human_privacy_reviews','human_message_templates',"
-                            "'human_campaign_approvals','human_campaign_plans','human_campaign_runs','human_delivery_receipts',"
-                            "'human_minimized_events','human_canary_correlations','human_stop_receipts','human_deletion_receipts',"
-                                "'human_rehearsal_receipts','human_evidence_records',"
-                                "'agent_provider_profiles','agent_projected_tools','agent_runs','agent_steps',"
-                                "'agent_proposals','agent_approvals','agent_budget_ledgers','agent_working_memory',"
-                                "'agent_reviewed_facts','agent_trace_envelopes','agent_qualification_receipts',"
-                                "'mcp_server_registrations','mcp_transport_attestations','mcp_inventory_revisions',"
-                                "'mcp_inventory_items','mcp_freeze_events','workbench_campaign_drafts',"
-                                "'workbench_trust_items','workbench_disclosures','workbench_reviewer_decisions',"
-                                "'workbench_conclusions','workbench_lifecycle_events','mcp_qualification_receipts',"
-                                "'finding_import_sessions','finding_import_records','managed_issues','finding_occurrences',"
-                                "'finding_evidence_links','finding_operations','finding_comments','finding_risk_acceptances',"
-                                "'finding_retests','finding_report_snapshots','finding_report_claims','finding_publications',"
-                                "'finding_connector_profiles','finding_connector_deliveries','finding_connector_attempts',"
-                                "'finding_connector_callbacks','finding_connector_reconciliations',"
-                                "'campaign_strategy_revisions','campaign_effects')"
+                        "'nuclei_cancellation_receipts','nuclei_cleanup_receipts',"
+                        "'api_diff_engine_artifacts','api_diff_spec_revisions','api_diff_operation_manifests',"
+                        "'api_diff_identity_matrices','api_diff_sequence_grammars','api_diff_reviews',"
+                        "'api_diff_promotions','api_diff_profiles','api_diff_target_attestations',"
+                        "'api_diff_plans','api_diff_cases','api_diff_runs','api_diff_resource_ledger',"
+                        "'api_diff_gateway_decisions','api_diff_observations','api_diff_replay_artifacts',"
+                        "'api_diff_cancellation_receipts','api_diff_cleanup_receipts',"
+                        "'network_engine_artifacts','network_adapter_declarations','network_profiles',"
+                        "'network_topology_attestations','network_target_sets','network_plans',"
+                        "'network_plan_tuples','network_runs','network_gateway_decisions',"
+                        "'network_observations','network_cancellation_receipts','network_cleanup_receipts',"
+                        "'cloud_adapter_artifacts','cloud_provider_profiles','cloud_operation_manifests',"
+                        "'cloud_identity_bindings','cloud_control_packs','cloud_offline_artifacts',"
+                        "'cloud_collection_plans','cloud_collection_runs','cloud_snapshot_pages',"
+                        "'cloud_snapshot_resources','cloud_check_results','cloud_cleanup_receipts',"
+                        "'identity_adapter_artifacts','identity_provider_profiles','identity_operation_manifests',"
+                        "'identity_tenant_bindings','identity_baseline_artifacts','identity_collection_plans',"
+                        "'identity_collection_runs','identity_snapshot_pages','identity_snapshot_resources',"
+                        "'identity_baseline_evaluations','identity_exception_annotations','identity_exception_approvals',"
+                        "'identity_graph_approvals','identity_graph_nodes','identity_graph_edges','identity_cleanup_receipts',"
+                        "'artifact_adapter_artifacts','artifact_pipeline_profiles','artifact_rule_bundles','artifact_database_snapshots',"
+                        "'artifact_bindings','artifact_analysis_plans','artifact_analysis_runs','artifact_manifest_entries',"
+                        "'artifact_components','artifact_license_observations','artifact_vulnerability_observations','artifact_vex_annotations',"
+                        "'artifact_credential_findings','artifact_static_findings','artifact_mobile_observations','artifact_cleanup_receipts',"
+                        "'purple_adapter_artifacts','purple_abilities','purple_ability_phases','purple_detection_expectations',"
+                        "'purple_lab_bindings','purple_approvals','purple_execution_plans','purple_runs','purple_snapshots',"
+                        "'purple_action_receipts','purple_telemetry_events','purple_cleanup_receipts','purple_teardown_receipts',"
+                        "'purple_rehearsal_receipts','human_adapter_artifacts','human_campaign_manifests',"
+                        "'human_consent_rosters','human_suppression_lists','human_privacy_reviews','human_message_templates',"
+                        "'human_campaign_approvals','human_campaign_plans','human_campaign_runs','human_delivery_receipts',"
+                        "'human_minimized_events','human_canary_correlations','human_stop_receipts','human_deletion_receipts',"
+                        "'human_rehearsal_receipts','human_evidence_records',"
+                        "'agent_provider_profiles','agent_projected_tools','agent_runs','agent_steps',"
+                        "'agent_proposals','agent_approvals','agent_budget_ledgers','agent_working_memory',"
+                        "'agent_reviewed_facts','agent_trace_envelopes','agent_qualification_receipts',"
+                        "'mcp_server_registrations','mcp_transport_attestations','mcp_inventory_revisions',"
+                        "'mcp_inventory_items','mcp_freeze_events','workbench_campaign_drafts',"
+                        "'workbench_trust_items','workbench_disclosures','workbench_reviewer_decisions',"
+                        "'workbench_conclusions','workbench_lifecycle_events','mcp_qualification_receipts',"
+                        "'finding_import_sessions','finding_import_records','managed_issues','finding_occurrences',"
+                        "'finding_evidence_links','finding_operations','finding_comments','finding_risk_acceptances',"
+                        "'finding_retests','finding_report_snapshots','finding_report_claims','finding_publications',"
+                        "'finding_connector_profiles','finding_connector_deliveries','finding_connector_attempts',"
+                        "'finding_connector_callbacks','finding_connector_reconciliations',"
+                        "'campaign_strategy_revisions','campaign_effects',"
+                        "'campaign_budget_ledgers','campaign_budget_reservations',"
+                        "'campaign_budget_events','plan_admission_receipts')"
                     )
                 )
                 assert revision == settings.expected_revision
-                assert int(table_count or 0) == 249
+                assert int(table_count or 0) == 253
                 for retired_table in (
                     "r118_campaign_controller_records",
                     "r118_campaign_controller_artifacts",
                 ):
-                    assert await connection.scalar(
-                        text("SELECT to_regclass(:table_name)"),
-                        {"table_name": f"public.{retired_table}"},
-                    ) is None
+                    assert (
+                        await connection.scalar(
+                            text("SELECT to_regclass(:table_name)"),
+                            {"table_name": f"public.{retired_table}"},
+                        )
+                        is None
+                    )
+
+            r158_downgraded = _alembic(secret_file, "downgrade", "0025_r123_closed_loop")
+            assert r158_downgraded.returncode == 0, r158_downgraded.stderr
+            async with engine.begin() as connection:
+                assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+                    "0025_r123_closed_loop"
+                )
+                for r158_table in (
+                    "campaign_budget_ledgers",
+                    "campaign_budget_reservations",
+                    "campaign_budget_events",
+                    "plan_admission_receipts",
+                ):
+                    assert (
+                        await connection.scalar(
+                            text("SELECT to_regclass(:table_name)"),
+                            {"table_name": f"public.{r158_table}"},
+                        )
+                        is None
+                    )
+
+            r158_reapplied = _alembic(secret_file, "upgrade", "0026_campaign_plan_admission")
+            assert r158_reapplied.returncode == 0, r158_reapplied.stderr
+            async with engine.begin() as connection:
+                assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+                    settings.expected_revision
+                )
+                for r158_table in (
+                    "campaign_budget_ledgers",
+                    "campaign_budget_reservations",
+                    "campaign_budget_events",
+                    "plan_admission_receipts",
+                ):
+                    assert (
+                        await connection.scalar(
+                            text("SELECT to_regclass(:table_name)"),
+                            {"table_name": f"public.{r158_table}"},
+                        )
+                        == r158_table
+                    )
 
             restored_r118 = _alembic(secret_file, "downgrade", "0023_r118_controller")
             assert restored_r118.returncode == 0, restored_r118.stderr
@@ -172,10 +217,13 @@ async def _migration_scenario() -> None:
                     "r118_campaign_controller_records",
                     "r118_campaign_controller_artifacts",
                 ):
-                    assert await connection.scalar(
-                        text("SELECT to_regclass(:table_name)"),
-                        {"table_name": f"public.{retired_table}"},
-                    ) is None
+                    assert (
+                        await connection.scalar(
+                            text("SELECT to_regclass(:table_name)"),
+                            {"table_name": f"public.{retired_table}"},
+                        )
+                        is None
+                    )
 
             downgraded = _alembic(secret_file, "downgrade", "base")
             assert downgraded.returncode == 0, downgraded.stderr
@@ -186,7 +234,10 @@ async def _migration_scenario() -> None:
             reapplied = _alembic(secret_file, "upgrade", "head")
             assert reapplied.returncode == 0, reapplied.stderr
             async with engine.begin() as connection:
-                assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == settings.expected_revision
+                assert (
+                    await connection.scalar(text("SELECT version_num FROM alembic_version"))
+                    == settings.expected_revision
+                )
         finally:
             await engine.dispose()
     finally:

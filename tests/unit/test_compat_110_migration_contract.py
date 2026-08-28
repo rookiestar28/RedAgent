@@ -9,7 +9,7 @@ REVISION = ROOT / "migrations/versions/0017_r110_artifact_pipeline.py"
 
 
 def test_revision_0017_is_expected_database_head() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0025_r123_closed_loop"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0026_campaign_plan_admission"
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0017_r110_artifact"' in source
     assert 'down_revision = "0016_r109_identity"' in source

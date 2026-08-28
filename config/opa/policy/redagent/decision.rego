@@ -67,6 +67,31 @@ boundary_allowed if {
 }
 
 boundary_allowed if {
+	input.boundary == "workflow"
+	input.action == "campaign.plan.admit"
+	"campaign:admit" in input.permissions
+	admission_metadata_current
+}
+
+admission_metadata_current if {
+	sha256_attribute("campaign_authority_sha256")
+	sha256_attribute("campaign_policy_bundle_sha256")
+	sha256_attribute("campaign_domain_sha256")
+	sha256_attribute("campaign_plan_sha256")
+	sha256_attribute("campaign_certificate_sha256")
+	sha256_attribute("campaign_subset_proof_sha256")
+	sha256_attribute("campaign_residual_budget_sha256")
+	object.get(input.attributes, "campaign_lifecycle_epoch", -1) >= 0
+	object.get(input.attributes, "campaign_policy_revocation_epoch", -1) >= 0
+	object.get(input.attributes, "campaign_roe_revocation_epoch", -1) >= 0
+	object.get(input.attributes, "campaign_kill_switch_epoch", -1) >= 0
+}
+
+sha256_attribute(name) if {
+	regex.match("^[0-9a-f]{64}$", object.get(input.attributes, name, ""))
+}
+
+boundary_allowed if {
 	input.boundary == "evidence"
 	input.action == "evidence.write"
 	"evidence:write" in input.permissions

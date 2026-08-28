@@ -31,7 +31,7 @@ def test_revision_0020_chains_from_r112_and_database_head_advances() -> None:
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0020_r113_agent"' in source
     assert 'down_revision = "0019_r112_human"' in source
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0025_r123_closed_loop"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0026_campaign_plan_admission"
 
 
 def test_revision_0020_defines_force_rls_tables_and_metadata_matches() -> None:

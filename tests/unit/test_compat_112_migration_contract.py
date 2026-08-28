@@ -15,7 +15,7 @@ TABLES = {
 
 
 def test_revision_0019_is_expected_head_and_force_rls_owned():
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0025_r123_closed_loop"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0026_campaign_plan_admission"
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0019_r112_human"' in source and 'down_revision = "0018_r111_purple"' in source
     assert "FORCE ROW LEVEL SECURITY" in source and "redagent.tenant_id" in source

@@ -7,6 +7,7 @@ from . import agent as _agent  # noqa: F401
 from . import api_differential as _api_differential  # noqa: F401
 from . import artifact as _artifact  # noqa: F401
 from . import campaign_loop as _campaign_loop  # noqa: F401
+from . import campaign_admission as _campaign_admission  # noqa: F401
 from . import cloud as _cloud  # noqa: F401
 from . import containment as _containment  # noqa: F401
 from . import control_plane as _control_plane  # noqa: F401

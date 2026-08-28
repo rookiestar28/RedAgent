@@ -11,6 +11,29 @@ test_workflow_allow if {
 	decision.allowed with input as fixture("workflow", "job.command", ["workflow:command"], {"dispatch_blocked": false, "roe_status": "current"})
 }
 
+test_campaign_plan_admission_requires_closed_current_metadata if {
+	attributes := {
+		"campaign_authority_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"campaign_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		"campaign_domain_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		"campaign_kill_switch_epoch": 1,
+		"campaign_lifecycle_epoch": 1,
+		"campaign_plan_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		"campaign_policy_bundle_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		"campaign_policy_revocation_epoch": 1,
+		"campaign_residual_budget_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		"campaign_roe_revocation_epoch": 1,
+		"campaign_subset_proof_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+	}
+	decision.allowed with input as fixture("workflow", "campaign.plan.admit", ["campaign:admit"], attributes)
+}
+
+test_campaign_plan_admission_denies_incomplete_projection if {
+	not decision.allowed with input as fixture("workflow", "campaign.plan.admit", ["campaign:admit"], {
+		"campaign_authority_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	})
+}
+
 test_evidence_allow if {
 	decision.allowed with input as fixture("evidence", "evidence.write", ["evidence:write"], {"classification": "restricted"})
 }

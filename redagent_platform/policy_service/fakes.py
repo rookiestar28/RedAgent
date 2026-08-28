@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import hashlib
+import re
 
 from redagent_platform.policy_service.contracts import (
     PolicyBoundary,
@@ -32,19 +33,22 @@ class DeterministicFakePolicyProvider:
         now: datetime,
     ) -> PolicyDecision:
         allowed = _allowed(request) and required_revision == self.revision
-        digest = hashlib.sha256(
-            f"{request.correlation_id}\0{policy_input_hash(request)}".encode("utf-8")
-        ).hexdigest()[:40]
+        digest = hashlib.sha256(f"{request.correlation_id}\0{policy_input_hash(request)}".encode("utf-8")).hexdigest()[
+            :40
+        ]
         obligations = [PolicyObligation.AUDIT]
         if request.boundary is PolicyBoundary.SECRET:
             obligations.append(PolicyObligation.EXACT_REVOKE)
         else:
             obligations.append(PolicyObligation.REQUIRE_EXPECTED_VERSION)
         return PolicyDecision(
-            decision_id=f"synthetic-{digest}", bundle_revision=self.revision,
-            input_hash=policy_input_hash(request), allowed=allowed,
+            decision_id=f"synthetic-{digest}",
+            bundle_revision=self.revision,
+            input_hash=policy_input_hash(request),
+            allowed=allowed,
             reason_code="boundary_authorized" if allowed else "boundary_denied",
-            obligations=tuple(obligations), issued_at=request.requested_at,
+            obligations=tuple(obligations),
+            issued_at=request.requested_at,
             valid_until=request.requested_at + timedelta(seconds=30),
         )
 
@@ -53,6 +57,20 @@ def _allowed(request: PolicyDecisionInput) -> bool:
     if request.boundary is PolicyBoundary.API:
         return request.action in request.permissions
     if request.boundary is PolicyBoundary.WORKFLOW:
+        if request.action == "campaign.plan.admit":
+            return "campaign:admit" in request.permissions and all(
+                isinstance(value := request.attributes.get(name), str)
+                and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+                for name in (
+                    "campaign_authority_sha256",
+                    "campaign_policy_bundle_sha256",
+                    "campaign_domain_sha256",
+                    "campaign_plan_sha256",
+                    "campaign_certificate_sha256",
+                    "campaign_subset_proof_sha256",
+                    "campaign_residual_budget_sha256",
+                )
+            )
         return (
             request.action in {"job.start", "job.command", "job.stop"}
             and "workflow:command" in request.permissions
@@ -66,10 +84,10 @@ def _allowed(request: PolicyDecisionInput) -> bool:
         )
     if request.boundary is PolicyBoundary.SECRET:
         return (
-        request.action == "secret.lease"
-        and "secret:lease" in request.permissions
-        and request.attributes.get("reference_status") == "active"
-        and request.attributes.get("revoke_pending") is False
+            request.action == "secret.lease"
+            and "secret:lease" in request.permissions
+            and request.attributes.get("reference_status") == "active"
+            and request.attributes.get("revoke_pending") is False
         )
     runner_stages = {
         "runner.manifest.issue": ("runner:issue", "draft", "absent", "certified"),
@@ -93,6 +111,5 @@ def _allowed(request: PolicyDecisionInput) -> bool:
         and request.attributes.get("cleanup_required") is True
         and isinstance(runner_generation, int)
         and runner_generation > 0
-        and request.attributes.get("identity_generation")
-        == request.attributes.get("runner_generation")
+        and request.attributes.get("identity_generation") == request.attributes.get("runner_generation")
     )

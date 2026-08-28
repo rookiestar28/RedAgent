@@ -13,17 +13,17 @@ ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "migrations" / "versions" / "0025_r123_closed_loop.py"
 
 
-def test_r123_is_single_additive_head_over_r118_retirement() -> None:
+def test_r123_remains_the_direct_additive_predecessor_of_current_head() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == ["0025_r123_closed_loop"]
+    assert scripts.get_revision("0026_campaign_plan_admission").down_revision == "0025_r123_closed_loop"
     source = MIGRATION.read_text(encoding="utf-8")
     assert 'revision = "0025_r123_closed_loop"' in source
     assert 'down_revision = "0024_r118_retirement"' in source
     assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0025_r123_closed_loop"
+        "0026_campaign_plan_admission"
     )
 
 
