@@ -65,8 +65,7 @@ def test_unconsumed_r118_validation_families_are_absent_from_active_source_and_g
 
     assert not (ROOT / "scripts" / "run_r118_shadow_qualification.py").exists()
     assert not any(
-        path.name.startswith(RETIRED_TEST_PREFIXES)
-        for path in (ROOT / "tests" / "unit").glob("test_r118_*.py")
+        path.name.startswith(RETIRED_TEST_PREFIXES) for path in (ROOT / "tests" / "unit").glob("test_r118_*.py")
     )
     assert not (ROOT / "tests" / "integration" / "test_r118_campaign_controller_repository.py").exists()
     assert not any((ROOT / "tests" / "fixtures").glob("r118_campaign_*.json"))
@@ -94,9 +93,7 @@ def test_unconsumed_r118_validation_families_are_absent_from_active_source_and_g
 
 
 def test_current_schema_retires_r118_campaign_controller_tables_additively() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0025_r123_closed_loop"
-    )
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0025_r123_closed_loop")
     assert "r118_campaign_controller_records" not in metadata.tables
     assert "r118_campaign_controller_artifacts" not in metadata.tables
 

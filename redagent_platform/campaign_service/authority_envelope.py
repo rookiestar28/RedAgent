@@ -277,6 +277,21 @@ class CampaignAuthorityApprovalV2:
 
 
 @dataclass(frozen=True, slots=True)
+class TrustedCampaignApproverKeyV2:
+    key_id: str
+    approver_id: str
+    allowed_roles: tuple[str, ...]
+    public_key: Ed25519PublicKey
+
+    def __post_init__(self) -> None:
+        _identifier("campaign_approver_key_id", self.key_id)
+        _identifier("campaign_approver_key_owner", self.approver_id)
+        _closed_ids("campaign_approver_key_roles", self.allowed_roles, maximum=16)
+        if not isinstance(self.public_key, Ed25519PublicKey):
+            raise ValueError("campaign_approver_public_key_invalid")
+
+
+@dataclass(frozen=True, slots=True)
 class SignedCampaignAuthorityEnvelopeV2:
     authority: CampaignAuthorityEnvelopeV2
     approvals: tuple[CampaignAuthorityApprovalV2, ...]
@@ -416,11 +431,14 @@ def verify_signed_campaign_authority(
     signed: SignedCampaignAuthorityEnvelopeV2,
     lifecycle: CampaignAuthorityLifecycleV2,
     *,
-    public_keys: Mapping[str, Ed25519PublicKey],
+    trusted_keys: Mapping[str, TrustedCampaignApproverKeyV2],
     now: datetime,
 ) -> CampaignAuthorityVerificationV2:
-    if not isinstance(signed, SignedCampaignAuthorityEnvelopeV2) or not isinstance(public_keys, Mapping):
+    if not isinstance(signed, SignedCampaignAuthorityEnvelopeV2) or not isinstance(trusted_keys, Mapping):
         raise ValueError("signed_campaign_authority_verification_input_invalid")
+    for registry_key_id, binding in trusted_keys.items():
+        if not isinstance(binding, TrustedCampaignApproverKeyV2) or registry_key_id != binding.key_id:
+            raise ValueError("campaign_approval_key_registry_invalid")
     _assert_current_lifecycle(signed.authority, lifecycle, now=now)
     if not signed.authority.valid_from <= now < signed.authority.expires_at:
         raise ValueError("campaign_authority_expired")
@@ -434,12 +452,17 @@ def verify_signed_campaign_authority(
             raise ValueError("campaign_approval_window_outside_authority")
         if not approval.approved_at <= now < approval.expires_at:
             raise ValueError("campaign_approval_expired")
-        key = public_keys.get(approval.key_id)
-        if not isinstance(key, Ed25519PublicKey):
+        trusted_key = trusted_keys.get(approval.key_id)
+        if not isinstance(trusted_key, TrustedCampaignApproverKeyV2):
             raise ValueError("campaign_approval_key_missing")
+        # CRITICAL: approval identity is untrusted signed content; bind it to server-trusted key ownership before counting it.
+        if approval.approver_id != trusted_key.approver_id or approval.approver_role not in trusted_key.allowed_roles:
+            raise ValueError("campaign_approval_identity_binding_mismatch")
         try:
             # CRITICAL: verify the reconstructed detached statement, never caller-provided bytes.
-            key.verify(bytes.fromhex(approval.signature_hex), _canonical_bytes(_approval_payload(approval)))
+            trusted_key.public_key.verify(
+                bytes.fromhex(approval.signature_hex), _canonical_bytes(_approval_payload(approval))
+            )
         except (InvalidSignature, ValueError) as exc:
             raise ValueError("campaign_approval_signature_invalid") from exc
         verified_pairs.add(CampaignApproverRequirementV2(approval.approver_id, approval.approver_role))
@@ -459,6 +482,17 @@ def classify_campaign_authority_subset(
 ) -> CampaignAuthoritySubsetProofV2:
     if not isinstance(candidate, CampaignAuthorityEnvelopeV2) or not isinstance(parent, CampaignAuthorityEnvelopeV2):
         raise ValueError("campaign_authority_subset_input_invalid")
+    if candidate.authority_sha256 != parent.authority_sha256 and (
+        candidate.parent_authority_sha256 != parent.authority_sha256
+    ):
+        # CRITICAL: a distinct child must bind this exact direct parent; scope narrowing alone cannot establish lineage.
+        return CampaignAuthoritySubsetProofV2(
+            AuthoritySubsetClassification.INCOMPARABLE,
+            candidate.authority_sha256,
+            parent.authority_sha256,
+            ("binding_mismatch:parent_authority_sha256",),
+            (),
+        )
     # CRITICAL: enumerate every authority-bearing dimension here; omission can silently mint authority.
     incomparable: list[str] = []
     for field_name in (

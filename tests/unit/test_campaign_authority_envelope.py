@@ -20,6 +20,7 @@ from redagent_platform.campaign_service.authority_envelope import (
     CampaignEnvironmentClass,
     CampaignSafetyRequirementsV2,
     SignedCampaignAuthorityEnvelopeV2,
+    TrustedCampaignApproverKeyV2,
     canonical_campaign_authority_bytes,
     classify_campaign_authority_subset,
     sign_campaign_authority,
@@ -154,6 +155,26 @@ def signed(authority: CampaignAuthorityEnvelopeV2 | None = None):
     return SignedCampaignAuthorityEnvelopeV2(authority=authority, approvals=(approval,)), key
 
 
+def trusted_key(
+    private_key: Ed25519PrivateKey,
+    *,
+    key_id: str = "key-a",
+    approver_id: str = "approver-a",
+    allowed_roles: tuple[str, ...] = ("campaign-owner",),
+) -> TrustedCampaignApproverKeyV2:
+    return TrustedCampaignApproverKeyV2(
+        key_id=key_id,
+        approver_id=approver_id,
+        allowed_roles=allowed_roles,
+        public_key=private_key.public_key(),
+    )
+
+
+def child(parent: CampaignAuthorityEnvelopeV2, **overrides: object) -> CampaignAuthorityEnvelopeV2:
+    overrides.setdefault("parent_authority_sha256", parent.authority_sha256)
+    return envelope(**overrides)
+
+
 def test_canonical_authority_is_stable_normalized_and_closed() -> None:
     first = envelope()
     repeated = envelope()
@@ -176,7 +197,7 @@ def test_signature_and_current_lifecycle_bind_exact_authority_and_approver() -> 
     result = verify_signed_campaign_authority(
         wrapped,
         lifecycle(wrapped.authority),
-        public_keys={"key-a": key.public_key()},
+        trusted_keys={"key-a": trusted_key(key)},
         now=NOW + timedelta(minutes=2),
     )
     assert result.authority_sha256 == wrapped.authority.authority_sha256
@@ -187,7 +208,7 @@ def test_signature_and_current_lifecycle_bind_exact_authority_and_approver() -> 
         verify_signed_campaign_authority(
             replace(wrapped, authority=tampered),
             lifecycle(tampered),
-            public_keys={"key-a": key.public_key()},
+            trusted_keys={"key-a": trusted_key(key)},
             now=NOW + timedelta(minutes=2),
         )
 
@@ -196,7 +217,7 @@ def test_signature_and_current_lifecycle_bind_exact_authority_and_approver() -> 
         verify_signed_campaign_authority(
             wrapped,
             lifecycle(wrapped.authority),
-            public_keys={"key-a": wrong_key.public_key()},
+            trusted_keys={"key-a": trusted_key(wrong_key)},
             now=NOW + timedelta(minutes=2),
         )
 
@@ -206,7 +227,36 @@ def test_signature_and_current_lifecycle_bind_exact_authority_and_approver() -> 
         verify_signed_campaign_authority(
             replace(wrapped, approvals=(replace(wrapped.approvals[0], signature_hex=flipped),)),
             lifecycle(wrapped.authority),
-            public_keys={"key-a": key.public_key()},
+            trusted_keys={"key-a": trusted_key(key)},
+            now=NOW + timedelta(minutes=2),
+        )
+
+
+def test_trusted_key_for_another_principal_cannot_impersonate_required_approver() -> None:
+    authority = envelope()
+    principal_b_key = Ed25519PrivateKey.generate()
+    forged_claim = sign_campaign_authority(
+        authority,
+        principal_b_key,
+        approver_id="approver-a",
+        approver_role="campaign-owner",
+        key_id="key-b",
+        approved_at=NOW + timedelta(seconds=1),
+        expires_at=NOW + timedelta(minutes=15),
+    )
+
+    with pytest.raises(ValueError, match="campaign_approval_identity_binding_mismatch"):
+        verify_signed_campaign_authority(
+            SignedCampaignAuthorityEnvelopeV2(authority=authority, approvals=(forged_claim,)),
+            lifecycle(authority),
+            trusted_keys={
+                "key-b": trusted_key(
+                    principal_b_key,
+                    key_id="key-b",
+                    approver_id="approver-b",
+                    allowed_roles=("campaign-owner",),
+                )
+            },
             now=NOW + timedelta(minutes=2),
         )
 
@@ -233,7 +283,7 @@ def test_current_lifecycle_fails_closed_for_drift(overrides: dict[str, object], 
         verify_signed_campaign_authority(
             wrapped,
             lifecycle(wrapped.authority, **overrides),
-            public_keys={"key-a": key.public_key()},
+            trusted_keys={"key-a": trusted_key(key)},
             now=NOW + timedelta(minutes=2),
         )
 
@@ -248,7 +298,7 @@ def test_expiry_and_duplicate_or_wrong_role_approvals_fail_closed() -> None:
                 observed_at=NOW + timedelta(minutes=20),
                 valid_until=NOW + timedelta(minutes=22),
             ),
-            public_keys={"key-a": key.public_key()},
+            trusted_keys={"key-a": trusted_key(key)},
             now=NOW + timedelta(minutes=20, seconds=1),
         )
 
@@ -261,11 +311,11 @@ def test_expiry_and_duplicate_or_wrong_role_approvals_fail_closed() -> None:
         approved_at=NOW + timedelta(seconds=1),
         expires_at=NOW + timedelta(minutes=15),
     )
-    with pytest.raises(ValueError, match="campaign_required_approval_missing"):
+    with pytest.raises(ValueError, match="campaign_approval_identity_binding_mismatch"):
         verify_signed_campaign_authority(
             replace(wrapped, approvals=(wrong_role,)),
             lifecycle(wrapped.authority),
-            public_keys={"key-a": key.public_key()},
+            trusted_keys={"key-a": trusted_key(key)},
             now=NOW + timedelta(minutes=2),
         )
 
@@ -280,7 +330,7 @@ def test_expiry_and_duplicate_or_wrong_role_approvals_fail_closed() -> None:
         verify_signed_campaign_authority(
             replace(wrapped, approvals=(outside_window,)),
             lifecycle(wrapped.authority),
-            public_keys={"key-a": key.public_key()},
+            trusted_keys={"key-a": trusted_key(key)},
             now=NOW + timedelta(minutes=2),
         )
 
@@ -323,61 +373,79 @@ def test_mechanical_subset_narrows_every_authority_dimension() -> None:
     }.issubset(set(proof.narrowed_dimensions))
 
 
+@pytest.mark.parametrize("parent_digest", (None, SHA_C))
+def test_distinct_child_requires_exact_direct_parent_digest(parent_digest: str | None) -> None:
+    parent = envelope()
+    candidate = envelope(
+        envelope_id="lineage-mismatch",
+        target_ids=("target-a",),
+        parent_authority_sha256=parent_digest,
+    )
+
+    proof = classify_campaign_authority_subset(candidate, parent)
+
+    assert proof.classification is AuthoritySubsetClassification.INCOMPARABLE
+    assert proof.reasons == ("binding_mismatch:parent_authority_sha256",)
+
+
 @pytest.mark.parametrize(
-    "candidate",
+    "overrides",
     (
-        envelope(envelope_id="scope-target", target_ids=("target-a", "target-b", "target-c")),
-        envelope(
-            envelope_id="scope-capability",
-            capability_ids=("artifact-posture", "nuclei-controlled-runtime", "zap-controlled-runtime"),
-        ),
-        envelope(
-            envelope_id="scope-effect",
-            allowed_effect_classes=(
+        {"envelope_id": "scope-target", "target_ids": ("target-a", "target-b", "target-c")},
+        {
+            "envelope_id": "scope-capability",
+            "capability_ids": ("artifact-posture", "nuclei-controlled-runtime", "zap-controlled-runtime"),
+        },
+        {
+            "envelope_id": "scope-effect",
+            "allowed_effect_classes": (
                 CampaignEffectClass.CONTROLLED_STATE_CHANGE,
                 CampaignEffectClass.NETWORK_REQUEST,
                 CampaignEffectClass.READ_ONLY_OBSERVATION,
             ),
-            forbidden_effect_classes=(CampaignEffectClass.DISRUPTIVE,),
-        ),
-        envelope(envelope_id="scope-forbidden", forbidden_effect_classes=(CampaignEffectClass.DISRUPTIVE,)),
-        envelope(
-            envelope_id="scope-data",
-            allowed_data_access_classes=(
+            "forbidden_effect_classes": (CampaignEffectClass.DISRUPTIVE,),
+        },
+        {"envelope_id": "scope-forbidden", "forbidden_effect_classes": (CampaignEffectClass.DISRUPTIVE,)},
+        {
+            "envelope_id": "scope-data",
+            "allowed_data_access_classes": (
                 CampaignDataAccessClass.METADATA_ONLY,
                 CampaignDataAccessClass.REPORT_SAFE,
                 CampaignDataAccessClass.SENSITIVE,
             ),
-        ),
-        envelope(
-            envelope_id="scope-credential",
-            allowed_credential_classes=(CampaignCredentialClass.NONE, CampaignCredentialClass.SCOPED_READ),
-        ),
-        envelope(
-            envelope_id="scope-environment",
-            allowed_environment_classes=(
+        },
+        {
+            "envelope_id": "scope-credential",
+            "allowed_credential_classes": (CampaignCredentialClass.NONE, CampaignCredentialClass.SCOPED_READ),
+        },
+        {
+            "envelope_id": "scope-environment",
+            "allowed_environment_classes": (
                 CampaignEnvironmentClass.OWNED_DISPOSABLE_LAB,
                 CampaignEnvironmentClass.OWNED_STAGING,
                 CampaignEnvironmentClass.SYNTHETIC_LOOPBACK,
             ),
-        ),
-        envelope(envelope_id="scope-time", expires_at=NOW + timedelta(minutes=21)),
-        envelope(envelope_id="scope-budget", bounds=bounds(max_nodes=25)),
+        },
+        {"envelope_id": "scope-time", "expires_at": NOW + timedelta(minutes=21)},
+        {"envelope_id": "scope-budget", "bounds": bounds(max_nodes=25)},
     ),
 )
-def test_each_widened_dimension_is_an_expansion(candidate: CampaignAuthorityEnvelopeV2) -> None:
-    proof = classify_campaign_authority_subset(candidate, envelope())
+def test_each_widened_dimension_is_an_expansion(overrides: dict[str, object]) -> None:
+    parent = envelope()
+    proof = classify_campaign_authority_subset(child(parent, **overrides), parent)
     assert proof.classification is AuthoritySubsetClassification.EXPANSION
     assert proof.reasons
 
 
 def test_objective_success_approver_and_safety_weakening_are_expansions() -> None:
     parent = envelope()
-    objective = envelope(
+    objective = child(
+        parent,
         envelope_id="objective-expansion",
         objective_ids=("objective-a", "objective-b", "objective-c"),
     )
-    success = envelope(
+    success = child(
+        parent,
         envelope_id="success-expansion",
         success_condition_ids=("success-a", "success-b", "success-c"),
     )
@@ -390,12 +458,13 @@ def test_objective_success_approver_and_safety_weakening_are_expansions() -> Non
             CampaignApproverRequirementV2("approver-b", "security-reviewer"),
         )
     )
-    approver_weakening = envelope(envelope_id="approver-weakening")
+    approver_weakening = child(stronger_approval_parent, envelope_id="approver-weakening")
     assert classify_campaign_authority_subset(approver_weakening, stronger_approval_parent).reasons == (
         "weakened_required_approvers",
     )
 
-    safety_weakening = envelope(
+    safety_weakening = child(
+        parent,
         envelope_id="safety-weakening",
         safety_requirements=safety(cleanup_required=False),
     )
@@ -408,7 +477,7 @@ def test_objective_success_approver_and_safety_weakening_are_expansions() -> Non
 def test_each_widened_bound_is_an_expansion(field_name: str) -> None:
     parent = envelope()
     widened = replace(parent.bounds, **{field_name: getattr(parent.bounds, field_name) + 1})
-    candidate = envelope(envelope_id=f"expanded-{field_name.replace('_', '-')}", bounds=widened)
+    candidate = child(parent, envelope_id=f"expanded-{field_name.replace('_', '-')}", bounds=widened)
     proof = classify_campaign_authority_subset(candidate, parent)
     assert proof.classification is AuthoritySubsetClassification.EXPANSION
     assert f"expanded_bound:{field_name}" in proof.reasons
@@ -423,10 +492,10 @@ def test_bounds_reject_boolean_or_fractional_units(invalid: object) -> None:
 def test_cross_tenant_and_policy_bindings_are_incomparable() -> None:
     parent = envelope()
     for candidate in (
-        envelope(envelope_id="cross-tenant", tenant_id="tenant-b"),
-        envelope(envelope_id="cross-engagement", engagement_id="engagement-b"),
-        envelope(envelope_id="cross-policy", policy_bundle_sha256=SHA_C),
-        envelope(envelope_id="cross-roe", roe_sha256=SHA_C),
+        child(parent, envelope_id="cross-tenant", tenant_id="tenant-b"),
+        child(parent, envelope_id="cross-engagement", engagement_id="engagement-b"),
+        child(parent, envelope_id="cross-policy", policy_bundle_sha256=SHA_C),
+        child(parent, envelope_id="cross-roe", roe_sha256=SHA_C),
     ):
         assert (
             classify_campaign_authority_subset(candidate, parent).classification
@@ -437,26 +506,32 @@ def test_cross_tenant_and_policy_bindings_are_incomparable() -> None:
 @given(max_nodes=st.integers(min_value=6, max_value=24), max_requests=st.integers(min_value=1, max_value=120))
 def test_generated_narrow_bounds_are_monotonic(max_nodes: int, max_requests: int) -> None:
     parent = envelope()
-    candidate = envelope(
+    candidate = child(
+        parent,
         envelope_id="generated-child",
         bounds=bounds(max_nodes=max_nodes, max_requests=max_requests),
     )
     assert classify_campaign_authority_subset(candidate, parent).classification is AuthoritySubsetClassification.SUBSET
 
 
-def test_subset_relation_is_reflexive_and_transitive() -> None:
+def test_subset_relation_is_reflexive_and_scope_transitive_with_direct_lineage_rebase() -> None:
     broad = envelope()
-    middle = envelope(envelope_id="middle", target_ids=("target-a",), bounds=bounds(max_nodes=12))
-    narrow = envelope(
+    middle = child(broad, envelope_id="middle", target_ids=("target-a",), bounds=bounds(max_nodes=12))
+    narrow = child(
+        middle,
         envelope_id="narrow",
         target_ids=("target-a",),
         capability_ids=("artifact-posture",),
         bounds=bounds(max_nodes=6),
     )
+    narrow_rebased_to_broad = replace(narrow, parent_authority_sha256=broad.authority_sha256)
     assert classify_campaign_authority_subset(broad, broad).classification is AuthoritySubsetClassification.SUBSET
     assert classify_campaign_authority_subset(middle, broad).classification is AuthoritySubsetClassification.SUBSET
     assert classify_campaign_authority_subset(narrow, middle).classification is AuthoritySubsetClassification.SUBSET
-    assert classify_campaign_authority_subset(narrow, broad).classification is AuthoritySubsetClassification.SUBSET
+    assert (
+        classify_campaign_authority_subset(narrow_rebased_to_broad, broad).classification
+        is AuthoritySubsetClassification.SUBSET
+    )
 
 
 def test_existing_v1_budget_digest_remains_frozen() -> None:
