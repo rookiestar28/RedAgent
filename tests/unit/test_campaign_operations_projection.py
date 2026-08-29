@@ -221,7 +221,7 @@ def _source() -> CampaignOperationsSource:
                 "action": "campaign.dag.start.requested",
                 "created_at": NOW,
                 "correlation_id": "corr-safe",
-                "details": {"plan_sha256": "2" * 64, "secret": "secret-detail"},
+                "details": {"plan_sha256": "2" * 64, "secret": "secret-detail"},  # pragma: allowlist secret
                 "actor_user_id": "operator-internal",
             },
         ),
