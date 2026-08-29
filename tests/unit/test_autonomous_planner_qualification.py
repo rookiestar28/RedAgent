@@ -44,10 +44,13 @@ MATRIX_V2_PATH = ROOT / "config/validation/autonomous-planner-qualification-v2.j
 MATRIX_V3_PATH = ROOT / "config/validation/autonomous-planner-qualification-v3.json"
 MATRIX_V4_PATH = ROOT / "config/validation/autonomous-planner-qualification-v4.json"
 MATRIX_V5_PATH = ROOT / "config/validation/autonomous-planner-qualification-v5.json"
+MATRIX_V6_PATH = ROOT / "config/validation/autonomous-planner-qualification-v6.json"
 MATRIX_SCHEMA_V4 = "redagent.autonomous-planner-qualification-matrix/v4"
 MATRIX_SCHEMA_V5 = "redagent.autonomous-planner-qualification-matrix/v5"
+MATRIX_SCHEMA_V6 = "redagent.autonomous-planner-qualification-matrix/v6"
 PROJECTION_SCHEMA_V4 = "redagent.autonomous-planner-qualification-projection/v4"
 PROJECTION_SCHEMA_V5 = "redagent.autonomous-planner-qualification-projection/v5"
+PROJECTION_SCHEMA_V6 = "redagent.autonomous-planner-qualification-projection/v6"
 ZERO_SHA = "0" * 64
 V5_DEFAULT_VOLUMES = (
     ("redagent-local-postgres-data", "redagent_postgres_data"),
@@ -62,10 +65,13 @@ def _projection_payload(matrix) -> dict[str, object]:
     is_v3 = matrix.schema_version == MATRIX_SCHEMA_V3
     is_v4 = matrix.schema_version == MATRIX_SCHEMA_V4
     is_v5 = matrix.schema_version == MATRIX_SCHEMA_V5
-    has_runtime_binding = is_v2 or is_v3 or is_v4 or is_v5
+    is_v6 = matrix.schema_version == MATRIX_SCHEMA_V6
+    has_runtime_binding = is_v2 or is_v3 or is_v4 or is_v5 or is_v6
     body: dict[str, object] = {
         "schema_version": (
-            PROJECTION_SCHEMA_V5
+            PROJECTION_SCHEMA_V6
+            if is_v6
+            else PROJECTION_SCHEMA_V5
             if is_v5
             else PROJECTION_SCHEMA_V4
             if is_v4
@@ -76,7 +82,9 @@ def _projection_payload(matrix) -> dict[str, object]:
             else PROJECTION_SCHEMA
         ),
         "attempt_id": (
-            "autonomous-planner-20260830-attempt-05"
+            "autonomous-planner-20260830-attempt-06"
+            if is_v6
+            else "autonomous-planner-20260830-attempt-05"
             if is_v5
             else "autonomous-planner-20260830-attempt-04"
             if is_v4
@@ -465,8 +473,38 @@ def test_v5_matrix_is_fresh_and_preserves_the_closed_nine_stage_authority() -> N
     assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
 
 
+def test_v6_matrix_is_fresh_and_preserves_v5_and_the_closed_nine_stage_authority() -> None:
+    matrix = load_matrix(MATRIX_V6_PATH)
+
+    assert matrix.schema_version == MATRIX_SCHEMA_V6
+    assert matrix.candidate_parent_commit == "3baad647775fdbf302b405a951b0315beb029891"  # pragma: allowlist secret
+    assert len(matrix.stages) == 9
+    assert dict(matrix.formal_runtime_paths) == {
+        "home": ".tmp/apq-06/runtime/h",
+        "pre_commit_home": ".tmp/apq-06/runtime/p",
+        "temp": ".tmp/apq-06/runtime/t",
+    }
+    assert all(path.startswith(".tmp/apq-06/runtime/") for path in matrix.cleanup_paths)
+    assert "config/validation/autonomous-planner-qualification-v5.json" in matrix.source_paths
+    assert "config/validation/autonomous-planner-qualification-v6.json" in matrix.source_paths
+    assert len(matrix.source_paths) == 44
+    assert matrix.stages[0].expected_pass_count == 316
+    assert all(stage.allowed_skip_count == 0 for stage in matrix.stages)
+
+    _matrix, _projection_value, events, bundle = _accepted_ceremony_for(MATRIX_V6_PATH)
+    assert len(events) == len(matrix.stages) + 3
+    assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
+
+
 def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> None:
-    for path in (MATRIX_PATH, MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH):
+    for path in (
+        MATRIX_PATH,
+        MATRIX_V2_PATH,
+        MATRIX_V3_PATH,
+        MATRIX_V4_PATH,
+        MATRIX_V5_PATH,
+        MATRIX_V6_PATH,
+    ):
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["max_concurrency"] = 2
         body = {key: value for key, value in payload.items() if key != "matrix_sha256"}
@@ -510,7 +548,10 @@ def test_projection_denies_target_runner_identity_and_candidate_lineage_drift() 
             parse_projection(mutated, matrix)
 
 
-@pytest.mark.parametrize("matrix_path", [MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH])
+@pytest.mark.parametrize(
+    "matrix_path",
+    [MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH, MATRIX_V6_PATH],
+)
 def test_runtime_bound_projection_denies_runner_runtime_and_snapshot_input_drift(
     matrix_path: Path,
 ) -> None:
@@ -712,8 +753,8 @@ def test_event_chain_rejects_missing_reordered_or_tampered_lifecycle() -> None:
 def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v5.json"
-    assert cli.OUTPUT_ROOT.relative_to(cli.ROOT).as_posix() == ".tmp/apq-05"
+    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v6.json"
+    assert cli.OUTPUT_ROOT.relative_to(cli.ROOT).as_posix() == ".tmp/apq-06"
     assert cli.build_parser().parse_args(["preflight"]).command == "preflight"
     assert cli.build_parser().parse_args(["run"]).command == "run"
     assert cli.build_parser().parse_args(["verify"]).command == "verify"
@@ -743,6 +784,48 @@ def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> N
     assert [command[2] for command in provision] == ["start", "provision", "provision"]
 
 
+def test_cli_real_input_loader_binds_the_exact_current_matrix(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    workspace = tmp_path / "workspace"
+    matrix_path = workspace / "config/validation/autonomous-planner-qualification-v6.json"
+    matrix_path.parent.mkdir(parents=True)
+    shutil.copyfile(MATRIX_V6_PATH, matrix_path)
+    matrix = load_matrix(matrix_path)
+    projection = _projection_payload(matrix)
+    output_root = workspace / ".tmp/apq-06"
+    output_root.mkdir(parents=True)
+    projection_path = output_root / "execution-projection.json"
+    projection_path.write_text(json.dumps(projection), encoding="utf-8")
+    pins_body = {
+        "schema_version": PINS_SCHEMA,
+        "matrix_sha256": matrix.matrix_sha256,
+        "projection_sha256": projection["projection_sha256"],
+        "candidate_commit": projection["candidate_commit"],
+        "candidate_tree": projection["candidate_tree"],
+        "private_manifest_sha256": projection["private_manifest_sha256"],
+        "trust_anchor_sha256": projection["trust_anchor_sha256"],
+    }
+    pins_path = output_root / "verification-pins.json"
+    pins_path.write_text(
+        json.dumps({**pins_body, "pins_sha256": canonical_sha256(pins_body)}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "ROOT", workspace)
+    monkeypatch.setattr(cli, "MATRIX_PATH", matrix_path)
+    monkeypatch.setattr(cli, "PROJECTION_PATH", projection_path)
+    monkeypatch.setattr(cli, "PINS_PATH", pins_path)
+
+    loaded_matrix, loaded_projection, loaded_pins = cli._load_inputs()
+
+    assert loaded_matrix.schema_version == MATRIX_SCHEMA_V6
+    assert loaded_projection.projection_sha256 == projection["projection_sha256"]
+    assert loaded_pins["pins_sha256"] == canonical_sha256(pins_body)
+
+
 def test_v4_full_gate_stage_appends_fixed_transition_resets_without_changing_v3(monkeypatch) -> None:
     from scripts import autonomous_planner_qualification as cli
 
@@ -768,14 +851,18 @@ def test_v4_full_gate_stage_appends_fixed_transition_resets_without_changing_v3(
     assert len(cli._stage_commands(v3_stage, v3, v3_projection)) == 2
 
 
-def test_v5_full_gate_stage_preserves_the_v4_fixed_transition_commands(monkeypatch) -> None:
+@pytest.mark.parametrize("matrix_path", [MATRIX_V5_PATH, MATRIX_V6_PATH])
+def test_v5_v6_full_gate_stage_preserves_the_v4_fixed_transition_commands(
+    matrix_path: Path,
+    monkeypatch,
+) -> None:
     from scripts import autonomous_planner_qualification as cli
 
     monkeypatch.setattr(cli, "_tool", lambda name: name)
-    v5 = _v5_matrix()
-    v5_projection = _projection(v5)
-    v5_stage = next(stage for stage in v5.stages if stage.runner_id == "windows-full-gate")
-    commands = cli._stage_commands(v5_stage, v5, v5_projection)
+    matrix = load_matrix(matrix_path)
+    projection = _projection(matrix)
+    stage = next(stage for stage in matrix.stages if stage.runner_id == "windows-full-gate")
+    commands = cli._stage_commands(stage, matrix, projection)
 
     assert len(commands) == 5
     assert Path(commands[0][3]).name == "run_full_tests_windows.ps1"
@@ -1332,7 +1419,10 @@ def test_formal_children_receive_only_the_source_pinned_redagent_environment(
     assert "REDAGENT_R159_LIVE_QUALIFICATION" not in second_environment
 
 
-@pytest.mark.parametrize("matrix_path", [MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH])
+@pytest.mark.parametrize(
+    "matrix_path",
+    [MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH, MATRIX_V6_PATH],
+)
 def test_product_semantic_formal_children_bind_authority_only_on_the_authority_runner(
     matrix_path: Path,
     tmp_path: Path,

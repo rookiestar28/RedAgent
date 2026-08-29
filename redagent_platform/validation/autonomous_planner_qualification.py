@@ -16,6 +16,7 @@ MATRIX_SCHEMA_V2 = "redagent.autonomous-planner-qualification-matrix/v2"
 MATRIX_SCHEMA_V3 = "redagent.autonomous-planner-qualification-matrix/v3"
 MATRIX_SCHEMA_V4 = "redagent.autonomous-planner-qualification-matrix/v4"
 MATRIX_SCHEMA_V5 = "redagent.autonomous-planner-qualification-matrix/v5"
+MATRIX_SCHEMA_V6 = "redagent.autonomous-planner-qualification-matrix/v6"
 MATRIX_SCHEMA = MATRIX_SCHEMA_V1
 SCORER_SCHEMA = "redagent.autonomous-planner-qualification-scorer/v1"
 PROJECTION_SCHEMA_V1 = "redagent.autonomous-planner-qualification-projection/v1"
@@ -23,6 +24,7 @@ PROJECTION_SCHEMA_V2 = "redagent.autonomous-planner-qualification-projection/v2"
 PROJECTION_SCHEMA_V3 = "redagent.autonomous-planner-qualification-projection/v3"
 PROJECTION_SCHEMA_V4 = "redagent.autonomous-planner-qualification-projection/v4"
 PROJECTION_SCHEMA_V5 = "redagent.autonomous-planner-qualification-projection/v5"
+PROJECTION_SCHEMA_V6 = "redagent.autonomous-planner-qualification-projection/v6"
 PROJECTION_SCHEMA = PROJECTION_SCHEMA_V1
 PREFLIGHT_SCHEMA = "redagent.autonomous-planner-qualification-preflight/v1"
 STAGE_RESULT_SCHEMA = "redagent.autonomous-planner-qualification-stage-result/v1"
@@ -45,6 +47,7 @@ EXPECTED_MATRIX_SHA256_V2 = "236ca3a0c1422440c7e04a96186870dfa21735a21ccc6736de7
 EXPECTED_MATRIX_SHA256_V3 = "84d477f1864025b0857d6e7b623f32ca9c3ee61c5df39aeb3272983fbdfb6e5f"
 EXPECTED_MATRIX_SHA256_V4 = "b2996b2d06ef0e041e08f0dd97e419aea7281a4294af8c425cfdd3d3319d777e"
 EXPECTED_MATRIX_SHA256_V5 = "64ffe65c7b50060037418e872ad15625a50aa56868980a736b6d6a683626442c"
+EXPECTED_MATRIX_SHA256_V6 = "864ea9c6faef2f68a0058a313f40d13ad7bee215d3d24af2316400ef31a18d72"
 
 
 def _pinned_git_oid(*chunks: str) -> str:
@@ -135,6 +138,7 @@ EXPECTED_STAGE_BINDINGS_V3 = (
 )
 EXPECTED_STAGE_BINDINGS_V4 = EXPECTED_STAGE_BINDINGS_V3
 EXPECTED_STAGE_BINDINGS_V5 = EXPECTED_STAGE_BINDINGS_V3
+EXPECTED_STAGE_BINDINGS_V6 = EXPECTED_STAGE_BINDINGS_V3
 EXPECTED_STAGE_BINDINGS = EXPECTED_STAGE_BINDINGS_V1
 EXPECTED_FORMAL_RUNTIME_PATHS_V2 = {
     "home": ".tmp/autonomous-planner-qualification-attempt-02/runtime/home",
@@ -156,10 +160,18 @@ EXPECTED_FORMAL_RUNTIME_PATHS_V5 = {
     "pre_commit_home": ".tmp/apq-05/runtime/p",
     "temp": ".tmp/apq-05/runtime/t",
 }
+EXPECTED_FORMAL_RUNTIME_PATHS_V6 = {
+    "home": ".tmp/apq-06/runtime/h",
+    "pre_commit_home": ".tmp/apq-06/runtime/p",
+    "temp": ".tmp/apq-06/runtime/t",
+}
 EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3 = {"REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1"}
 EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V4 = EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3
 EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V5 = EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3
-RUNTIME_BOUND_MATRIX_SCHEMAS = frozenset({MATRIX_SCHEMA_V2, MATRIX_SCHEMA_V3, MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5})
+EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V6 = EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3
+RUNTIME_BOUND_MATRIX_SCHEMAS = frozenset(
+    {MATRIX_SCHEMA_V2, MATRIX_SCHEMA_V3, MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6}
+)
 
 _TOKEN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -534,6 +546,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         MATRIX_SCHEMA_V3: EXPECTED_MATRIX_SHA256_V3,
         MATRIX_SCHEMA_V4: EXPECTED_MATRIX_SHA256_V4,
         MATRIX_SCHEMA_V5: EXPECTED_MATRIX_SHA256_V5,
+        MATRIX_SCHEMA_V6: EXPECTED_MATRIX_SHA256_V6,
     }[schema_version]
     if computed_digest != expected_digest:
         raise QualificationError("trusted matrix digest mismatch")
@@ -627,6 +640,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
             MATRIX_SCHEMA_V3: EXPECTED_FORMAL_RUNTIME_PATHS_V3,
             MATRIX_SCHEMA_V4: EXPECTED_FORMAL_RUNTIME_PATHS_V4,
             MATRIX_SCHEMA_V5: EXPECTED_FORMAL_RUNTIME_PATHS_V5,
+            MATRIX_SCHEMA_V6: EXPECTED_FORMAL_RUNTIME_PATHS_V6,
         }[schema_version]
         if formal_runtime_paths != expected_runtime_paths:
             raise QualificationError("formal runtime path binding invalid")
@@ -646,6 +660,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         MATRIX_SCHEMA_V3: EXPECTED_STAGE_BINDINGS_V3,
         MATRIX_SCHEMA_V4: EXPECTED_STAGE_BINDINGS_V4,
         MATRIX_SCHEMA_V5: EXPECTED_STAGE_BINDINGS_V5,
+        MATRIX_SCHEMA_V6: EXPECTED_STAGE_BINDINGS_V6,
     }[schema_version]
     if stage_bindings != expected_stage_bindings:
         raise QualificationError("stage order or runner binding invalid")
@@ -665,12 +680,13 @@ def parse_matrix(payload: object) -> QualificationMatrix:
             if runner_id != "pytest-authority-to-terminal"
         ):
             raise QualificationError("runner environment exceeded authority stage")
-        # IMPORTANT: V2 remains authenticated by its immutable trusted matrix digest; current V3-V5
+        # IMPORTANT: V2 remains authenticated by its immutable trusted matrix digest; current V3-V6
         # authority surfaces are product-semantic and must never regress to a private item code.
         expected_authority_environment = {
             MATRIX_SCHEMA_V3: EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3,
             MATRIX_SCHEMA_V4: EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V4,
             MATRIX_SCHEMA_V5: EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V5,
+            MATRIX_SCHEMA_V6: EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V6,
         }.get(schema_version)
         if expected_authority_environment is not None and authority_environment != expected_authority_environment:
             raise QualificationError("product authority runner environment invalid")
@@ -697,6 +713,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         MATRIX_SCHEMA_V3: ".tmp/autonomous-planner-qualification-attempt-03/runtime/",
         MATRIX_SCHEMA_V4: ".tmp/apq-04/runtime/",
         MATRIX_SCHEMA_V5: ".tmp/apq-05/runtime/",
+        MATRIX_SCHEMA_V6: ".tmp/apq-06/runtime/",
     }[schema_version]
     if any(not path.startswith(cleanup_root) for path in cleanup_paths):
         raise QualificationError("cleanup path escaped the item-owned runtime root")
@@ -739,6 +756,7 @@ def parse_projection(payload: object, matrix: QualificationMatrix) -> ExecutionP
         MATRIX_SCHEMA_V3: PROJECTION_SCHEMA_V3,
         MATRIX_SCHEMA_V4: PROJECTION_SCHEMA_V4,
         MATRIX_SCHEMA_V5: PROJECTION_SCHEMA_V5,
+        MATRIX_SCHEMA_V6: PROJECTION_SCHEMA_V6,
     }[matrix.schema_version]
     common_fields = {
         "schema_version",

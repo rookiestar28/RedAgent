@@ -26,6 +26,7 @@ from redagent_platform.validation.autonomous_planner_qualification import (  # n
     MAX_PROJECTION_BYTES,
     MATRIX_SCHEMA_V4,
     MATRIX_SCHEMA_V5,
+    MATRIX_SCHEMA_V6,
     QualificationError,
     QualificationMatrix,
     StageSpec,
@@ -46,10 +47,10 @@ from redagent_platform.validation.autonomous_planner_qualification import (  # n
 )
 
 
-MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v5.json"
+MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v6.json"
 # IMPORTANT: keep this formal writer root short; deep atomic filenames fail under legacy Windows
 # MAX_PATH when the qualification namespace consumes the path budget before product tests run.
-OUTPUT_ROOT = ROOT / ".tmp/apq-05"
+OUTPUT_ROOT = ROOT / ".tmp/apq-06"
 RUNTIME_ROOT = OUTPUT_ROOT / "runtime"
 STAGE_LOG_ROOT = OUTPUT_ROOT / "stages"
 PROJECTION_PATH = OUTPUT_ROOT / "execution-projection.json"
@@ -207,9 +208,9 @@ def _stage_commands(
         projection.candidate_commit,
         projection.candidate_parent_commit,
     )
-    if matrix.schema_version not in (MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5) or stage.runner_id != "windows-full-gate":
+    if matrix.schema_version not in (MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6) or stage.runner_id != "windows-full-gate":
         return commands
-    # CRITICAL: the Full Gate can leave default persisted coordinates. V4/V5 must reset that exact
+    # CRITICAL: the Full Gate can leave default persisted coordinates. V4-V6 must reset that exact
     # synthetic runtime only after both gate commands pass, or provision can combine 55432 state
     # with the frozen 55472 environment. Keep V1-V3 command behavior unchanged.
     return (
@@ -336,17 +337,19 @@ def _observe_preflight(matrix: QualificationMatrix, projection) -> dict[str, obj
 
 
 def _load_inputs():
+    # CRITICAL: keep all three exact input paths synchronized with the active attempt constants.
+    # A stale prior-attempt literal mixes immutable evidence into a fresh qualification setup.
     _assert_fixed_path(
-        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v4.json", must_exist=True
+        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v6.json", must_exist=True
     )
     _assert_fixed_path(
         PROJECTION_PATH,
-        ROOT / ".tmp/apq-04/execution-projection.json",
+        ROOT / ".tmp/apq-06/execution-projection.json",
         must_exist=True,
     )
     _assert_fixed_path(
         PINS_PATH,
-        ROOT / ".tmp/apq-04/verification-pins.json",
+        ROOT / ".tmp/apq-06/verification-pins.json",
         must_exist=True,
     )
     matrix = load_matrix(MATRIX_PATH)
@@ -555,7 +558,7 @@ def _remove_item_runtime_paths(matrix: QualificationMatrix) -> None:
         if not path.exists():
             continue
         _assert_fixed_path(path, expected, must_exist=True, directory=True)
-        if matrix.schema_version == MATRIX_SCHEMA_V5:
+        if matrix.schema_version in (MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6):
             shutil.rmtree(path, onerror=_v5_cleanup_onerror(path))
         else:
             shutil.rmtree(path)
@@ -639,7 +642,7 @@ def _zap_qualification_state_absent() -> bool:
 
 
 def _remove_v5_empty_state_root(matrix: QualificationMatrix) -> int:
-    if matrix.schema_version != MATRIX_SCHEMA_V5:
+    if matrix.schema_version not in (MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6):
         raise QualificationError("empty state-root cleanup schema invalid")
     state_root = ROOT / Path(matrix.formal_environment["REDAGENT_STATE_DIR"])
     _assert_fixed_path(state_root, ROOT / ".local/redagent", must_exist=False, directory=True)
@@ -647,7 +650,7 @@ def _remove_v5_empty_state_root(matrix: QualificationMatrix) -> int:
         return 0
     _assert_fixed_path(state_root, ROOT / ".local/redagent", must_exist=True, directory=True)
     try:
-        # CRITICAL: keep this nonrecursive and V5-only. Broadening it to rmtree would erase
+        # CRITICAL: keep this nonrecursive and V5/V6-only. Broadening it to rmtree would erase
         # ambiguous product state that must deny readiness after receipt-bound child cleanup.
         state_root.rmdir()
     except OSError as exc:
@@ -691,7 +694,7 @@ def _v5_docker_lines(command: Sequence[str], *, label: str) -> tuple[str, ...]:
 
 
 def _remove_v5_default_full_gate_volumes(matrix: QualificationMatrix) -> int:
-    if matrix.schema_version != MATRIX_SCHEMA_V5:
+    if matrix.schema_version not in (MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6):
         raise QualificationError("default Full Gate volume cleanup schema invalid")
     docker = _tool("docker")
     expected = dict(V5_DEFAULT_FULL_GATE_VOLUMES)
@@ -782,7 +785,7 @@ def _remove_v5_default_full_gate_volumes(matrix: QualificationMatrix) -> int:
 
 
 def _assert_formal_start_ready(matrix: QualificationMatrix) -> None:
-    if matrix.schema_version not in (MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5):
+    if matrix.schema_version not in (MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6):
         return
 
     state_root = ROOT / Path(matrix.formal_environment["REDAGENT_STATE_DIR"])
@@ -836,7 +839,7 @@ def _assert_formal_start_ready(matrix: QualificationMatrix) -> None:
         _workspace_compose_project("redagent-opa"),
         _workspace_compose_project("redagent-openbao"),
         "redagent-r123-zap",
-        *(("redagent-local",) if matrix.schema_version == MATRIX_SCHEMA_V5 else ()),
+        *(("redagent-local",) if matrix.schema_version in (MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6) else ()),
     )
     # CRITICAL: this is a startup-only denial check. Reusing it after a formal stage would classify
     # expected provisioned state as drift and abort a valid lifecycle before its fixed cleanup stage.
@@ -875,8 +878,8 @@ def _complete_v4_full_gate_transition(matrix: QualificationMatrix, stdout_path: 
 
 
 def _complete_v5_full_gate_transition(matrix: QualificationMatrix, stdout_path: Path) -> None:
-    if matrix.schema_version != MATRIX_SCHEMA_V5:
-        raise QualificationError("V5 formal Full Gate transition schema invalid")
+    if matrix.schema_version not in (MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6):
+        raise QualificationError("V5/V6 formal Full Gate transition schema invalid")
     removed_receipts = _remove_owned_zap_qualification_state()
     _remove_item_runtime_paths(matrix)
     removed_empty_state_root = _remove_v5_empty_state_root(matrix)
@@ -1133,7 +1136,7 @@ def _execute_stage(stage: StageSpec, matrix: QualificationMatrix, projection) ->
         if stage.runner_id == "windows-full-gate" and not launch_aborted and completed_count == len(commands):
             if matrix.schema_version == MATRIX_SCHEMA_V4:
                 _complete_v4_full_gate_transition(matrix, stdout_path)
-            elif matrix.schema_version == MATRIX_SCHEMA_V5:
+            elif matrix.schema_version in (MATRIX_SCHEMA_V5, MATRIX_SCHEMA_V6):
                 _complete_v5_full_gate_transition(matrix, stdout_path)
         if stage.result_kind == "cleanup" and not launch_aborted and completed_count == len(commands):
             removed_receipts = _remove_owned_zap_qualification_state()
