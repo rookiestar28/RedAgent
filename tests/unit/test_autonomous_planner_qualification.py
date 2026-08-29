@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
+import stat
 
 import pytest
 
@@ -39,19 +43,31 @@ MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v1.json
 MATRIX_V2_PATH = ROOT / "config/validation/autonomous-planner-qualification-v2.json"
 MATRIX_V3_PATH = ROOT / "config/validation/autonomous-planner-qualification-v3.json"
 MATRIX_V4_PATH = ROOT / "config/validation/autonomous-planner-qualification-v4.json"
+MATRIX_V5_PATH = ROOT / "config/validation/autonomous-planner-qualification-v5.json"
 MATRIX_SCHEMA_V4 = "redagent.autonomous-planner-qualification-matrix/v4"
+MATRIX_SCHEMA_V5 = "redagent.autonomous-planner-qualification-matrix/v5"
 PROJECTION_SCHEMA_V4 = "redagent.autonomous-planner-qualification-projection/v4"
+PROJECTION_SCHEMA_V5 = "redagent.autonomous-planner-qualification-projection/v5"
 ZERO_SHA = "0" * 64
+V5_DEFAULT_VOLUMES = (
+    ("redagent-local-postgres-data", "redagent_postgres_data"),
+    ("redagent-local-keycloak-data", "redagent_keycloak_data"),
+    ("redagent-local-temporal-data", "redagent_temporal_data"),
+    ("redagent-local-rustfs-data", "redagent_rustfs_data"),
+)
 
 
 def _projection_payload(matrix) -> dict[str, object]:
     is_v2 = matrix.schema_version == MATRIX_SCHEMA_V2
     is_v3 = matrix.schema_version == MATRIX_SCHEMA_V3
     is_v4 = matrix.schema_version == MATRIX_SCHEMA_V4
-    has_runtime_binding = is_v2 or is_v3 or is_v4
+    is_v5 = matrix.schema_version == MATRIX_SCHEMA_V5
+    has_runtime_binding = is_v2 or is_v3 or is_v4 or is_v5
     body: dict[str, object] = {
         "schema_version": (
-            PROJECTION_SCHEMA_V4
+            PROJECTION_SCHEMA_V5
+            if is_v5
+            else PROJECTION_SCHEMA_V4
             if is_v4
             else PROJECTION_SCHEMA_V3
             if is_v3
@@ -60,7 +76,9 @@ def _projection_payload(matrix) -> dict[str, object]:
             else PROJECTION_SCHEMA
         ),
         "attempt_id": (
-            "autonomous-planner-20260830-attempt-04"
+            "autonomous-planner-20260830-attempt-05"
+            if is_v5
+            else "autonomous-planner-20260830-attempt-04"
             if is_v4
             else "r165-20260829-attempt-03"
             if is_v3
@@ -102,6 +120,63 @@ def _projection_payload(matrix) -> dict[str, object]:
 
 def _projection(matrix):
     return parse_projection(_projection_payload(matrix), matrix)
+
+
+def _v5_matrix(*, cleanup_paths: tuple[str, ...] | None = None):
+    matrix = load_matrix(MATRIX_V4_PATH)
+    return replace(
+        matrix,
+        schema_version=MATRIX_SCHEMA_V5,
+        cleanup_paths=cleanup_paths or matrix.cleanup_paths,
+        formal_runtime_paths={
+            "home": ".tmp/apq-05/runtime/h",
+            "pre_commit_home": ".tmp/apq-05/runtime/p",
+            "temp": ".tmp/apq-05/runtime/t",
+        },
+    )
+
+
+def _bind_cli_artifact_paths(cli, monkeypatch, output_root: Path) -> None:
+    replacements = {
+        "OUTPUT_ROOT": output_root,
+        "RUNTIME_ROOT": output_root / "runtime",
+        "STAGE_LOG_ROOT": output_root / "stages",
+        "PREFLIGHT_PATH": output_root / "preflight.json",
+        "STAGE_RESULTS_PATH": output_root / "stage-results.json",
+        "EVENTS_PATH": output_root / "events.jsonl",
+        "BUNDLE_PATH": output_root / "qualification-bundle.json",
+        "FORCED_G2_RETAINED": output_root / "forced-g2-verification.json",
+        "RUNTIME_COORDINATE_SNAPSHOT": output_root / "runtime-coordinate-snapshot.json",
+    }
+    for name, value in replacements.items():
+        monkeypatch.setattr(cli, name, value)
+
+
+def _optional_file_snapshot(path: Path) -> tuple[bool, bytes | None]:
+    return path.exists(), path.read_bytes() if path.is_file() else None
+
+
+def _v5_volume_inspect_rows(
+    *,
+    missing: str | None = None,
+    project_override: str | None = None,
+    driver_override: str | None = None,
+) -> str:
+    rows = []
+    for name, volume_key in V5_DEFAULT_VOLUMES:
+        if name == missing:
+            continue
+        rows.append(
+            "\t".join(
+                (
+                    name,
+                    driver_override or "local",
+                    project_override or "redagent-local",
+                    volume_key,
+                )
+            )
+        )
+    return "".join(f"{row}\n" for row in rows)
 
 
 def _preflight(matrix, projection) -> dict[str, object]:
@@ -363,8 +438,35 @@ def test_v4_matrix_uses_only_the_short_windows_safe_runtime_and_preserves_v3_lif
     assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
 
 
+def test_v5_matrix_is_fresh_and_preserves_the_closed_nine_stage_authority() -> None:
+    matrix = load_matrix(MATRIX_V5_PATH)
+
+    assert matrix.schema_version == MATRIX_SCHEMA_V5
+    assert matrix.candidate_parent_commit == "aa351e0b64aa7a0a2e58b03e4d896c9802e4d195"  # pragma: allowlist secret
+    assert len(matrix.stages) == 9
+    assert [stage.stage_id for stage in matrix.stages][3:7] == [
+        "windows-full-gate",
+        "owned-runtime-provision",
+        "runtime-coordinate-snapshot",
+        "owned-runtime-cleanup",
+    ]
+    assert dict(matrix.formal_runtime_paths) == {
+        "home": ".tmp/apq-05/runtime/h",
+        "pre_commit_home": ".tmp/apq-05/runtime/p",
+        "temp": ".tmp/apq-05/runtime/t",
+    }
+    assert all(path.startswith(".tmp/apq-05/runtime/") for path in matrix.cleanup_paths)
+    assert "config/validation/autonomous-planner-qualification-v5.json" in matrix.source_paths
+    assert matrix.stages[0].expected_pass_count == 310
+    assert all(stage.allowed_skip_count == 0 for stage in matrix.stages)
+
+    _matrix, _projection_value, events, bundle = _accepted_ceremony_for(MATRIX_V5_PATH)
+    assert len(events) == len(matrix.stages) + 3
+    assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
+
+
 def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> None:
-    for path in (MATRIX_PATH, MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH):
+    for path in (MATRIX_PATH, MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH):
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["max_concurrency"] = 2
         body = {key: value for key, value in payload.items() if key != "matrix_sha256"}
@@ -408,7 +510,7 @@ def test_projection_denies_target_runner_identity_and_candidate_lineage_drift() 
             parse_projection(mutated, matrix)
 
 
-@pytest.mark.parametrize("matrix_path", [MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH])
+@pytest.mark.parametrize("matrix_path", [MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH])
 def test_runtime_bound_projection_denies_runner_runtime_and_snapshot_input_drift(
     matrix_path: Path,
 ) -> None:
@@ -610,8 +712,8 @@ def test_event_chain_rejects_missing_reordered_or_tampered_lifecycle() -> None:
 def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v4.json"
-    assert cli.OUTPUT_ROOT.relative_to(cli.ROOT).as_posix() == ".tmp/apq-04"
+    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v5.json"
+    assert cli.OUTPUT_ROOT.relative_to(cli.ROOT).as_posix() == ".tmp/apq-05"
     assert cli.build_parser().parse_args(["preflight"]).command == "preflight"
     assert cli.build_parser().parse_args(["run"]).command == "run"
     assert cli.build_parser().parse_args(["verify"]).command == "verify"
@@ -666,6 +768,26 @@ def test_v4_full_gate_stage_appends_fixed_transition_resets_without_changing_v3(
     assert len(cli._stage_commands(v3_stage, v3, v3_projection)) == 2
 
 
+def test_v5_full_gate_stage_preserves_the_v4_fixed_transition_commands(monkeypatch) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    v5 = _v5_matrix()
+    v5_projection = _projection(v5)
+    v5_stage = next(stage for stage in v5.stages if stage.runner_id == "windows-full-gate")
+    commands = cli._stage_commands(v5_stage, v5, v5_projection)
+
+    assert len(commands) == 5
+    assert Path(commands[0][3]).name == "run_full_tests_windows.ps1"
+    assert Path(commands[1][1]).name == "run_validation_gate.py"
+    assert [Path(command[1]).name for command in commands[2:]] == [
+        "openbao_conformance.py",
+        "opa_conformance.py",
+        "redagent_local_stack.py",
+    ]
+    assert [command[2] for command in commands[2:]] == ["reset", "reset", "reset"]
+
+
 def test_v4_full_gate_transition_failure_aborts_before_stage_result(
     tmp_path: Path,
     monkeypatch,
@@ -675,7 +797,9 @@ def test_v4_full_gate_transition_failure_aborts_before_stage_result(
     matrix = load_matrix(MATRIX_V4_PATH)
     projection = _projection(matrix)
     stage = next(stage for stage in matrix.stages if stage.runner_id == "windows-full-gate")
-    monkeypatch.setattr(cli, "STAGE_LOG_ROOT", tmp_path / "stages")
+    historical_retained = cli.FORCED_G2_RETAINED
+    historical_snapshot = _optional_file_snapshot(historical_retained)
+    _bind_cli_artifact_paths(cli, monkeypatch, tmp_path / "apq-04-test")
     monkeypatch.setattr(cli, "_stage_commands", lambda *_args: (("fixed", "command"),))
 
     def successful_commands(_commands, observed_stage, _matrix):
@@ -697,6 +821,7 @@ def test_v4_full_gate_transition_failure_aborts_before_stage_result(
     with pytest.raises(QualificationError, match="transition readiness failed"):
         cli._execute_stage(stage, matrix, projection)
     assert transition_calls == ["transition"]
+    assert _optional_file_snapshot(historical_retained) == historical_snapshot
 
 
 def test_v4_start_readiness_rejects_persisted_owned_state(tmp_path: Path, monkeypatch) -> None:
@@ -814,6 +939,239 @@ def test_v4_start_readiness_ignores_other_workspace_resources_and_checks_six_por
 
     cli._assert_formal_start_ready(matrix)
     assert sorted(probed) == [55472, 57273, 58090, 58191, 58200, 59010]
+
+
+def test_v5_start_readiness_denies_exact_default_project_without_deleting_it(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "_port_closed", lambda _port: True)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    commands: list[tuple[str, ...]] = []
+
+    def docker(command, **_kwargs):
+        commands.append(tuple(command))
+        is_volume_inventory = command[1:3] == ("volume", "ls")
+        return cli.subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="redagent-local-postgres-data\n" if is_volume_inventory else "",
+            stderr="",
+        )
+
+    monkeypatch.setattr(cli.subprocess, "run", docker)
+    with pytest.raises(QualificationError, match="formal start owned Docker resource is present"):
+        cli._assert_formal_start_ready(matrix)
+    assert all(command[1:3] != ("volume", "rm") for command in commands)
+
+
+def test_v5_post_gate_volume_cleanup_prevalidates_all_four_then_removes_exact_names(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    remaining = {name for name, _volume_key in V5_DEFAULT_VOLUMES} | {"other-workspace-data"}
+    commands: list[tuple[str, ...]] = []
+
+    def docker(command, **_kwargs):
+        command = tuple(command)
+        commands.append(command)
+        if command[1:4] == ("volume", "inspect", "--format"):
+            return cli.subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=_v5_volume_inspect_rows(),
+                stderr="",
+            )
+        if command[1:3] == ("ps", "-a"):
+            return cli.subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        if command[1:3] == ("volume", "rm"):
+            name = command[3]
+            assert name in remaining
+            remaining.remove(name)
+            return cli.subprocess.CompletedProcess(command, 0, stdout=f"{name}\n", stderr="")
+        if command[1:4] == ("volume", "ls", "--format"):
+            return cli.subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="".join(f"{name}\n" for name in sorted(remaining)),
+                stderr="",
+            )
+        raise AssertionError(f"unexpected Docker command: {command}")
+
+    monkeypatch.setattr(cli.subprocess, "run", docker)
+    assert cli._remove_v5_default_full_gate_volumes(matrix) == 4
+    removed = [command[3] for command in commands if command[1:3] == ("volume", "rm")]
+    assert removed == [name for name, _volume_key in V5_DEFAULT_VOLUMES]
+    first_remove = next(index for index, command in enumerate(commands) if command[1:3] == ("volume", "rm"))
+    assert sum(command[1:3] == ("ps", "-a") for command in commands[:first_remove]) == 4
+    assert remaining == {"other-workspace-data"}
+
+
+@pytest.mark.parametrize("drift", ["missing", "malformed", "project", "driver", "attached", "unavailable"])
+def test_v5_post_gate_volume_cleanup_aborts_before_any_removal_on_inventory_drift(
+    drift: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    commands: list[tuple[str, ...]] = []
+
+    def docker(command, **_kwargs):
+        command = tuple(command)
+        commands.append(command)
+        if command[1:4] == ("volume", "inspect", "--format"):
+            if drift == "unavailable":
+                return cli.subprocess.CompletedProcess(command, 1, stdout="", stderr="")
+            if drift == "malformed":
+                stdout = "not-a-bounded-volume-row\n"
+            else:
+                stdout = _v5_volume_inspect_rows(
+                    missing=V5_DEFAULT_VOLUMES[-1][0] if drift == "missing" else None,
+                    project_override="other-project" if drift == "project" else None,
+                    driver_override="other-driver" if drift == "driver" else None,
+                )
+            return cli.subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+        if command[1:3] == ("ps", "-a"):
+            attached = drift == "attached" and f"volume={V5_DEFAULT_VOLUMES[0][0]}" in command
+            return cli.subprocess.CompletedProcess(command, 0, stdout=("a" * 64 + "\n") if attached else "", stderr="")
+        if command[1:3] == ("volume", "rm"):
+            raise AssertionError("volume removal must not start after ownership drift")
+        raise AssertionError(f"unexpected Docker command: {command}")
+
+    monkeypatch.setattr(cli.subprocess, "run", docker)
+    with pytest.raises(QualificationError, match="default Full Gate volume"):
+        cli._remove_v5_default_full_gate_volumes(matrix)
+    assert all(command[1:3] != ("volume", "rm") for command in commands)
+
+
+def test_v5_empty_state_root_cleanup_accepts_absent_or_exact_empty_directory(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    assert cli._remove_v5_empty_state_root(matrix) == 0
+
+    state_root = tmp_path / ".local/redagent"
+    state_root.mkdir(parents=True)
+    assert cli._remove_v5_empty_state_root(matrix) == 1
+    assert not state_root.exists()
+
+
+@pytest.mark.parametrize("drift", ["schema", "path", "file", "nonempty", "reparse"])
+def test_v5_empty_state_root_cleanup_denies_ambiguous_state(
+    drift: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    state_root = tmp_path / ".local/redagent"
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    if drift == "schema":
+        matrix = replace(matrix, schema_version=MATRIX_SCHEMA_V4)
+    elif drift == "path":
+        matrix = replace(
+            matrix,
+            formal_environment={**matrix.formal_environment, "REDAGENT_STATE_DIR": ".local/other"},
+        )
+    elif drift == "file":
+        state_root.parent.mkdir(parents=True)
+        state_root.write_text("not a directory\n", encoding="utf-8")
+    else:
+        state_root.mkdir(parents=True)
+        if drift == "nonempty":
+            (state_root / "ambiguous").write_text("must remain\n", encoding="utf-8")
+        else:
+            monkeypatch.setattr(cli, "is_link_or_reparse", lambda path: path == state_root)
+
+    with pytest.raises(QualificationError):
+        cli._remove_v5_empty_state_root(matrix)
+    if drift == "nonempty":
+        assert (state_root / "ambiguous").read_text(encoding="utf-8") == "must remain\n"
+
+
+def test_v5_full_gate_transition_orders_tree_then_volume_cleanup_before_readiness(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    stdout_path = tmp_path / "full-gate.stdout.log"
+    stdout_path.write_bytes(b"gate passed\n")
+    calls: list[str] = []
+    monkeypatch.setattr(cli, "_remove_owned_zap_qualification_state", lambda: calls.append("zap") or 2)
+    monkeypatch.setattr(cli, "_remove_item_runtime_paths", lambda _matrix: calls.append("runtime"))
+    monkeypatch.setattr(cli, "_remove_v5_empty_state_root", lambda _matrix: calls.append("state-root") or 1)
+    monkeypatch.setattr(
+        cli,
+        "_remove_v5_default_full_gate_volumes",
+        lambda _matrix: calls.append("volumes") or 4,
+    )
+    monkeypatch.setattr(cli, "_assert_formal_start_ready", lambda _matrix: calls.append("ready"))
+
+    cli._complete_v5_full_gate_transition(matrix, stdout_path)
+
+    assert calls == ["zap", "runtime", "state-root", "volumes", "ready"]
+    transition = json.loads(stdout_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert transition == {
+        "formal_full_gate_transition_ready": True,
+        "removed_default_full_gate_volumes": 4,
+        "removed_empty_state_root": 1,
+        "removed_qualification_receipts": 2,
+    }
+
+
+def test_v5_full_gate_transition_failure_aborts_before_stage_result(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    projection = _projection(load_matrix(MATRIX_V4_PATH))
+    stage = next(stage for stage in matrix.stages if stage.runner_id == "windows-full-gate")
+    historical_retained = cli.FORCED_G2_RETAINED
+    historical_snapshot = _optional_file_snapshot(historical_retained)
+    _bind_cli_artifact_paths(cli, monkeypatch, tmp_path / "apq-05-test")
+    monkeypatch.setattr(cli, "_stage_commands", lambda *_args: (("fixed", "command"),))
+
+    def successful_commands(_commands, observed_stage, _matrix):
+        stdout_path, stderr_path = cli._stage_log_paths(observed_stage)
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_text("fixed commands passed\n", encoding="utf-8")
+        stderr_path.write_bytes(b"")
+        return 1, False
+
+    monkeypatch.setattr(cli, "_run_processes", successful_commands)
+    transition_calls: list[str] = []
+
+    def fail_transition(_matrix, _stdout_path):
+        transition_calls.append("transition")
+        raise QualificationError("V5 formal Full Gate transition readiness failed")
+
+    monkeypatch.setattr(cli, "_complete_v5_full_gate_transition", fail_transition, raising=False)
+    with pytest.raises(QualificationError, match="V5 formal Full Gate transition readiness failed"):
+        cli._execute_stage(stage, matrix, projection)
+    assert transition_calls == ["transition"]
+    assert _optional_file_snapshot(historical_retained) == historical_snapshot
 
 
 @pytest.mark.parametrize("command_name", ["preflight", "run"])
@@ -941,7 +1299,7 @@ def test_formal_children_receive_only_the_source_pinned_redagent_environment(
     assert "REDAGENT_R159_LIVE_QUALIFICATION" not in second_environment
 
 
-@pytest.mark.parametrize("matrix_path", [MATRIX_V3_PATH, MATRIX_V4_PATH])
+@pytest.mark.parametrize("matrix_path", [MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH])
 def test_product_semantic_formal_children_bind_authority_only_on_the_authority_runner(
     matrix_path: Path,
     tmp_path: Path,
@@ -1201,6 +1559,103 @@ def test_declared_item_runtime_paths_are_removed_without_touching_other_outputs(
     assert not run_root.exists()
     assert not receipt.exists()
     assert unrelated_receipt.read_text(encoding="utf-8") == "preserve"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows read-only deletion contract")
+def test_v5_cleanup_clears_readonly_regular_file_only_inside_declared_root(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    relative = ".tmp/r167-v5-cleanup/runtime/t"
+    cleanup_root = tmp_path / Path(relative)
+    readonly_object = cleanup_root / ".git/objects/aa/0123456789abcdef"
+    unrelated = tmp_path / ".tmp/r167-v5-cleanup/retained.txt"
+    readonly_object.parent.mkdir(parents=True)
+    readonly_object.write_bytes(b"synthetic-read-only-git-object\n")
+    unrelated.write_text("retained", encoding="utf-8")
+    os.chmod(readonly_object, stat.S_IREAD)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    matrix = _v5_matrix(cleanup_paths=(relative,))
+
+    try:
+        cli._remove_item_runtime_paths(matrix)
+        assert not cleanup_root.exists()
+        assert unrelated.read_text(encoding="utf-8") == "retained"
+    finally:
+        if readonly_object.exists():
+            os.chmod(readonly_object, stat.S_IWRITE)
+        if cleanup_root.exists():
+            shutil.rmtree(cleanup_root)
+
+
+def test_v4_cleanup_keeps_plain_rmtree_behavior(tmp_path: Path, monkeypatch) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    relative = ".tmp/r167-v4-compat/runtime/t"
+    cleanup_root = tmp_path / Path(relative)
+    cleanup_root.mkdir(parents=True)
+    (cleanup_root / "fixture.txt").write_text("fixture", encoding="utf-8")
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    matrix = replace(load_matrix(MATRIX_V4_PATH), cleanup_paths=(relative,))
+    real_rmtree = cli.shutil.rmtree
+    calls: list[dict[str, object]] = []
+
+    def observed_rmtree(path, *args, **kwargs):
+        calls.append(dict(kwargs))
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(cli.shutil, "rmtree", observed_rmtree)
+    cli._remove_item_runtime_paths(matrix)
+    assert calls == [{}]
+
+
+@pytest.mark.parametrize(
+    "drift",
+    ["escape", "function", "exception", "writable", "nonregular", "reparse", "nonwindows"],
+)
+def test_v5_cleanup_refuses_every_callback_or_ownership_drift(
+    drift: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    relative = ".tmp/r167-v5-denial/runtime/t"
+    cleanup_root = tmp_path / Path(relative)
+    owned = cleanup_root / ".git/objects/aa/owned"
+    outside = tmp_path / ".tmp/r167-v5-denial/outside"
+    owned.parent.mkdir(parents=True)
+    owned.write_bytes(b"owned\n")
+    outside.write_bytes(b"outside\n")
+    os.chmod(owned, stat.S_IREAD)
+    os.chmod(outside, stat.S_IREAD)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    matrix = _v5_matrix(cleanup_paths=(relative,))
+    if drift == "reparse":
+        monkeypatch.setattr(cli, "is_link_or_reparse", lambda path: Path(path) == owned.parent)
+    if drift == "nonwindows":
+        monkeypatch.setattr(cli.platform, "system", lambda: "Linux")
+
+    def denied_rmtree(_path, *, onerror=None):
+        assert onerror is not None
+        failed = outside if drift == "escape" else owned.parent if drift == "nonregular" else owned
+        function = os.rmdir if drift == "function" else os.unlink
+        error: BaseException = OSError("unexpected") if drift == "exception" else PermissionError(13, "denied")
+        if drift == "writable":
+            os.chmod(owned, stat.S_IWRITE)
+        onerror(function, str(failed), (type(error), error, None))
+
+    monkeypatch.setattr(cli.shutil, "rmtree", denied_rmtree)
+    try:
+        with pytest.raises(QualificationError, match="V5 cleanup"):
+            cli._remove_item_runtime_paths(matrix)
+        assert outside.exists()
+    finally:
+        for path in (owned, outside):
+            if path.exists():
+                os.chmod(path, stat.S_IWRITE)
 
 
 def test_unexpected_formal_stage_exception_is_retained_as_terminal_aborted_evidence(

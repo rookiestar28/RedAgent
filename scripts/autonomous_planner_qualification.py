@@ -11,6 +11,7 @@ import platform
 import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 from typing import Mapping, Sequence
@@ -24,6 +25,7 @@ from redagent_platform.validation.autonomous_planner_qualification import (  # n
     MAX_BUNDLE_BYTES,
     MAX_PROJECTION_BYTES,
     MATRIX_SCHEMA_V4,
+    MATRIX_SCHEMA_V5,
     QualificationError,
     QualificationMatrix,
     StageSpec,
@@ -44,10 +46,10 @@ from redagent_platform.validation.autonomous_planner_qualification import (  # n
 )
 
 
-MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v4.json"
+MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v5.json"
 # IMPORTANT: keep this formal writer root short; deep atomic filenames fail under legacy Windows
 # MAX_PATH when the qualification namespace consumes the path budget before product tests run.
-OUTPUT_ROOT = ROOT / ".tmp/apq-04"
+OUTPUT_ROOT = ROOT / ".tmp/apq-05"
 RUNTIME_ROOT = OUTPUT_ROOT / "runtime"
 STAGE_LOG_ROOT = OUTPUT_ROOT / "stages"
 PROJECTION_PATH = OUTPUT_ROOT / "execution-projection.json"
@@ -65,6 +67,13 @@ RUNTIME_COORDINATE_SCHEMA = "redagent.autonomous-planner-runtime-coordinate-snap
 LOCAL_COMPOSE_PROJECT = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 QUALIFICATION_INVOCATION_ID = re.compile(r"^invocation-planner-[0-9a-f]{12}$")
 DOCKER_RESOURCE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$")
+DOCKER_CONTAINER_ID = re.compile(r"^[0-9a-f]{12,64}$")
+V5_DEFAULT_FULL_GATE_VOLUMES = (
+    ("redagent-local-postgres-data", "redagent_postgres_data"),
+    ("redagent-local-keycloak-data", "redagent_keycloak_data"),
+    ("redagent-local-temporal-data", "redagent_temporal_data"),
+    ("redagent-local-rustfs-data", "redagent_rustfs_data"),
+)
 
 PYTHON_STARTUP_VARIABLES = frozenset(
     {
@@ -198,9 +207,9 @@ def _stage_commands(
         projection.candidate_commit,
         projection.candidate_parent_commit,
     )
-    if matrix.schema_version != MATRIX_SCHEMA_V4 or stage.runner_id != "windows-full-gate":
+    if matrix.schema_version not in (MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5) or stage.runner_id != "windows-full-gate":
         return commands
-    # CRITICAL: the Full Gate can leave default persisted coordinates. V4 must reset that exact
+    # CRITICAL: the Full Gate can leave default persisted coordinates. V4/V5 must reset that exact
     # synthetic runtime only after both gate commands pass, or provision can combine 55432 state
     # with the frozen 55472 environment. Keep V1-V3 command behavior unchanged.
     return (
@@ -499,6 +508,45 @@ def _run_processes(
     return completed_count, False
 
 
+def _v5_cleanup_onerror(cleanup_root: Path):
+    root = cleanup_root.absolute()
+
+    def handle(function, failed_path, exc_info) -> None:
+        failed = Path(failed_path).absolute()
+        try:
+            relative = failed.relative_to(root)
+        except ValueError as exc:
+            raise QualificationError("V5 cleanup path escaped the declared root") from exc
+        if not relative.parts or platform.system() != "Windows":
+            raise QualificationError("V5 cleanup platform or descendant contract invalid")
+        if function not in (os.unlink, os.remove):
+            raise QualificationError("V5 cleanup callback function invalid")
+        if not isinstance(exc_info, tuple) or len(exc_info) != 3 or not isinstance(exc_info[1], PermissionError):
+            raise QualificationError("V5 cleanup exception contract invalid")
+
+        if is_link_or_reparse(root):
+            raise QualificationError("V5 cleanup path traverses a link or reparse point")
+        current = root
+        for component in relative.parts:
+            current /= component
+            if is_link_or_reparse(current):
+                raise QualificationError("V5 cleanup path traverses a link or reparse point")
+        if not failed.is_file():
+            raise QualificationError("V5 cleanup target is not a regular file")
+        attributes = getattr(failed.lstat(), "st_file_attributes", 0)
+        readonly = getattr(stat, "FILE_ATTRIBUTE_READONLY", 0x1)
+        if not attributes & readonly:
+            raise QualificationError("V5 cleanup target is not read-only")
+
+        # CRITICAL: pytest can leave read-only Git objects in the declared Windows temp tree. Clear
+        # only that exact regular descendant and retry its failed unlink once; widening this callback
+        # can traverse reparse points or delete state owned by another workspace.
+        os.chmod(failed, stat.S_IWRITE)
+        function(failed)
+
+    return handle
+
+
 def _remove_item_runtime_paths(matrix: QualificationMatrix) -> None:
     for relative in matrix.cleanup_paths:
         path = ROOT / Path(relative)
@@ -507,7 +555,10 @@ def _remove_item_runtime_paths(matrix: QualificationMatrix) -> None:
         if not path.exists():
             continue
         _assert_fixed_path(path, expected, must_exist=True, directory=True)
-        shutil.rmtree(path)
+        if matrix.schema_version == MATRIX_SCHEMA_V5:
+            shutil.rmtree(path, onerror=_v5_cleanup_onerror(path))
+        else:
+            shutil.rmtree(path)
         if path.exists():
             raise QualificationError("item-owned qualification runtime cleanup incomplete")
 
@@ -587,6 +638,25 @@ def _zap_qualification_state_absent() -> bool:
     return not any(re.fullmatch(r"[0-9a-f]{24}", path.name) for path in runtime.iterdir())
 
 
+def _remove_v5_empty_state_root(matrix: QualificationMatrix) -> int:
+    if matrix.schema_version != MATRIX_SCHEMA_V5:
+        raise QualificationError("empty state-root cleanup schema invalid")
+    state_root = ROOT / Path(matrix.formal_environment["REDAGENT_STATE_DIR"])
+    _assert_fixed_path(state_root, ROOT / ".local/redagent", must_exist=False, directory=True)
+    if not state_root.exists():
+        return 0
+    _assert_fixed_path(state_root, ROOT / ".local/redagent", must_exist=True, directory=True)
+    try:
+        # CRITICAL: keep this nonrecursive and V5-only. Broadening it to rmtree would erase
+        # ambiguous product state that must deny readiness after receipt-bound child cleanup.
+        state_root.rmdir()
+    except OSError as exc:
+        raise QualificationError("empty state-root cleanup failed") from exc
+    if state_root.exists():
+        raise QualificationError("empty state-root cleanup incomplete")
+    return 1
+
+
 def _workspace_compose_project(prefix: str) -> str:
     try:
         root = ROOT.resolve(strict=True)
@@ -599,8 +669,108 @@ def _workspace_compose_project(prefix: str) -> str:
     return f"{prefix}-{digest}"
 
 
+def _v5_docker_lines(command: Sequence[str], *, label: str) -> tuple[str, ...]:
+    completed = subprocess.run(
+        tuple(command),
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    lines = tuple(completed.stdout.splitlines())
+    if (
+        completed.returncode != 0
+        or completed.stderr
+        or len(completed.stdout) > 1024 * 1024
+        or len(lines) > 4096
+        or any(line != line.strip() for line in lines)
+    ):
+        raise QualificationError(f"default Full Gate volume {label} invalid")
+    return lines
+
+
+def _remove_v5_default_full_gate_volumes(matrix: QualificationMatrix) -> int:
+    if matrix.schema_version != MATRIX_SCHEMA_V5:
+        raise QualificationError("default Full Gate volume cleanup schema invalid")
+    docker = _tool("docker")
+    expected = dict(V5_DEFAULT_FULL_GATE_VOLUMES)
+    inspect_format = (
+        '{{.Name}}\t{{.Driver}}\t{{index .Labels "com.docker.compose.project"}}'
+        '\t{{index .Labels "com.docker.compose.volume"}}'
+    )
+    inspect_lines = _v5_docker_lines(
+        (
+            docker,
+            "volume",
+            "inspect",
+            "--format",
+            inspect_format,
+            *(name for name, _volume_key in V5_DEFAULT_FULL_GATE_VOLUMES),
+        ),
+        label="inventory",
+    )
+    observed: dict[str, str] = {}
+    for line in inspect_lines:
+        fields = line.split("\t")
+        if len(fields) != 4:
+            raise QualificationError("default Full Gate volume inventory invalid")
+        name, driver, project, volume_key = fields
+        if (
+            name in observed
+            or name not in expected
+            or DOCKER_RESOURCE_NAME.fullmatch(name) is None
+            or driver != "local"
+            or project != "redagent-local"
+            or volume_key != expected[name]
+        ):
+            raise QualificationError("default Full Gate volume ownership invalid")
+        observed[name] = volume_key
+    if observed != expected:
+        raise QualificationError("default Full Gate volume inventory incomplete")
+
+    # CRITICAL: validate the complete exact ownership and zero-attachment set before the first
+    # destructive call. Deleting incrementally while still discovering ownership can erase an
+    # ambiguous volume and leave a partial runtime that a later provision would misclassify.
+    for name, _volume_key in V5_DEFAULT_FULL_GATE_VOLUMES:
+        attachments = _v5_docker_lines(
+            (
+                docker,
+                "ps",
+                "-a",
+                "--filter",
+                f"volume={name}",
+                "--format",
+                "{{.ID}}",
+            ),
+            label="attachment inventory",
+        )
+        if any(DOCKER_CONTAINER_ID.fullmatch(container_id) is None for container_id in attachments):
+            raise QualificationError("default Full Gate volume attachment inventory invalid")
+        if attachments:
+            raise QualificationError("default Full Gate volume is attached")
+
+    for name, _volume_key in V5_DEFAULT_FULL_GATE_VOLUMES:
+        removed = _v5_docker_lines(
+            (docker, "volume", "rm", name),
+            label="removal",
+        )
+        if removed != (name,):
+            raise QualificationError("default Full Gate volume removal readback invalid")
+
+    remaining = _v5_docker_lines(
+        (docker, "volume", "ls", "--format", "{{.Name}}"),
+        label="absence readback",
+    )
+    if any(DOCKER_RESOURCE_NAME.fullmatch(name) is None for name in remaining):
+        raise QualificationError("default Full Gate volume absence inventory invalid")
+    if any(name in expected for name in remaining):
+        raise QualificationError("default Full Gate volume cleanup incomplete")
+    return len(V5_DEFAULT_FULL_GATE_VOLUMES)
+
+
 def _assert_formal_start_ready(matrix: QualificationMatrix) -> None:
-    if matrix.schema_version != MATRIX_SCHEMA_V4:
+    if matrix.schema_version not in (MATRIX_SCHEMA_V4, MATRIX_SCHEMA_V5):
         return
 
     state_root = ROOT / Path(matrix.formal_environment["REDAGENT_STATE_DIR"])
@@ -654,6 +824,7 @@ def _assert_formal_start_ready(matrix: QualificationMatrix) -> None:
         _workspace_compose_project("redagent-opa"),
         _workspace_compose_project("redagent-openbao"),
         "redagent-r123-zap",
+        *(("redagent-local",) if matrix.schema_version == MATRIX_SCHEMA_V5 else ()),
     )
     # CRITICAL: this is a startup-only denial check. Reusing it after a formal stage would classify
     # expected provisioned state as drift and abort a valid lifecycle before its fixed cleanup stage.
@@ -680,6 +851,33 @@ def _complete_v4_full_gate_transition(matrix: QualificationMatrix, stdout_path: 
                 json.dumps(
                     {
                         "formal_full_gate_transition_ready": True,
+                        "removed_qualification_receipts": removed_receipts,
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            ).encode("utf-8")
+        )
+        stdout.flush()
+        os.fsync(stdout.fileno())
+
+
+def _complete_v5_full_gate_transition(matrix: QualificationMatrix, stdout_path: Path) -> None:
+    if matrix.schema_version != MATRIX_SCHEMA_V5:
+        raise QualificationError("V5 formal Full Gate transition schema invalid")
+    removed_receipts = _remove_owned_zap_qualification_state()
+    _remove_item_runtime_paths(matrix)
+    removed_empty_state_root = _remove_v5_empty_state_root(matrix)
+    removed_volumes = _remove_v5_default_full_gate_volumes(matrix)
+    _assert_formal_start_ready(matrix)
+    with stdout_path.open("ab") as stdout:
+        stdout.write(
+            (
+                json.dumps(
+                    {
+                        "formal_full_gate_transition_ready": True,
+                        "removed_default_full_gate_volumes": removed_volumes,
+                        "removed_empty_state_root": removed_empty_state_root,
                         "removed_qualification_receipts": removed_receipts,
                     },
                     sort_keys=True,
@@ -920,13 +1118,11 @@ def _execute_stage(stage: StageSpec, matrix: QualificationMatrix, projection) ->
         _atomic_write(stderr_path, b"")
     else:
         completed_count, launch_aborted = _run_processes(commands, stage, matrix)
-        if (
-            matrix.schema_version == MATRIX_SCHEMA_V4
-            and stage.runner_id == "windows-full-gate"
-            and not launch_aborted
-            and completed_count == len(commands)
-        ):
-            _complete_v4_full_gate_transition(matrix, stdout_path)
+        if stage.runner_id == "windows-full-gate" and not launch_aborted and completed_count == len(commands):
+            if matrix.schema_version == MATRIX_SCHEMA_V4:
+                _complete_v4_full_gate_transition(matrix, stdout_path)
+            elif matrix.schema_version == MATRIX_SCHEMA_V5:
+                _complete_v5_full_gate_transition(matrix, stdout_path)
         if stage.result_kind == "cleanup" and not launch_aborted and completed_count == len(commands):
             removed_receipts = _remove_owned_zap_qualification_state()
             with stdout_path.open("ab") as stdout:
