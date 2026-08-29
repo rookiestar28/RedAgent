@@ -55,7 +55,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     ),
     "reviewer": frozenset(
         {"engagement:read", "roe:read", "audit:read", "jit:read", "jit:review", "break_glass:review", "runner:read",
-         "campaign:read", "campaign:inspect",
+         "campaign:read", "campaign:inspect", "campaign:evidence-export",
          "finding:read", "finding:review", "report:create", "report:review"}
     ),
     "tenant_admin": frozenset(
@@ -75,6 +75,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "campaign:read",
             "campaign:inspect",
             "campaign:stop",
+            "campaign:evidence-export",
             "finding:read",
             "connector:deliver",
             "connector:manage",
