@@ -149,7 +149,8 @@ def build_stock_campaign_dag_factory(
     signing_key, signing_key_id = load_campaign_signing_identity(workspace, env)
     evidence_settings = load_evidence_settings(workspace, env)
     evidence_backend = build_evidence_backend(evidence_settings, env)
-    kms_reference = evidence_settings.kms_reference or "kms:redagent:r159-local"
+    # IMPORTANT: this fallback is persisted as evidence metadata; keep it product-neutral.
+    kms_reference = evidence_settings.kms_reference or "kms:redagent:synthetic-local"
     policy_settings = load_policy_settings(workspace, env)
     if (
         policy_settings.provider != "opa"
