@@ -12,10 +12,12 @@ from redagent_platform.validation.autonomous_planner_qualification import (
     AUTONOMOUS_PLANNER_QUALIFIED,
     EXPECTED_FORMAL_ENVIRONMENT,
     MATRIX_SCHEMA_V2,
+    MATRIX_SCHEMA_V3,
     NOT_QUALIFIED,
     PINS_SCHEMA,
     PROJECTION_SCHEMA,
     PROJECTION_SCHEMA_V2,
+    PROJECTION_SCHEMA_V3,
     QualificationError,
     build_bundle,
     build_event_chain,
@@ -35,14 +37,25 @@ from redagent_platform.validation.autonomous_planner_qualification import (
 ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v1.json"
 MATRIX_V2_PATH = ROOT / "config/validation/autonomous-planner-qualification-v2.json"
+MATRIX_V3_PATH = ROOT / "config/validation/autonomous-planner-qualification-v3.json"
 ZERO_SHA = "0" * 64
 
 
 def _projection_payload(matrix) -> dict[str, object]:
     is_v2 = matrix.schema_version == MATRIX_SCHEMA_V2
+    is_v3 = matrix.schema_version == MATRIX_SCHEMA_V3
+    has_runtime_binding = is_v2 or is_v3
     body: dict[str, object] = {
-        "schema_version": PROJECTION_SCHEMA_V2 if is_v2 else PROJECTION_SCHEMA,
-        "attempt_id": "r164-formal-attempt-2" if is_v2 else "r163-formal-attempt-1",
+        "schema_version": (
+            PROJECTION_SCHEMA_V3 if is_v3 else PROJECTION_SCHEMA_V2 if is_v2 else PROJECTION_SCHEMA
+        ),
+        "attempt_id": (
+            "r165-20260829-attempt-03"
+            if is_v3
+            else "r164-formal-attempt-2"
+            if is_v2
+            else "r163-formal-attempt-1"
+        ),
         "candidate_commit": "1" * 40,
         "candidate_tree": "2" * 40,
         "candidate_parent_commit": matrix.candidate_parent_commit,
@@ -64,10 +77,10 @@ def _projection_payload(matrix) -> dict[str, object]:
         "max_concurrency": 1,
         "scorer_sha256": matrix.scorer_sha256,
         "retained_artifacts": list(matrix.retained_artifacts),
-        "residual_ports": [] if is_v2 else [43161, 43162, 43163, 43164],
+        "residual_ports": [] if has_runtime_binding else [43161, 43162, 43163, 43164],
         "residual_process_markers": ["redagent-opa", "redagent-openbao", "redagent-stack"],
     }
-    if is_v2:
+    if has_runtime_binding:
         body["runner_environment"] = {
             runner_id: dict(environment) for runner_id, environment in matrix.runner_environment.items()
         }
@@ -270,8 +283,45 @@ def test_v2_matrix_is_fresh_closed_and_binds_runner_and_runtime_environments() -
     assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
 
 
+def test_v3_matrix_adds_owned_provisioning_and_uses_only_product_semantic_authority() -> None:
+    matrix = load_matrix(MATRIX_V3_PATH)
+
+    assert matrix.schema_version == MATRIX_SCHEMA_V3
+    expected_parent = "302bcab86aad22e4d48bcc1fe0a0fa429667cd77"  # pragma: allowlist secret
+    assert matrix.candidate_parent_commit == expected_parent
+    assert len(matrix.stages) == 9
+    assert [stage.stage_id for stage in matrix.stages][3:7] == [
+        "windows-full-gate",
+        "owned-runtime-provision",
+        "runtime-coordinate-snapshot",
+        "owned-runtime-cleanup",
+    ]
+    assert dict(matrix.runner_environment["pytest-authority-to-terminal"]) == {
+        "REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1"
+    }
+    assert all(
+        not environment
+        for runner_id, environment in matrix.runner_environment.items()
+        if runner_id != "pytest-authority-to-terminal"
+    )
+    assert set(matrix.formal_runtime_paths) == {"home", "pre_commit_home", "temp"}
+    assert all(
+        path.startswith(".tmp/autonomous-planner-qualification-attempt-03/runtime/")
+        for path in (*matrix.formal_runtime_paths.values(), *matrix.cleanup_paths)
+    )
+    stages = {stage.result_kind: stage for stage in matrix.stages}
+    assert matrix.stages[0].expected_pass_count == 266
+    assert stages["provision"].expected_pass_count == 3
+    assert all(stage.allowed_skip_count == 0 for stage in matrix.stages)
+    assert "config/validation/autonomous-planner-qualification-v3.json" in matrix.source_paths
+
+    _matrix, _projection_value, events, bundle = _accepted_ceremony_for(MATRIX_V3_PATH)
+    assert len(events) == len(matrix.stages) + 3
+    assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
+
+
 def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> None:
-    for path in (MATRIX_PATH, MATRIX_V2_PATH):
+    for path in (MATRIX_PATH, MATRIX_V2_PATH, MATRIX_V3_PATH):
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["max_concurrency"] = 2
         body = {key: value for key, value in payload.items() if key != "matrix_sha256"}
@@ -315,13 +365,17 @@ def test_projection_denies_target_runner_identity_and_candidate_lineage_drift() 
             parse_projection(mutated, matrix)
 
 
-def test_v2_projection_denies_runner_runtime_and_snapshot_input_drift() -> None:
-    matrix = load_matrix(MATRIX_V2_PATH)
+@pytest.mark.parametrize("matrix_path", [MATRIX_V2_PATH, MATRIX_V3_PATH])
+def test_runtime_bound_projection_denies_runner_runtime_and_snapshot_input_drift(
+    matrix_path: Path,
+) -> None:
+    matrix = load_matrix(matrix_path)
     payload = _projection_payload(matrix)
+    authority_key = next(iter(matrix.runner_environment["pytest-authority-to-terminal"]))
     cases = (
         (
             "runner_environment",
-            {**payload["runner_environment"], "windows-full-gate": {"REDAGENT_R159_LIVE_QUALIFICATION": "owned-loopback-zap-v1"}},
+            {**payload["runner_environment"], "windows-full-gate": {authority_key: "owned-loopback-zap-v1"}},
         ),
         (
             "formal_runtime_paths",
@@ -513,8 +567,8 @@ def test_event_chain_rejects_missing_reordered_or_tampered_lifecycle() -> None:
 def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v2.json"
-    assert cli.OUTPUT_ROOT.name == "autonomous-planner-qualification-attempt-02"
+    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v3.json"
+    assert cli.OUTPUT_ROOT.name == "autonomous-planner-qualification-attempt-03"
     assert cli.build_parser().parse_args(["preflight"]).command == "preflight"
     assert cli.build_parser().parse_args(["run"]).command == "run"
     assert cli.build_parser().parse_args(["verify"]).command == "verify"
@@ -536,12 +590,19 @@ def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> N
         "opa_conformance.py",
         "redagent_local_stack.py",
     ]
+    provision = cli._runner_commands("owned-runtime-provision", "1" * 40, "2" * 40)
+    assert [Path(command[1]).name for command in provision] == [
+        "redagent_local_stack.py",
+        "openbao_conformance.py",
+        "opa_conformance.py",
+    ]
+    assert [command[2] for command in provision] == ["start", "provision", "provision"]
 
 
 def test_count_parser_is_capture_safe_for_every_output_kind() -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    matrix = load_matrix(MATRIX_V2_PATH)
+    matrix = load_matrix(MATRIX_V3_PATH)
     stages = {stage.result_kind: stage for stage in matrix.stages}
 
     assert cli._parse_counts(stages["pytest"], "301 passed", None) == (301, 0)
@@ -554,6 +615,7 @@ def test_count_parser_is_capture_safe_for_every_output_kind() -> None:
         {"stages": [{"status": "passed"}] * 22},
     ) == (22, 0)
     assert cli._parse_counts(stages["cleanup"], '{"ok": true}\n' * 4, None) == (4, 0)
+    assert cli._parse_counts(stages["provision"], '{"ok": true}\n' * 3, None) == (3, 0)
     residual = '{"passed_check_count":9}'
     assert cli._parse_counts(stages["residual"], residual, None) == (9, 0)
     snapshot = '{"passed_check_count":1}'
@@ -623,6 +685,30 @@ def test_formal_children_receive_only_the_source_pinned_redagent_environment(
     assert "REDAGENT_R159_LIVE_QUALIFICATION" not in second_environment
 
 
+def test_v3_formal_children_receive_product_semantic_authority_only_on_authority_runner(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V3_PATH)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setenv("REDAGENT_R159_LIVE_QUALIFICATION", "must-not-survive")
+    monkeypatch.setenv("REDAGENT_UNDECLARED", "must-not-survive")
+
+    authority = cli._fixed_child_environment(matrix, matrix.stages[0])
+    observed = {key: value for key, value in authority.items() if key.upper().startswith("REDAGENT_")}
+    assert observed == {
+        **EXPECTED_FORMAL_ENVIRONMENT,
+        "REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1",
+    }
+
+    component = cli._fixed_child_environment(matrix, matrix.stages[1])
+    assert "REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION" not in component
+    assert "REDAGENT_R159_LIVE_QUALIFICATION" not in component
+    assert "REDAGENT_UNDECLARED" not in component
+
+
 def test_fixed_child_environment_supports_nested_repository_imports_and_strips_poison(
     tmp_path: Path,
     monkeypatch,
@@ -653,6 +739,39 @@ def test_fixed_child_environment_supports_nested_repository_imports_and_strips_p
     assert "PYTHONSAFEPATH" not in environment
     assert "PYTHONPATH" not in environment
     assert "REDAGENT_UNDECLARED" not in environment
+
+
+def test_runtime_coordinate_snapshot_fails_closed_when_opa_coordinate_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    runtime = tmp_path / ".local/redagent/runtime"
+    runtime.mkdir(parents=True)
+    (runtime / "local-stack.env").write_text(
+        "\n".join(
+            (
+                "REDAGENT_COMPOSE_PROJECT_NAME=redagent-planner-local",  # pragma: allowlist secret
+                "REDAGENT_BIND_HOST=127.0.0.1",
+                "REDAGENT_POSTGRES_PORT=55433",
+                "REDAGENT_KEYCLOAK_PORT=58081",
+                "REDAGENT_TEMPORAL_PORT=57234",
+                "REDAGENT_RUSTFS_PORT=59001",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "RUNTIME_COORDINATE_SNAPSHOT",
+        tmp_path / ".tmp/autonomous-planner-qualification-attempt-03/runtime-coordinate-snapshot.json",
+    )
+
+    with pytest.raises(QualificationError, match="qualification fixed file is unavailable"):
+        cli._capture_runtime_coordinate_snapshot()
 
 
 def test_runtime_coordinate_snapshot_is_closed_secret_free_and_workspace_scoped(
@@ -809,7 +928,7 @@ def test_declared_item_runtime_paths_are_removed_without_touching_other_outputs(
     assert all(not (tmp_path / Path(relative)).exists() for relative in matrix.cleanup_paths)
     assert unrelated.read_text(encoding="utf-8") == "retained"
 
-    invocation_id = "invocation-r159-0123456789ab"
+    invocation_id = "invocation-planner-0123456789ab"
     digest = hashlib.sha256(invocation_id.encode("utf-8")).hexdigest()
     zap_runtime = tmp_path / ".local/redagent/r123-zap"
     run_root = zap_runtime / digest[:24]

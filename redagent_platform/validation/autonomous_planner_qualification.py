@@ -13,10 +13,12 @@ from typing import Any, Mapping, Sequence
 
 MATRIX_SCHEMA_V1 = "redagent.autonomous-planner-qualification-matrix/v1"
 MATRIX_SCHEMA_V2 = "redagent.autonomous-planner-qualification-matrix/v2"
+MATRIX_SCHEMA_V3 = "redagent.autonomous-planner-qualification-matrix/v3"
 MATRIX_SCHEMA = MATRIX_SCHEMA_V1
 SCORER_SCHEMA = "redagent.autonomous-planner-qualification-scorer/v1"
 PROJECTION_SCHEMA_V1 = "redagent.autonomous-planner-qualification-projection/v1"
 PROJECTION_SCHEMA_V2 = "redagent.autonomous-planner-qualification-projection/v2"
+PROJECTION_SCHEMA_V3 = "redagent.autonomous-planner-qualification-projection/v3"
 PROJECTION_SCHEMA = PROJECTION_SCHEMA_V1
 PREFLIGHT_SCHEMA = "redagent.autonomous-planner-qualification-preflight/v1"
 STAGE_RESULT_SCHEMA = "redagent.autonomous-planner-qualification-stage-result/v1"
@@ -36,6 +38,7 @@ MAX_BUNDLE_BYTES = 4 * 1024 * 1024
 MAX_JSON_DEPTH = 16
 EXPECTED_MATRIX_SHA256_V1 = "1ab6ef282abeda1dac450c2556a50369ab05211420d128e009a91c1ca6a2b524"
 EXPECTED_MATRIX_SHA256_V2 = "236ca3a0c1422440c7e04a96186870dfa21735a21ccc6736de7d5784a7fa29b5"
+EXPECTED_MATRIX_SHA256_V3 = "84d477f1864025b0857d6e7b623f32ca9c3ee61c5df39aeb3272983fbdfb6e5f"
 
 
 def _pinned_git_oid(*chunks: str) -> str:
@@ -113,20 +116,32 @@ EXPECTED_STAGE_BINDINGS_V2 = (
     ("post-cleanup-offline-lineage", "pytest-offline-lineage"),
     ("residual-safety", "internal-residual-safety"),
 )
+EXPECTED_STAGE_BINDINGS_V3 = (
+    ("authority-to-terminal-python", "pytest-authority-to-terminal"),
+    ("operations-component", "vitest-operations-component"),
+    ("operations-e2e", "playwright-operations-e2e"),
+    ("windows-full-gate", "windows-full-gate"),
+    ("owned-runtime-provision", "owned-runtime-provision"),
+    ("runtime-coordinate-snapshot", "internal-runtime-coordinate-snapshot"),
+    ("owned-runtime-cleanup", "owned-runtime-cleanup"),
+    ("post-cleanup-offline-lineage", "pytest-offline-lineage"),
+    ("residual-safety", "internal-residual-safety"),
+)
 EXPECTED_STAGE_BINDINGS = EXPECTED_STAGE_BINDINGS_V1
-EXPECTED_RUNNER_ENVIRONMENT_V2 = {
-    runner_id: (
-        {"REDAGENT_R159_LIVE_QUALIFICATION": "owned-loopback-zap-v1"}
-        if runner_id == "pytest-authority-to-terminal"
-        else {}
-    )
-    for _stage_id, runner_id in EXPECTED_STAGE_BINDINGS_V2
-}
 EXPECTED_FORMAL_RUNTIME_PATHS_V2 = {
     "home": ".tmp/autonomous-planner-qualification-attempt-02/runtime/home",
     "pre_commit_home": ".tmp/autonomous-planner-qualification-attempt-02/runtime/cache/pre-commit",
     "temp": ".tmp/autonomous-planner-qualification-attempt-02/runtime/temp",
 }
+EXPECTED_FORMAL_RUNTIME_PATHS_V3 = {
+    "home": ".tmp/autonomous-planner-qualification-attempt-03/runtime/home",
+    "pre_commit_home": ".tmp/autonomous-planner-qualification-attempt-03/runtime/cache/pre-commit",
+    "temp": ".tmp/autonomous-planner-qualification-attempt-03/runtime/temp",
+}
+EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3 = {
+    "REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1"
+}
+RUNTIME_BOUND_MATRIX_SCHEMAS = frozenset({MATRIX_SCHEMA_V2, MATRIX_SCHEMA_V3})
 
 _TOKEN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -442,6 +457,7 @@ def _parse_stage(value: object) -> StageSpec:
         "vitest",
         "playwright",
         "forced-g2",
+        "provision",
         "runtime-snapshot",
         "cleanup",
         "residual",
@@ -479,7 +495,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
     }
     if schema_version == MATRIX_SCHEMA_V1:
         matrix_fields = common_fields
-    elif schema_version == MATRIX_SCHEMA_V2:
+    elif schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS:
         matrix_fields = common_fields | {"runner_environment", "formal_runtime_paths"}
     else:
         raise QualificationError("matrix schema invalid")
@@ -494,9 +510,11 @@ def parse_matrix(payload: object) -> QualificationMatrix:
     # IMPORTANT: a coherently rehashed public matrix still needs the source-pinned trusted digest.
     if supplied_digest != computed_digest:
         raise QualificationError("matrix digest mismatch")
-    expected_digest = (
-        EXPECTED_MATRIX_SHA256_V1 if schema_version == MATRIX_SCHEMA_V1 else EXPECTED_MATRIX_SHA256_V2
-    )
+    expected_digest = {
+        MATRIX_SCHEMA_V1: EXPECTED_MATRIX_SHA256_V1,
+        MATRIX_SCHEMA_V2: EXPECTED_MATRIX_SHA256_V2,
+        MATRIX_SCHEMA_V3: EXPECTED_MATRIX_SHA256_V3,
+    }[schema_version]
     if computed_digest != expected_digest:
         raise QualificationError("trusted matrix digest mismatch")
 
@@ -581,12 +599,14 @@ def parse_matrix(payload: object) -> QualificationMatrix:
     ):
         raise QualificationError("formal qualification environment invalid")
     formal_environment = dict(sorted(formal_environment_value.items()))
-    if schema_version == MATRIX_SCHEMA_V2:
+    if schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS:
         runner_environment = _runner_environment_mapping(item["runner_environment"])
-        if runner_environment != EXPECTED_RUNNER_ENVIRONMENT_V2:
-            raise QualificationError("runner environment binding invalid")
         formal_runtime_paths = _runtime_path_mapping(item["formal_runtime_paths"])
-        if formal_runtime_paths != EXPECTED_FORMAL_RUNTIME_PATHS_V2:
+        expected_runtime_paths = {
+            MATRIX_SCHEMA_V2: EXPECTED_FORMAL_RUNTIME_PATHS_V2,
+            MATRIX_SCHEMA_V3: EXPECTED_FORMAL_RUNTIME_PATHS_V3,
+        }[schema_version]
+        if formal_runtime_paths != expected_runtime_paths:
             raise QualificationError("formal runtime path binding invalid")
     else:
         runner_environment = {}
@@ -598,11 +618,35 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         raise QualificationError("stages invalid")
     stages = tuple(_parse_stage(value) for value in stage_values)
     stage_bindings = tuple((stage.stage_id, stage.runner_id) for stage in stages)
-    expected_stage_bindings = (
-        EXPECTED_STAGE_BINDINGS_V1 if schema_version == MATRIX_SCHEMA_V1 else EXPECTED_STAGE_BINDINGS_V2
-    )
+    expected_stage_bindings = {
+        MATRIX_SCHEMA_V1: EXPECTED_STAGE_BINDINGS_V1,
+        MATRIX_SCHEMA_V2: EXPECTED_STAGE_BINDINGS_V2,
+        MATRIX_SCHEMA_V3: EXPECTED_STAGE_BINDINGS_V3,
+    }[schema_version]
     if stage_bindings != expected_stage_bindings:
         raise QualificationError("stage order or runner binding invalid")
+    if schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS:
+        runner_ids = tuple(sorted(stage.runner_id for stage in stages))
+        if tuple(runner_environment) != runner_ids:
+            raise QualificationError("runner environment inventory invalid")
+        authority_environment = runner_environment["pytest-authority-to-terminal"]
+        if len(authority_environment) != 1 or tuple(authority_environment.values()) != (
+            "owned-loopback-zap-v1",
+        ):
+            raise QualificationError("authority runner environment invalid")
+        authority_name = next(iter(authority_environment))
+        if not authority_name.startswith("REDAGENT_") or not authority_name.endswith("_LIVE_QUALIFICATION"):
+            raise QualificationError("authority runner environment name invalid")
+        if any(
+            environment
+            for runner_id, environment in runner_environment.items()
+            if runner_id != "pytest-authority-to-terminal"
+        ):
+            raise QualificationError("runner environment exceeded authority stage")
+        # IMPORTANT: V2 remains authenticated by its immutable trusted matrix digest; only the
+        # fresh V3 authority surface is product-semantic and may be used by the current ceremony.
+        if schema_version == MATRIX_SCHEMA_V3 and authority_environment != EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3:
+            raise QualificationError("V3 authority runner environment invalid")
 
     retained_artifacts = _path_tuple(item["retained_artifacts"], label="retained artifact")
     expected_retained_artifacts = tuple(
@@ -620,15 +664,15 @@ def parse_matrix(payload: object) -> QualificationMatrix:
     if retained_artifacts != expected_retained_artifacts:
         raise QualificationError("retained artifact inventory does not cover the fixed ceremony")
     cleanup_paths = _path_tuple(item["cleanup_paths"], label="cleanup path")
-    cleanup_root = (
-        ".tmp/autonomous-planner-qualification/runtime/"
-        if schema_version == MATRIX_SCHEMA_V1
-        else ".tmp/autonomous-planner-qualification-attempt-02/runtime/"
-    )
+    cleanup_root = {
+        MATRIX_SCHEMA_V1: ".tmp/autonomous-planner-qualification/runtime/",
+        MATRIX_SCHEMA_V2: ".tmp/autonomous-planner-qualification-attempt-02/runtime/",
+        MATRIX_SCHEMA_V3: ".tmp/autonomous-planner-qualification-attempt-03/runtime/",
+    }[schema_version]
     if any(not path.startswith(cleanup_root) for path in cleanup_paths):
         raise QualificationError("cleanup path escaped the item-owned runtime root")
     # IMPORTANT: every formal writer must be owned by an exact declared cleanup root.
-    if schema_version == MATRIX_SCHEMA_V2 and not all(
+    if schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS and not all(
         any(path == cleanup_path or path.startswith(cleanup_path + "/") for cleanup_path in cleanup_paths)
         for path in formal_runtime_paths.values()
     ):
@@ -660,7 +704,11 @@ def load_matrix(path: Path) -> QualificationMatrix:
 
 
 def parse_projection(payload: object, matrix: QualificationMatrix) -> ExecutionProjection:
-    projection_schema = PROJECTION_SCHEMA_V2 if matrix.schema_version == MATRIX_SCHEMA_V2 else PROJECTION_SCHEMA_V1
+    projection_schema = {
+        MATRIX_SCHEMA_V1: PROJECTION_SCHEMA_V1,
+        MATRIX_SCHEMA_V2: PROJECTION_SCHEMA_V2,
+        MATRIX_SCHEMA_V3: PROJECTION_SCHEMA_V3,
+    }[matrix.schema_version]
     common_fields = {
         "schema_version",
         "attempt_id",
@@ -686,7 +734,7 @@ def parse_projection(payload: object, matrix: QualificationMatrix) -> ExecutionP
     }
     projection_fields = (
         common_fields | {"runner_environment", "formal_runtime_paths"}
-        if matrix.schema_version == MATRIX_SCHEMA_V2
+        if matrix.schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS
         else common_fields
     )
     item = _mapping(
@@ -731,7 +779,7 @@ def parse_projection(payload: object, matrix: QualificationMatrix) -> ExecutionP
         matrix.formal_environment
     ):
         raise QualificationError("projection formal environment drift")
-    if matrix.schema_version == MATRIX_SCHEMA_V2:
+    if matrix.schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS:
         runner_environment = _runner_environment_mapping(item["runner_environment"])
         if runner_environment != matrix.runner_environment:
             raise QualificationError("projection runner environment drift")
@@ -749,12 +797,12 @@ def parse_projection(payload: object, matrix: QualificationMatrix) -> ExecutionP
         label="residual port",
         minimum=1024,
         maximum=65535,
-        allow_empty=matrix.schema_version == MATRIX_SCHEMA_V2,
+        allow_empty=matrix.schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS,
     )
     if matrix.schema_version == MATRIX_SCHEMA_V1 and not 4 <= len(residual_ports) <= 16:
         raise QualificationError("residual port inventory invalid")
-    if matrix.schema_version == MATRIX_SCHEMA_V2 and residual_ports:
-        raise QualificationError("V2 residual ports must come from the retained runtime snapshot")
+    if matrix.schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS and residual_ports:
+        raise QualificationError("runtime-bound residual ports must come from the retained runtime snapshot")
     residual_process_markers = _sorted_unique_strings(
         item["residual_process_markers"], label="residual process marker", pattern=_TOKEN
     )
@@ -813,7 +861,7 @@ def _formal_execution_binding(
     projection: ExecutionProjection,
 ) -> dict[str, object]:
     binding: dict[str, object] = {"formal_environment": dict(projection.formal_environment)}
-    if matrix.schema_version == MATRIX_SCHEMA_V2:
+    if matrix.schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS:
         binding["runner_environment"] = {
             key: dict(value) for key, value in projection.runner_environment.items()
         }

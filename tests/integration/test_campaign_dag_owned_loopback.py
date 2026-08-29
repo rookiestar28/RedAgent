@@ -50,14 +50,14 @@ from redagent_platform.zap_service.campaign_transport import ZapDockerTransport
 ROOT = Path(__file__).resolve().parents[2]
 NOW = datetime(2026, 8, 29, 8, tzinfo=timezone.utc)
 LIVE = (
-    os.environ.get("REDAGENT_R159_LIVE_QUALIFICATION")
+    os.environ.get("REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION")
     == "owned-loopback-zap-v1"
 )
 
 
 @pytest.mark.skipif(
     not LIVE,
-    reason="requires explicit R159 repo-owned loopback ZAP qualification authority",
+    reason="requires explicit autonomous-planner repo-owned loopback ZAP qualification authority",
 )
 def test_dag_activity_executes_only_certified_zap_owned_loopback() -> None:
     asyncio.run(_allowed_scenario())
@@ -178,8 +178,8 @@ class _Authority:
         return AuthorityRecheck(
             allowed,
             "allowed" if allowed else self.denial_reason,
-            "runner-r159",
-            "spiffe://redagent.test/runner/r159",
+            "runner-planner",
+            "spiffe://redagent.test/runner/planner",
         )
 
 
@@ -236,17 +236,17 @@ class _ManifestIssuer:
                 job_id=f"job-{command.effect_id[-12:]}",
                 tenant_id=command.tenant_id,
                 engagement_id=command.engagement_id,
-                roe_version_id="roe-r159",
+                roe_version_id="roe-planner",
                 environment="local",
-                runner_class_id="runner-class-r159",
+                runner_class_id="runner-class-planner",
                 network_plane="isolated-target",
                 adapter_id=command.binding.adapter_id,
                 adapter_version=command.binding.adapter_version,
                 capability_digest=command.binding.execution_manifest_sha256,
                 image_digest="sha256:" + "9" * 64,
-                artifact_receipt_id="artifact-r159",
-                policy_revision="policy-r159",
-                policy_decision_id="decision-r159",
+                artifact_receipt_id="artifact-planner",
+                policy_revision="policy-planner",
+                policy_decision_id="decision-planner",
                 target_ids=(command.target_id,),
                 target_hashes=("8" * 64,),
                 limits=ResourceLimits(
@@ -276,7 +276,7 @@ class _ManifestIssuer:
         return sign_job_manifest_v2(
             draft,
             Ed25519PrivateKey.generate(),
-            key_id="r159-test-key",
+            key_id="planner-test-key",
         )
 
 
@@ -310,8 +310,8 @@ class _QualificationResultWriter:
             invocation_id=material.request.invocation_id,
             effect_id=material.request.effect_id,
             state="confirmed",
-            external_receipt_id=f"r159-result-{digest}",
-            evidence_ids=(f"r159-evidence-{digest}",),
+            external_receipt_id=f"planner-result-{digest}",
+            evidence_ids=(f"planner-evidence-{digest}",),
             cleanup_receipt_id=material.cleanup_receipt_id,
             output_complete=True,
             external_contact_count=0,
@@ -363,18 +363,18 @@ def _binding() -> CapabilityBindingKeyV1:
 
 def _command(suffix: str) -> EffectDispatchCommand:
     return EffectDispatchCommand(
-        tenant_id="tenant-r159-live",
-        principal_id="principal-r159-live",
-        engagement_id="engagement-r159-live",
-        target_id="target-r159-live",
-        effect_id=f"effect-r159-{suffix}",
-        invocation_id=f"invocation-r159-{suffix}",
+        tenant_id="tenant-planner-live",
+        principal_id="principal-planner-live",
+        engagement_id="engagement-planner-live",
+        target_id="target-planner-live",
+        effect_id=f"effect-planner-{suffix}",
+        invocation_id=f"invocation-planner-{suffix}",
         effect_intent_sha256="e" * 64,
         envelope_sha256="f" * 64,
         expected_claim_version=0,
         expected_dispatch_attempt=0,
         expected_dispatch_generation=0,
-        claim_owner="dag-r159-live",
+        claim_owner="dag-planner-live",
         binding=_binding(),
     )
 
@@ -391,7 +391,7 @@ def _snapshot(
         state=state,
         revision=3 if terminal else 2,
         transition_count=2 if terminal else 1,
-        current_node_id=None if terminal else "node-r159-live",
+        current_node_id=None if terminal else "node-planner-live",
         current_node_state=None if terminal else DagNodeState.RESERVED,
         stop_requested=False,
         terminal_reason="all_nodes_confirmed" if terminal else None,

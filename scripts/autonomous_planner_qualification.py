@@ -43,8 +43,8 @@ from redagent_platform.validation.autonomous_planner_qualification import (  # n
 )
 
 
-MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v2.json"
-OUTPUT_ROOT = ROOT / ".tmp/autonomous-planner-qualification-attempt-02"
+MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v3.json"
+OUTPUT_ROOT = ROOT / ".tmp/autonomous-planner-qualification-attempt-03"
 RUNTIME_ROOT = OUTPUT_ROOT / "runtime"
 STAGE_LOG_ROOT = OUTPUT_ROOT / "stages"
 PROJECTION_PATH = OUTPUT_ROOT / "execution-projection.json"
@@ -60,7 +60,7 @@ MAX_STAGE_LOG_BYTES = 32 * 1024 * 1024
 MAX_RUNTIME_COORDINATE_BYTES = 128 * 1024
 RUNTIME_COORDINATE_SCHEMA = "redagent.autonomous-planner-runtime-coordinate-snapshot/v1"
 LOCAL_COMPOSE_PROJECT = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
-R159_INVOCATION_ID = re.compile(r"^invocation-r159-[0-9a-f]{12}$")
+QUALIFICATION_INVOCATION_ID = re.compile(r"^invocation-planner-[0-9a-f]{12}$")
 
 PYTHON_STARTUP_VARIABLES = frozenset(
     {
@@ -156,6 +156,12 @@ def _runner_commands(runner_id: str, projection_commit: str, projection_parent: 
                 "--expected-mode",
                 "risk_proportional",
             ),
+        )
+    if runner_id == "owned-runtime-provision":
+        return (
+            (python, "scripts/redagent_local_stack.py", "start", "--json"),
+            (python, "scripts/openbao_conformance.py", "provision"),
+            (python, "scripts/opa_conformance.py", "provision"),
         )
     if runner_id == "owned-runtime-cleanup":
         return (
@@ -293,16 +299,16 @@ def _observe_preflight(matrix: QualificationMatrix, projection) -> dict[str, obj
 
 def _load_inputs():
     _assert_fixed_path(
-        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v2.json", must_exist=True
+        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v3.json", must_exist=True
     )
     _assert_fixed_path(
         PROJECTION_PATH,
-        ROOT / ".tmp/autonomous-planner-qualification-attempt-02/execution-projection.json",
+        ROOT / ".tmp/autonomous-planner-qualification-attempt-03/execution-projection.json",
         must_exist=True,
     )
     _assert_fixed_path(
         PINS_PATH,
-        ROOT / ".tmp/autonomous-planner-qualification-attempt-02/verification-pins.json",
+        ROOT / ".tmp/autonomous-planner-qualification-attempt-03/verification-pins.json",
         must_exist=True,
     )
     matrix = load_matrix(MATRIX_PATH)
@@ -336,7 +342,7 @@ def _parse_counts(stage: StageSpec, text: str, receipt: object | None) -> tuple[
         stages = receipt["stages"]
         passed = sum(1 for value in stages if isinstance(value, Mapping) and value.get("status") == "passed")
         return passed, 0
-    if stage.result_kind == "cleanup":
+    if stage.result_kind in {"cleanup", "provision"}:
         return text.count('"ok": true'), 0
     if stage.result_kind in {"residual", "runtime-snapshot"}:
         value = decode_json_bytes(
@@ -501,24 +507,24 @@ def _qualification_zap_state() -> tuple[tuple[Path, Path], ...]:
     _assert_fixed_path(runtime, runtime, must_exist=True, directory=True)
     entries = tuple(runtime.iterdir())
     if len(entries) > 128 or any(is_link_or_reparse(path) for path in entries):
-        raise QualificationError("R159 qualification runtime inventory invalid")
+        raise QualificationError("qualification runtime inventory invalid")
     records: list[tuple[Path, Path]] = []
     for receipt in entries:
         if not receipt.name.startswith("receipt-") or receipt.suffix != ".json":
             continue
         value = load_json_file(
             receipt,
-            label="R159 qualification receipt",
+            label="qualification receipt",
             maximum_bytes=1024 * 1024,
         )
         if not isinstance(value, Mapping):
-            raise QualificationError("R159 qualification receipt invalid")
+            raise QualificationError("qualification receipt invalid")
         invocation_id = value.get("invocation_id")
-        if not isinstance(invocation_id, str) or R159_INVOCATION_ID.fullmatch(invocation_id) is None:
+        if not isinstance(invocation_id, str) or QUALIFICATION_INVOCATION_ID.fullmatch(invocation_id) is None:
             continue
         digest = hashlib.sha256(invocation_id.encode("utf-8")).hexdigest()
         if receipt.name != f"receipt-{digest}.json":
-            raise QualificationError("R159 qualification receipt binding invalid")
+            raise QualificationError("qualification receipt binding invalid")
         run_root = runtime / digest[:24]
         _assert_fixed_path(run_root, run_root, must_exist=True, directory=True)
         records.append((receipt, run_root))
@@ -528,7 +534,7 @@ def _qualification_zap_state() -> tuple[tuple[Path, Path], ...]:
 def _remove_owned_zap_qualification_state() -> int:
     records = _qualification_zap_state()
     for receipt, run_root in records:
-        # CRITICAL: only a receipt-bound R159 invocation authorizes recursive removal of its exact
+        # CRITICAL: only a receipt-bound qualification invocation authorizes recursive removal of its exact
         # workspace-contained run directory; never generalize this to the shared R123 runtime.
         shutil.rmtree(run_root)
         receipt.unlink()
@@ -536,7 +542,7 @@ def _remove_owned_zap_qualification_state() -> int:
     if runtime.is_dir() and not any(runtime.iterdir()):
         runtime.rmdir()
     if _qualification_zap_state():
-        raise QualificationError("R159 qualification runtime cleanup incomplete")
+        raise QualificationError("qualification runtime cleanup incomplete")
     return len(records)
 
 
@@ -802,7 +808,7 @@ def _execute_stage(stage: StageSpec, matrix: QualificationMatrix, projection) ->
                         json.dumps(
                             {
                                 "ok": True,
-                                "removed_r159_qualification_receipts": removed_receipts,
+                                "removed_qualification_receipts": removed_receipts,
                             },
                             sort_keys=True,
                         )
