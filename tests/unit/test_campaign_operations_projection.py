@@ -37,7 +37,7 @@ def test_operations_projection_exposes_bound_server_truth_without_raw_operator_i
         {
             "label": "Step 1",
             "capability": "HTTP posture",
-            "state": "running",
+            "state": "dispatching",
             "order": 0,
         }
     ]
@@ -50,11 +50,16 @@ def test_operations_projection_exposes_bound_server_truth_without_raw_operator_i
     assert projected["revisions"][0]["invalidated_count"] == 1
     assert projected["revisions"][0]["retained_count"] == 1
     assert projected["revisions"][0]["substitution_count"] == 1
+    assert projected["observations"][0]["fact"] == "HTTP header present"
+    assert projected["observations"][0]["producer_kind"] == "DAG runner result"
+    assert projected["audit"][0]["action"] == "Campaign start requested"
+    assert projected["audit"][0]["correlation_id"] == "Event 1"
     assert projected["evidence"]["evidence_count"] == 2
     assert projected["evidence"]["cleanup_state"] == "complete"
     assert projected["evidence"]["export_state"] == "unavailable_without_verified_bundle"
     serialized = json.dumps(projected, sort_keys=True)
     assert "operator-internal" not in serialized
+    assert "corr-safe" not in serialized
     assert "secret-detail" not in serialized
     assert "target-internal" not in serialized
 
@@ -111,6 +116,112 @@ def test_operations_projection_fails_closed_on_unbounded_or_malformed_stored_jso
         project_campaign_operations(malformed_campaign, now=NOW)
 
 
+@pytest.mark.parametrize(
+    ("case", "code"),
+    (
+        ("admission", "operations_admission_outcome_invalid"),
+        ("execution", "operations_execution_state_invalid"),
+        ("stop", "operations_stop_requested_invalid"),
+        ("transition", "operations_transition_count_exceeded"),
+        ("budget", "operations_budget_requests_overcommitted"),
+        ("reservation", "operations_reservation_state_invalid"),
+    ),
+)
+def test_operations_projection_rejects_unknown_or_impossible_semantic_state(
+    case: str,
+    code: str,
+) -> None:
+    source = _source()
+    if case == "admission":
+        source = replace(source, admission={**source.admission, "outcome": "pending"})
+    elif case == "execution":
+        source = replace(source, execution={**source.execution, "run_state": "weird"})
+    elif case == "stop":
+        source = replace(source, execution={**source.execution, "stop_requested": "false"})
+    elif case == "transition":
+        source = replace(source, execution={**source.execution, "transition_count": 21, "max_transitions": 20})
+    elif case == "budget":
+        source = replace(source, reservations=({**source.reservations[0], "requests": 1_000},))
+    else:
+        source = replace(source, reservations=({**source.reservations[0], "reservation_state": "mystery"},))
+    with pytest.raises(CampaignOperationsProjectionInvalid, match=code):
+        project_campaign_operations(source, now=NOW)
+
+
+def test_operations_projection_requires_complete_coherent_admitted_authority_binding() -> None:
+    source = _source()
+    missing = dict(source.admission)
+    missing["receipt_payload"] = {}
+    with pytest.raises(CampaignOperationsProjectionInvalid, match="operations_authority_binding_invalid"):
+        project_campaign_operations(replace(source, admission=missing), now=NOW)
+
+    mismatched = dict(source.execution)
+    mismatched["authority_sha256"] = "9" * 64
+    with pytest.raises(CampaignOperationsProjectionInvalid, match="operations_authority_binding_mismatch"):
+        project_campaign_operations(replace(source, execution=mismatched), now=NOW)
+
+    receipt_mismatch = dict(source.execution)
+    receipt_mismatch["admission_receipt_sha256"] = "8" * 64
+    with pytest.raises(CampaignOperationsProjectionInvalid, match="operations_authority_binding_mismatch"):
+        project_campaign_operations(replace(source, execution=receipt_mismatch), now=NOW)
+
+
+def test_operations_projection_rejects_deep_or_non_json_stored_material() -> None:
+    source = _source()
+    deep: dict[str, object] = {}
+    cursor = deep
+    for _ in range(64):
+        child: dict[str, object] = {}
+        cursor["next"] = child
+        cursor = child
+    with pytest.raises(CampaignOperationsProjectionInvalid, match="operations_input_payload_unbounded"):
+        project_campaign_operations(
+            replace(source, execution={**source.execution, "input_payload": deep}),
+            now=NOW,
+        )
+
+    with pytest.raises(CampaignOperationsProjectionInvalid, match="operations_audit_details_unbounded"):
+        project_campaign_operations(
+            replace(
+                source,
+                audits=({**source.audits[0], "details": {"unsupported": object()}},),
+            ),
+            now=NOW,
+        )
+
+
+@pytest.mark.parametrize(
+    "case",
+    (
+        "capability",
+        "fact",
+        "producer",
+        "audit",
+    ),
+)
+def test_operations_projection_rejects_unknown_public_labels(case: str) -> None:
+    source = _source()
+    if case == "capability":
+        source = replace(
+            source,
+            nodes=({**source.nodes[0], "capability_id": "runner-internal-secret"},),  # pragma: allowlist secret
+        )
+    elif case == "fact":
+        source = replace(source, observations=({**source.observations[0], "fact_id": "target-internal"},))
+    elif case == "producer":
+        source = replace(
+            source,
+            observations=({**source.observations[0], "producer_kind": "operator-internal"},),
+        )
+    else:
+        source = replace(
+            source,
+            audits=({**source.audits[0], "action": "campaign.internal.secret"},),  # pragma: allowlist secret
+        )
+    with pytest.raises(CampaignOperationsProjectionInvalid, match="operations_public_label_invalid"):
+        project_campaign_operations(source, now=NOW)
+
+
 def _source() -> CampaignOperationsSource:
     budget = {
         "duration_seconds": 3600,
@@ -162,6 +273,7 @@ def _source() -> CampaignOperationsSource:
             "terminal_reason": None,
             "authority_sha256": "b" * 64,
             "signed_authority_sha256": "a" * 64,
+            "admission_receipt_sha256": "c" * 64,
             "lifecycle_epoch": 4,
             "policy_revocation_epoch": 2,
             "roe_revocation_epoch": 1,
@@ -194,7 +306,7 @@ def _source() -> CampaignOperationsSource:
                 "node_id": "node-internal",
                 "node_order": 0,
                 "capability_id": "http-posture",
-                "node_state": "running",
+                "node_state": "dispatching",
             },
         ),
         observations=(

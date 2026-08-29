@@ -20,6 +20,10 @@ OPERATIONS_SCHEMA_VERSION = "redagent.campaign-operations/v1"
 _MAX_NODES = 100
 _MAX_ROWS = 100
 _MAX_JSON_BYTES = 1_000_000
+_MAX_JSON_DEPTH = 32
+_MAX_JSON_NODES = 10_000
+_MAX_JSON_KEYS = 10_000
+_MAX_JSON_KEY_LENGTH = 200
 _BUDGET_UNITS = {
     "duration_seconds": "seconds",
     "requests": "requests",
@@ -32,6 +36,52 @@ _BUDGET_UNITS = {
 }
 _ACTIVE_RESERVATIONS = {"reserved", "held", "consumed"}
 _ACTIVE_RUNS = {"start_pending", "running", "stopping", "reconciliation_required"}
+_ADMISSION_OUTCOMES = {"admitted", "denied"}
+_RESERVATION_STATES = {"reserved", "held", "consumed", "released", "expired"}
+_RUN_STATES = _ACTIVE_RUNS | {
+    "completed",
+    "contained",
+    "manual_review_required",
+    "failed_before_io",
+    "failed",
+}
+_NODE_STATES = {
+    "pending",
+    "ready",
+    "reserved",
+    "claimed",
+    "dispatching",
+    "reconciliation_required",
+    "not_applied",
+    "confirmed",
+    "skipped",
+    "contained",
+    "manual_review_required",
+    "failed",
+}
+_VALIDATION_RESULTS = {"valid", "invalid", "unknown"}
+_CAPABILITY_LABELS = {
+    "artifact-posture": "Artifact posture",
+    "http-posture": "HTTP posture",
+    "nuclei-trusted-runtime": "Nuclei trusted runtime",
+    "zap-controlled-runtime": "ZAP controlled runtime",
+}
+_FACT_LABELS = {
+    "authorized": "Authorized",
+    "finding-count": "Finding count",
+    "http_header_present": "HTTP header present",
+    "posture-collected": "Posture collected",
+}
+_PRODUCER_LABELS = {
+    "dag_runner_result": "DAG runner result",
+    "detection_correlation": "Detection correlation",
+}
+_AUDIT_ACTION_LABELS = {
+    "campaign.dag.containment_recorded": "Campaign containment recorded",
+    "campaign.dag.start.requested": "Campaign start requested",
+    "campaign.dag.workflow_start_delivery_failed": "Campaign workflow start failed",
+    "campaign.dag.workflow_started": "Campaign workflow started",
+}
 
 
 class CampaignOperationsProjectionInvalid(RuntimeError):
@@ -375,7 +425,7 @@ def project_campaign_operations(
     )
     if admission_payload:
         _json_bound(admission_payload, "operations_admission_payload_unbounded")
-    authority = _authority(source, admission_payload)
+    authority = _authority(source, admission_payload, now=now)
     validation = _validation(certificate)
     admission = _admission(source.admission)
     budget = _budget(source)
@@ -389,7 +439,7 @@ def project_campaign_operations(
         "schema_version": OPERATIONS_SCHEMA_VERSION,
         "aggregate_version": version,
         "etag": f'"{campaign_id}:{version}"',
-        "preparation_state": _preparation_state(source.admission, execution),
+        "preparation_state": _preparation_state(source.admission, execution, authority_state=authority["state"]),
         "authority": authority,
         "plan": {
             "revision_label": "Current revision" if revision else "Unavailable",
@@ -408,7 +458,12 @@ def project_campaign_operations(
     }
 
 
-def _authority(source: CampaignOperationsSource, payload: Mapping[str, Any]) -> dict[str, Any]:
+def _authority(
+    source: CampaignOperationsSource,
+    payload: Mapping[str, Any],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
     execution = source.execution or {}
     if not source.admission and not execution:
         return {
@@ -421,26 +476,60 @@ def _authority(source: CampaignOperationsSource, payload: Mapping[str, Any]) -> 
             "kill_switch_epoch": None,
             "expires_at": None,
         }
-    outcome = (
-        _required("operations_authority_state", source.admission.get("outcome"), 32)
-        if source.admission
-        else "unavailable"
+    if source.admission is None:
+        raise CampaignOperationsProjectionInvalid("operations_authority_binding_invalid")
+    outcome = _closed_value(
+        source.admission.get("outcome"),
+        _ADMISSION_OUTCOMES,
+        "operations_admission_outcome_invalid",
     )
+    try:
+        signed_authority_sha256 = _digest_required(payload.get("signed_authority_sha256"))
+        authority_sha256 = _digest_required(payload.get("authority_sha256"))
+        lifecycle_epoch = _integer(payload.get("lifecycle_epoch"), "operations_authority_binding_invalid")
+        policy_revocation_epoch = _integer(
+            payload.get("policy_revocation_epoch"),
+            "operations_authority_binding_invalid",
+        )
+        roe_revocation_epoch = _integer(
+            payload.get("roe_revocation_epoch"),
+            "operations_authority_binding_invalid",
+        )
+        kill_switch_epoch = _integer(
+            payload.get("kill_switch_epoch"),
+            "operations_authority_binding_invalid",
+        )
+        expires_at = _as_datetime(payload.get("expires_at"), "operations_authority_binding_invalid")
+        admission_receipt_sha256 = _digest_required(source.admission.get("receipt_sha256"))
+    except CampaignOperationsProjectionInvalid as exc:
+        raise CampaignOperationsProjectionInvalid("operations_authority_binding_invalid") from exc
+    if execution:
+        # CRITICAL: never render an admitted approval from a partial or cross-revision binding;
+        # doing so makes unrelated persisted rows look like one current authority grant.
+        if outcome != "admitted":
+            raise CampaignOperationsProjectionInvalid("operations_authority_binding_mismatch")
+        expected = {
+            "signed_authority_sha256": signed_authority_sha256,
+            "authority_sha256": authority_sha256,
+            "lifecycle_epoch": lifecycle_epoch,
+            "policy_revocation_epoch": policy_revocation_epoch,
+            "roe_revocation_epoch": roe_revocation_epoch,
+            "kill_switch_epoch": kill_switch_epoch,
+            "admission_receipt_sha256": admission_receipt_sha256,
+        }
+        for name, value in expected.items():
+            actual = execution.get(name)
+            if actual != value or type(actual) is not type(value):
+                raise CampaignOperationsProjectionInvalid("operations_authority_binding_mismatch")
     return {
-        "state": outcome,
-        "signed_authority_sha256": _digest_or_none(
-            execution.get("signed_authority_sha256") or payload.get("signed_authority_sha256")
-        ),
-        "authority_sha256": _digest_or_none(execution.get("authority_sha256") or payload.get("authority_sha256")),
-        "lifecycle_epoch": _optional_integer(execution.get("lifecycle_epoch", payload.get("lifecycle_epoch"))),
-        "policy_revocation_epoch": _optional_integer(
-            execution.get("policy_revocation_epoch", payload.get("policy_revocation_epoch"))
-        ),
-        "roe_revocation_epoch": _optional_integer(
-            execution.get("roe_revocation_epoch", payload.get("roe_revocation_epoch"))
-        ),
-        "kill_switch_epoch": _optional_integer(execution.get("kill_switch_epoch", payload.get("kill_switch_epoch"))),
-        "expires_at": _datetime_text(payload.get("expires_at")),
+        "state": "expired" if outcome == "admitted" and expires_at <= now else outcome,
+        "signed_authority_sha256": signed_authority_sha256,
+        "authority_sha256": authority_sha256,
+        "lifecycle_epoch": lifecycle_epoch,
+        "policy_revocation_epoch": policy_revocation_epoch,
+        "roe_revocation_epoch": roe_revocation_epoch,
+        "kill_switch_epoch": kill_switch_epoch,
+        "expires_at": expires_at.astimezone(timezone.utc).isoformat(),
     }
 
 
@@ -455,7 +544,11 @@ def _validation(certificate: Mapping[str, Any]) -> dict[str, Any]:
         counterexample = _mapping(item, "operations_counterexample_invalid")
         codes.append(_required("operations_counterexample_code", counterexample.get("code"), 150))
     return {
-        "result": _required("operations_validation_result", certificate.get("result"), 32),
+        "result": _closed_value(
+            certificate.get("result"),
+            _VALIDATION_RESULTS,
+            "operations_validation_result_invalid",
+        ),
         "reason": _optional_text(certificate.get("bounded_reason"), 150),
         "counterexample_codes": codes,
     }
@@ -465,24 +558,38 @@ def _admission(row: Mapping[str, Any] | None) -> dict[str, Any]:
     if row is None:
         return {"outcome": "unavailable", "reason": None, "receipt_sha256": None}
     return {
-        "outcome": _required("operations_admission_outcome", row.get("outcome"), 32),
+        "outcome": _closed_value(
+            row.get("outcome"),
+            _ADMISSION_OUTCOMES,
+            "operations_admission_outcome_invalid",
+        ),
         "reason": _optional_text(row.get("reason_code"), 100),
-        "receipt_sha256": _digest_or_none(row.get("receipt_sha256")),
+        "receipt_sha256": _digest_required(row.get("receipt_sha256")),
     }
 
 
 def _budget(source: CampaignOperationsSource) -> dict[str, Any]:
+    if source.ledger is None and source.reservations:
+        raise CampaignOperationsProjectionInvalid("operations_budget_ledger_missing")
+    for reservation in source.reservations:
+        _closed_value(
+            reservation.get("reservation_state"),
+            _RESERVATION_STATES,
+            "operations_reservation_state_invalid",
+        )
     dimensions: dict[str, dict[str, Any]] = {}
     for name, unit in _BUDGET_UNITS.items():
-        authorized = _optional_integer(source.ledger.get(name)) if source.ledger else None
+        authorized = _integer(source.ledger.get(name), f"operations_budget_{name}_invalid") if source.ledger else None
         committed = 0
         for reservation in source.reservations:
             if reservation.get("reservation_state") in _ACTIVE_RESERVATIONS:
                 committed += _integer(reservation.get(name), f"operations_budget_{name}_invalid")
+        if authorized is not None and committed > authorized:
+            raise CampaignOperationsProjectionInvalid(f"operations_budget_{name}_overcommitted")
         dimensions[name] = {
             "authorized": authorized,
             "committed": committed if authorized is not None else None,
-            "residual": max(0, authorized - committed) if authorized is not None else None,
+            "residual": authorized - committed if authorized is not None else None,
             "unit": unit,
         }
     return {"state": "available" if source.ledger else "unavailable", "dimensions": dimensions}
@@ -503,13 +610,31 @@ def _execution(
         }
     frontier: dict[str, int] = {}
     for node in nodes:
-        state = _required("operations_node_state", node.get("node_state"), 32)
+        state = _closed_value(
+            node.get("node_state"),
+            _NODE_STATES,
+            "operations_node_state_invalid",
+        )
         frontier[state] = frontier.get(state, 0) + 1
+    state = _closed_value(
+        row.get("run_state"),
+        _RUN_STATES,
+        "operations_execution_state_invalid",
+    )
+    transition_count = _integer(row.get("transition_count"), "operations_transition_count_invalid")
+    max_transitions = _integer(row.get("max_transitions"), "operations_max_transitions_invalid")
+    if max_transitions < 1 or max_transitions > 10_000:
+        raise CampaignOperationsProjectionInvalid("operations_max_transitions_invalid")
+    if transition_count > max_transitions:
+        raise CampaignOperationsProjectionInvalid("operations_transition_count_exceeded")
+    stop_requested = row.get("stop_requested")
+    if type(stop_requested) is not bool:
+        raise CampaignOperationsProjectionInvalid("operations_stop_requested_invalid")
     return {
-        "state": _required("operations_execution_state", row.get("run_state"), 32),
-        "transition_count": _integer(row.get("transition_count"), "operations_transition_count_invalid"),
-        "max_transitions": _integer(row.get("max_transitions"), "operations_max_transitions_invalid"),
-        "stop_requested": bool(row.get("stop_requested")),
+        "state": state,
+        "transition_count": transition_count,
+        "max_transitions": max_transitions,
+        "stop_requested": stop_requested,
         "terminal_reason": _optional_text(row.get("terminal_reason"), 100),
         "frontier": dict(sorted(frontier.items())),
     }
@@ -521,8 +646,8 @@ def _observations(rows: tuple[Mapping[str, Any], ...], *, now: datetime) -> list
         expires = _as_datetime(row.get("expires_at"), "operations_observation_expiry_invalid")
         result.append(
             {
-                "fact": _human_label(row.get("fact_id")),
-                "producer_kind": _required("operations_observation_producer", row.get("producer_kind"), 32),
+                "fact": _public_label(row.get("fact_id"), _FACT_LABELS),
+                "producer_kind": _public_label(row.get("producer_kind"), _PRODUCER_LABELS),
                 "observation_sha256": _digest_or_none(row.get("observation_sha256")),
                 "provenance_sha256": _digest_or_none(row.get("provenance_sha256")),
                 "freshness": "current" if expires > now else "expired",
@@ -558,16 +683,17 @@ def _revisions(rows: tuple[Mapping[str, Any], ...]) -> list[dict[str, Any]]:
 
 def _audits(rows: tuple[Mapping[str, Any], ...]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    for row in rows:
+    for index, row in enumerate(rows):
         details = _mapping(row.get("details"), "operations_audit_details_invalid")
         _json_bound(details, "operations_audit_details_unbounded")
+        _required("operations_audit_correlation", row.get("correlation_id"), 100)
         result.append(
             {
-                "action": _required("operations_audit_action", row.get("action"), 100),
+                "action": _public_label(row.get("action"), _AUDIT_ACTION_LABELS),
                 "occurred_at": _datetime_text(row.get("created_at")),
-                "correlation_id": _required("operations_audit_correlation", row.get("correlation_id"), 100),
+                "correlation_id": f"Event {index + 1}",
                 "details_sha256": hashlib.sha256(
-                    json.dumps(details, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+                    json.dumps(details, sort_keys=True, separators=(",", ":")).encode("utf-8")
                 ).hexdigest(),
             }
         )
@@ -615,14 +741,21 @@ def _aggregate_version(source: CampaignOperationsSource) -> int:
 def _preparation_state(
     admission: Mapping[str, Any] | None,
     execution: Mapping[str, Any] | None,
+    *,
+    authority_state: str,
 ) -> str:
     if admission is None and execution is None:
         return "not_prepared"
-    if admission is not None and admission.get("outcome") == "denied":
+    if authority_state == "denied":
         return "denied"
     if execution is None:
-        return "admitted"
-    return "executing" if execution.get("run_state") in _ACTIVE_RUNS else "terminal"
+        return authority_state
+    state = _closed_value(
+        execution.get("run_state"),
+        _RUN_STATES,
+        "operations_execution_state_invalid",
+    )
+    return "executing" if state in _ACTIVE_RUNS else "terminal"
 
 
 def _mapping(value: Any, code: str, *, optional: bool = False) -> Mapping[str, Any]:
@@ -646,10 +779,44 @@ def _bound(name: str, rows: tuple[Mapping[str, Any], ...], maximum: int) -> None
         raise CampaignOperationsProjectionInvalid(f"operations_{name}_invalid")
 
 
-def _json_bound(value: Mapping[str, Any], code: str) -> None:
+def _json_bound(value: Any, code: str) -> None:
+    # CRITICAL: stored JSON is untrusted persistence input; implicit string conversion or recursive
+    # traversal can leak internal objects or escape the typed fail-closed projection boundary.
+    stack: list[tuple[Any, int]] = [(value, 0)]
+    seen_containers: set[int] = set()
+    node_count = 0
+    key_count = 0
+    while stack:
+        current, depth = stack.pop()
+        node_count += 1
+        if depth > _MAX_JSON_DEPTH or node_count > _MAX_JSON_NODES:
+            raise CampaignOperationsProjectionInvalid(code)
+        if isinstance(current, Mapping):
+            identity = id(current)
+            if identity in seen_containers or len(current) > _MAX_JSON_KEYS:
+                raise CampaignOperationsProjectionInvalid(code)
+            seen_containers.add(identity)
+            key_count += len(current)
+            if key_count > _MAX_JSON_KEYS:
+                raise CampaignOperationsProjectionInvalid(code)
+            for key, child in current.items():
+                if not isinstance(key, str) or not key or len(key) > _MAX_JSON_KEY_LENGTH:
+                    raise CampaignOperationsProjectionInvalid(code)
+                stack.append((child, depth + 1))
+        elif isinstance(current, list):
+            identity = id(current)
+            if identity in seen_containers or len(current) > _MAX_JSON_NODES:
+                raise CampaignOperationsProjectionInvalid(code)
+            seen_containers.add(identity)
+            stack.extend((child, depth + 1) for child in current)
+        elif current is None or type(current) in {str, bool, int, float}:
+            if type(current) is float and (current != current or current in {float("inf"), float("-inf")}):
+                raise CampaignOperationsProjectionInvalid(code)
+        else:
+            raise CampaignOperationsProjectionInvalid(code)
     try:
-        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    except (RecursionError, TypeError, ValueError) as exc:
         raise CampaignOperationsProjectionInvalid(code) from exc
     if len(encoded) > _MAX_JSON_BYTES:
         raise CampaignOperationsProjectionInvalid(code)
@@ -687,6 +854,13 @@ def _digest_or_none(value: Any) -> str | None:
     return value
 
 
+def _digest_required(value: Any) -> str:
+    result = _digest_or_none(value)
+    if result is None:
+        raise CampaignOperationsProjectionInvalid("operations_digest_invalid")
+    return result
+
+
 def _as_datetime(value: Any, code: str) -> datetime:
     if isinstance(value, datetime):
         result = value
@@ -713,12 +887,17 @@ def _aware(value: datetime) -> None:
         raise CampaignOperationsProjectionInvalid("operations_now_invalid")
 
 
-def _human_label(value: Any) -> str:
-    return _required("operations_label", value, 150).replace("_", " ").replace("-", " ").capitalize()
+def _closed_value(value: Any, allowed: set[str], code: str) -> str:
+    if not isinstance(value, str) or value not in allowed:
+        raise CampaignOperationsProjectionInvalid(code)
+    return value
+
+
+def _public_label(value: Any, labels: Mapping[str, str]) -> str:
+    if not isinstance(value, str) or value not in labels:
+        raise CampaignOperationsProjectionInvalid("operations_public_label_invalid")
+    return labels[value]
 
 
 def _capability_label(value: Any) -> str:
-    source = _required("operations_capability", value, 150)
-    if source == "http-posture":
-        return "HTTP posture"
-    return source.replace("_", " ").replace("-", " ").capitalize()
+    return _public_label(value, _CAPABILITY_LABELS)

@@ -6,6 +6,10 @@ from datetime import datetime
 import httpx
 
 from redagent_platform.api.app import create_app
+from redagent_platform.campaign_service.operations import (
+    CampaignOperationsSource,
+    project_campaign_operations,
+)
 
 
 AUTH = {
@@ -79,6 +83,24 @@ class InvalidCampaignOperationsOwner(CampaignOperationsOwner):
     async def read(self, **values):
         self.calls.append(values)
         return {"etag": '"campaign-safe:7"', "schema_version": "wrong"}
+
+
+class DeepInvalidCampaignOperationsOwner(CampaignOperationsOwner):
+    async def read(self, **values):
+        self.calls.append(values)
+        deep: dict[str, object] = {}
+        cursor = deep
+        for _ in range(64):
+            child: dict[str, object] = {}
+            cursor["next"] = child
+            cursor = child
+        return project_campaign_operations(
+            CampaignOperationsSource(
+                campaign={"id": values["campaign_id"], "version": 1},
+                execution={"input_payload": deep},
+            ),
+            now=values["now"],
+        )
 
 
 def test_campaign_operations_route_is_tenant_guarded_typed_and_etagged() -> None:
@@ -156,6 +178,22 @@ def test_campaign_operations_rejects_invalid_owner_projection_with_typed_error()
             test_issuer_enabled=True,
             r124_campaign_core_service=CampaignCoreReader(),
             campaign_operations_owner=InvalidCampaignOperationsOwner(),
+        ),
+        "GET",
+        "/api/v1/campaign-core/campaigns/campaign-safe/operations",
+        headers=AUTH,
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "campaign_operations_projection_invalid"
+
+
+def test_campaign_operations_converts_deep_stored_json_to_typed_503() -> None:
+    response = _request(
+        create_app(
+            test_issuer_enabled=True,
+            r124_campaign_core_service=CampaignCoreReader(),
+            campaign_operations_owner=DeepInvalidCampaignOperationsOwner(),
         ),
         "GET",
         "/api/v1/campaign-core/campaigns/campaign-safe/operations",
