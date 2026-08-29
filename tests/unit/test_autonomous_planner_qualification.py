@@ -457,7 +457,7 @@ def test_v5_matrix_is_fresh_and_preserves_the_closed_nine_stage_authority() -> N
     }
     assert all(path.startswith(".tmp/apq-05/runtime/") for path in matrix.cleanup_paths)
     assert "config/validation/autonomous-planner-qualification-v5.json" in matrix.source_paths
-    assert matrix.stages[0].expected_pass_count == 310
+    assert matrix.stages[0].expected_pass_count == 311
     assert all(stage.allowed_skip_count == 0 for stage in matrix.stages)
 
     _matrix, _projection_value, events, bundle = _accepted_ceremony_for(MATRIX_V5_PATH)
@@ -1016,6 +1016,29 @@ def test_v5_post_gate_volume_cleanup_prevalidates_all_four_then_removes_exact_na
     assert remaining == {"other-workspace-data"}
 
 
+def test_v5_post_gate_volume_cleanup_accepts_complete_all_absent_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = _v5_matrix()
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    commands: list[tuple[str, ...]] = []
+
+    def docker(command, **_kwargs):
+        command = tuple(command)
+        commands.append(command)
+        if command[1:4] == ("volume", "ls", "--format"):
+            return cli.subprocess.CompletedProcess(command, 0, stdout="other-workspace-data\n", stderr="")
+        raise AssertionError(f"all-absent state must not inspect or remove: {command}")
+
+    monkeypatch.setattr(cli.subprocess, "run", docker)
+    assert cli._remove_v5_default_full_gate_volumes(matrix) == 0
+    assert commands == [("docker", "volume", "ls", "--format", "{{.Name}}")]
+
+
 @pytest.mark.parametrize("drift", ["missing", "malformed", "project", "driver", "attached", "unavailable"])
 def test_v5_post_gate_volume_cleanup_aborts_before_any_removal_on_inventory_drift(
     drift: str,
@@ -1032,9 +1055,19 @@ def test_v5_post_gate_volume_cleanup_aborts_before_any_removal_on_inventory_drif
     def docker(command, **_kwargs):
         command = tuple(command)
         commands.append(command)
-        if command[1:4] == ("volume", "inspect", "--format"):
+        if command[1:4] == ("volume", "ls", "--format"):
             if drift == "unavailable":
                 return cli.subprocess.CompletedProcess(command, 1, stdout="", stderr="")
+            names = [name for name, _volume_key in V5_DEFAULT_VOLUMES]
+            if drift == "missing":
+                names.pop()
+            return cli.subprocess.CompletedProcess(
+                command,
+                0,
+                stdout="".join(f"{name}\n" for name in names),
+                stderr="",
+            )
+        if command[1:4] == ("volume", "inspect", "--format"):
             if drift == "malformed":
                 stdout = "not-a-bounded-volume-row\n"
             else:

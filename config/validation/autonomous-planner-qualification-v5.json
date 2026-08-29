@@ -1,6 +1,6 @@
 {
   "schema_version": "redagent.autonomous-planner-qualification-matrix/v5",
-  "matrix_sha256": "43b12f462eb838fba924a818f95774b31676b0e74bb19ee6b5b67ba47319c7bd",
+  "matrix_sha256": "64ffe65c7b50060037418e872ad15625a50aa56868980a736b6d6a683626442c",
   "accepted_predecessors": [
     {
       "contract": "campaign-authority-envelope-v2",
@@ -134,7 +134,7 @@
       "runner_id": "pytest-authority-to-terminal",
       "timeout_seconds": 2400,
       "result_kind": "pytest",
-      "expected_pass_count": 310,
+      "expected_pass_count": 311,
       "allowed_skip_count": 0,
       "expected_artifacts": []
     },

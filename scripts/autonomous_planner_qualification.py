@@ -695,6 +695,18 @@ def _remove_v5_default_full_gate_volumes(matrix: QualificationMatrix) -> int:
         raise QualificationError("default Full Gate volume cleanup schema invalid")
     docker = _tool("docker")
     expected = dict(V5_DEFAULT_FULL_GATE_VOLUMES)
+    inventory = _v5_docker_lines(
+        (docker, "volume", "ls", "--format", "{{.Name}}"),
+        label="name inventory",
+    )
+    if len(set(inventory)) != len(inventory) or any(DOCKER_RESOURCE_NAME.fullmatch(name) is None for name in inventory):
+        raise QualificationError("default Full Gate volume name inventory invalid")
+    present = set(inventory).intersection(expected)
+    if not present:
+        return 0
+    if present != set(expected):
+        raise QualificationError("default Full Gate volume inventory incomplete")
+
     inspect_format = (
         '{{.Name}}\t{{.Driver}}\t{{index .Labels "com.docker.compose.project"}}'
         '\t{{index .Labels "com.docker.compose.volume"}}'
