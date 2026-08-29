@@ -428,26 +428,13 @@ def build_campaign_activity_coordinator(
     kms_reference: str = "kms:redagent:r123",
 ) -> CampaignActivityCoordinator:
     """Build the only enabled-mode compat_123 path; all dynamic tenant scope comes from owner reads."""
-    result_writer = PostgresAdapterResultWriter(
+    dispatcher = build_runner_owned_campaign_dispatcher(
+        workspace,
         sessions,
-        evidence_service,
+        runner_identity_owner=runner_identity_owner,
+        evidence_service=evidence_service,
         actor_user_id=actor_user_id,
         kms_reference=kms_reference,
-    )
-    closed = ClosedCampaignDispatcher(
-        (
-            ArtifactCampaignAdapter(workspace, result_writer),
-            ZapCampaignAdapter(ZapDockerTransport(workspace), result_writer),
-            NucleiCampaignAdapter(NucleiDockerTransport(workspace), result_writer),
-        )
-    )
-    dispatcher = RunnerOwnedCampaignDispatcher(
-        closed,
-        PostgresRunnerLifecycleOwner(
-            sessions,
-            runner_identity_owner,
-            actor_user_id=actor_user_id,
-        ),
     )
     effect = CampaignEffectCoordinator(
         ResolverAuthorityGate(resolver, envelope_verifier),
@@ -477,6 +464,39 @@ def build_campaign_activity_coordinator(
         actor_user_id=actor_user_id,
     )
     return CampaignActivityCoordinator(state, effect)
+
+
+def build_runner_owned_campaign_dispatcher(
+    workspace: Path,
+    sessions: object,
+    *,
+    runner_identity_owner: RunnerIdentityOwner,
+    evidence_service: object,
+    actor_user_id: str,
+    kms_reference: str,
+) -> RunnerOwnedCampaignDispatcher:
+    """Compose the sole certified adapter and runner-lifecycle dispatch boundary."""
+    result_writer = PostgresAdapterResultWriter(
+        sessions,
+        evidence_service,
+        actor_user_id=actor_user_id,
+        kms_reference=kms_reference,
+    )
+    closed = ClosedCampaignDispatcher(
+        (
+            ArtifactCampaignAdapter(workspace, result_writer),
+            ZapCampaignAdapter(ZapDockerTransport(workspace), result_writer),
+            NucleiCampaignAdapter(NucleiDockerTransport(workspace), result_writer),
+        )
+    )
+    return RunnerOwnedCampaignDispatcher(
+        closed,
+        PostgresRunnerLifecycleOwner(
+            sessions,
+            runner_identity_owner,
+            actor_user_id=actor_user_id,
+        ),
+    )
 
 
 def build_stock_campaign_activity_coordinator(

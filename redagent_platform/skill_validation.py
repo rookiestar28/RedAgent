@@ -127,7 +127,11 @@ def validate_skill_package(skill_root: str | Path, *, platform: str) -> SkillVal
 
 
 def _validate_required_layout(root: Path, platform: str, issues: list[SkillValidationIssue]) -> None:
-    required = ("SKILL.md", *REQUIRED_REFERENCES, "evals/evals.json")
+    required: tuple[str, ...] = (
+        "SKILL.md",
+        *REQUIRED_REFERENCES,
+        "evals/evals.json",
+    )
     if platform == "codex":
         required = (*required, "agents/openai.yaml")
     for relative_path in required:

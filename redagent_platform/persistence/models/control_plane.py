@@ -5,9 +5,11 @@ from __future__ import annotations
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     JSON,
@@ -16,6 +18,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.schema import conv
 
 from ._base import _owned_columns, metadata
 
@@ -133,12 +136,29 @@ Table(
     Column("dispatch_blocked", Boolean, nullable=False, default=True),
     Column("stop_requested", Boolean, nullable=False, default=False),
     Column("strategy_revision_id", String(64), ForeignKey("campaign_strategy_revisions.id")),
+    Column("execution_run_id", String(64)),
     Column("node_id", String(100)),
     Column("effect_id", String(100)),
     Column("envelope_sha256", String(64)),
     Column("manifest_v2_sha256", String(64)),
     *_owned_columns(),
     UniqueConstraint("tenant_id", "workflow_id"),
+    UniqueConstraint(
+        "tenant_id", "execution_run_id", "node_id", name="uq_jobs_campaign_execution_node"
+    ),
+    ForeignKeyConstraint(
+        ("tenant_id", "execution_run_id", "campaign_id"),
+        (
+            "campaign_execution_runs.tenant_id",
+            "campaign_execution_runs.id",
+            "campaign_execution_runs.campaign_id",
+        ),
+        name="fk_jobs_tenant_execution_run_campaign",
+    ),
+    CheckConstraint(
+        "NOT (strategy_revision_id IS NOT NULL AND execution_run_id IS NOT NULL)",
+        name=conv("jobs_campaign_lineage_not_ambiguous"),
+    ),
 )
 
 Table(

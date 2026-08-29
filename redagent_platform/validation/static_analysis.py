@@ -200,6 +200,11 @@ def sync_ruff_baseline(
         json.dumps(_ruff_payload(findings), indent=2, sort_keys=False) + "\n",
         encoding="utf-8",
     )
+    # IMPORTANT: Windows text writes use CRLF; normalize ratchets so Git and CI see byte-stable LF.
+    payload = baseline_path.read_bytes()
+    normalized = payload.replace(b"\r\n", b"\n")
+    if normalized != payload:
+        baseline_path.write_bytes(normalized)
 
 
 def run_ruff_gate(

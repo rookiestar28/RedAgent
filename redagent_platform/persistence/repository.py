@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import insert, select, text, update
+from sqlalchemy import and_, insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from redagent_platform.campaign_service.registry import closed_execution_binding_for
@@ -889,6 +889,11 @@ class ControlPlaneRepository:
                 retry_count=0,
                 dispatch_blocked=False,
                 stop_requested=False,
+                strategy_revision_id=authority["strategy_record_id"],
+                execution_run_id=None,
+                node_id=None,
+                effect_id=normalized_effect,
+                envelope_sha256=envelope_sha256,
                 version=1,
                 created_at=occurred_at,
                 updated_at=occurred_at,
@@ -902,6 +907,216 @@ class ControlPlaneRepository:
             subject_type="job",
             subject_id=job_id,
             event_type="r123.runner.job.created",
+            occurred_at=occurred_at,
+        )
+
+    async def create_campaign_execution_runner_job(
+        self,
+        *,
+        campaign_id: str,
+        execution_run_id: str,
+        node_id: str,
+        effect_id: str,
+        claim_owner: str,
+        capability_id: str,
+        envelope_sha256: str,
+        occurred_at: datetime,
+    ) -> MutationResult:
+        """Create one claimed-effect job using only Phase 25 execution lineage."""
+        await self._tenant_context()
+        _time(occurred_at)
+        normalized_campaign = _required("campaign_id", campaign_id, 64)
+        normalized_run = _required("execution_run_id", execution_run_id, 64)
+        normalized_node = _required("node_id", node_id, 100)
+        normalized_effect = _required("effect_id", effect_id, 100)
+        normalized_owner = _required("claim_owner", claim_owner, 100)
+        if capability_id not in {
+            "zap-controlled-runtime",
+            "nuclei-trusted-runtime",
+        }:
+            raise ValueError("dag_runner_job_capability_denied")
+        if (
+            not isinstance(envelope_sha256, str)
+            or len(envelope_sha256) != 64
+            or any(character not in "0123456789abcdef" for character in envelope_sha256)
+        ):
+            raise ValueError("dag_runner_job_envelope_invalid")
+
+        campaigns = metadata.tables["campaigns"]
+        runs = metadata.tables["campaign_execution_runs"]
+        nodes = metadata.tables["campaign_execution_nodes"]
+        effects = metadata.tables["campaign_effects"]
+        authority = (
+            await self.session.execute(
+                select(
+                    campaigns.c.engagement_id,
+                    campaigns.c.roe_version_id,
+                )
+                .select_from(
+                    campaigns.join(
+                        runs,
+                        and_(
+                            runs.c.tenant_id == campaigns.c.tenant_id,
+                            runs.c.campaign_id == campaigns.c.id,
+                        ),
+                    )
+                    .join(
+                        nodes,
+                        and_(
+                            nodes.c.tenant_id == runs.c.tenant_id,
+                            nodes.c.execution_run_id == runs.c.id,
+                            nodes.c.campaign_id == runs.c.campaign_id,
+                        ),
+                    )
+                    .join(
+                        effects,
+                        and_(
+                            effects.c.tenant_id == runs.c.tenant_id,
+                            effects.c.execution_run_id == runs.c.id,
+                            effects.c.campaign_id == runs.c.campaign_id,
+                            effects.c.node_id == nodes.c.node_id,
+                        ),
+                    )
+                )
+                .where(
+                    campaigns.c.tenant_id == self.tenant_id,
+                    campaigns.c.id == normalized_campaign,
+                    campaigns.c.status != "completed",
+                    runs.c.id == normalized_run,
+                    runs.c.run_state.in_(("running", "reconciliation_required")),
+                    runs.c.stop_requested.is_(False),
+                    nodes.c.node_id == normalized_node,
+                    nodes.c.node_state == "claimed",
+                    effects.c.effect_id == normalized_effect,
+                    effects.c.execution_run_id == normalized_run,
+                    effects.c.strategy_revision_id.is_(None),
+                    effects.c.effect_state == "claimed",
+                    effects.c.claim_owner == normalized_owner,
+                    effects.c.claim_expires_at > occurred_at,
+                    effects.c.envelope_sha256 == envelope_sha256,
+                )
+                .with_for_update()
+            )
+        ).mappings().one_or_none()
+        if authority is None:
+            raise RecordConflict("dag_runner_job_effect_claim_mismatch")
+
+        effect_payload = await self.session.scalar(
+            select(effects.c.effect_intent_payload).where(
+                effects.c.tenant_id == self.tenant_id,
+                effects.c.effect_id == normalized_effect,
+            )
+        )
+        try:
+            expected_binding = closed_execution_binding_for(capability_id)
+        except ValueError as exc:
+            raise RecordConflict("dag_runner_job_capability_mismatch") from exc
+        payload_binding = (
+            effect_payload.get("binding")
+            if isinstance(effect_payload, dict)
+            else None
+        )
+        if (
+            not isinstance(effect_payload, dict)
+            or effect_payload.get("capability_id") != capability_id
+            or not isinstance(payload_binding, dict)
+            or payload_binding.get("capability_id") != expected_binding.capability_id
+            or payload_binding.get("capability_revision")
+            != expected_binding.capability_revision
+            or payload_binding.get("adapter_id") != expected_binding.adapter_id
+            or payload_binding.get("adapter_version") != expected_binding.adapter_version
+        ):
+            raise RecordConflict("dag_runner_job_capability_mismatch")
+
+        stable = hashlib.sha256(
+            (
+                f"{self.tenant_id}\0{normalized_campaign}\0{normalized_run}\0"
+                f"{normalized_node}\0{normalized_effect}"
+            ).encode("utf-8")
+        ).hexdigest()[:32]
+        job_id = f"job-dag-{stable}"
+        workflow_id = f"redagent-dag-effect-{stable}"
+        idempotency_key = f"dag-runner-job-{stable}"
+        request: dict[str, object] = {
+            "schema_version": "redagent.campaign-dag-runner-job/v1",
+            "capability_id": capability_id,
+            "execution_run_id": normalized_run,
+            "node_id": normalized_node,
+            "effect_id": normalized_effect,
+            "envelope_sha256": envelope_sha256,
+        }
+        operation = "job:campaign-dag:create"
+        normalized: dict[str, object] = {
+            "job_id": job_id,
+            "campaign_id": normalized_campaign,
+            "engagement_id": str(authority["engagement_id"]),
+            "roe_version_id": str(authority["roe_version_id"]),
+            "request": request,
+            "workflow_id": workflow_id,
+            "policy_reference": "policy:campaign-node-execute",
+        }
+        replay = await self._idempotency_replay(
+            operation, idempotency_key, normalized
+        )
+        if replay is not None:
+            return replay
+        resource: dict[str, object] = {
+            **normalized,
+            "created_by_user_id": self.actor_user_id,
+            "status": "approved",
+            "workflow_run_id": None,
+            "orchestration_state": WorkflowState.READY.value,
+            "orchestration_revision": 1,
+            "current_gate": "runner_dispatch",
+            "failure_code": None,
+            "retry_count": 0,
+            "dispatch_blocked": False,
+            "stop_requested": False,
+            "tenant_id": self.tenant_id,
+            "execution_run_id": normalized_run,
+            "node_id": normalized_node,
+            "effect_id": normalized_effect,
+            "version": 1,
+        }
+        jobs = metadata.tables["jobs"]
+        await self.session.execute(
+            insert(jobs).values(
+                id=job_id,
+                tenant_id=self.tenant_id,
+                engagement_id=authority["engagement_id"],
+                roe_version_id=authority["roe_version_id"],
+                created_by_user_id=self.actor_user_id,
+                campaign_id=normalized_campaign,
+                status="approved",
+                request=request,
+                policy_reference="policy:campaign-node-execute",
+                workflow_id=workflow_id,
+                workflow_run_id=None,
+                orchestration_state=WorkflowState.READY.value,
+                orchestration_revision=1,
+                current_gate="runner_dispatch",
+                failure_code=None,
+                retry_count=0,
+                dispatch_blocked=False,
+                stop_requested=False,
+                strategy_revision_id=None,
+                execution_run_id=normalized_run,
+                node_id=normalized_node,
+                effect_id=normalized_effect,
+                envelope_sha256=envelope_sha256,
+                version=1,
+                created_at=occurred_at,
+                updated_at=occurred_at,
+            )
+        )
+        return await self._record_mutation(
+            operation=operation,
+            idempotency_key=idempotency_key,
+            request=normalized,
+            resource=resource,
+            subject_type="job",
+            subject_id=job_id,
+            event_type="campaign.dag.runner.job.created",
             occurred_at=occurred_at,
         )
 

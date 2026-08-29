@@ -1596,12 +1596,6 @@
       "count": 1
     },
     {
-      "path": "redagent_platform/campaign_service/repository.py",
-      "code": "F841",
-      "message": "Local variable `outbox` is assigned to but never used",
-      "count": 1
-    },
-    {
       "path": "redagent_platform/campaign_service/status.py",
       "code": "F821",
       "message": "Undefined name `import_records`",

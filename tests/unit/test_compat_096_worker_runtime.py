@@ -6,6 +6,8 @@ import subprocess
 import sys
 
 from scripts.redagent_workflow_worker import (
+    build_runtime_dag_factory,
+    build_runtime_dag_relay_factory,
     build_runtime_r123_factory,
     build_runtime_r123_relay_factory,
     worker_health_response,
@@ -132,6 +134,21 @@ def test_stock_worker_entrypoint_selects_r123_factory_from_the_same_environment(
         build_runtime_r123_factory(
             tmp_path,
             {"REDAGENT_STRATEGY_LOOP_MODE": "two_capability"},
+        )
+
+
+def test_stock_worker_entrypoint_selects_dag_factories_from_the_same_environment(
+    tmp_path: Path,
+) -> None:
+    assert build_runtime_dag_factory(tmp_path, {}) is None
+    assert build_runtime_dag_relay_factory({}) is None
+    assert callable(build_runtime_dag_relay_factory({
+        "REDAGENT_DAG_EXECUTION_MODE": "owned_loopback",
+    }))
+    with pytest.raises(ValueError, match="r123_signing_configuration_incomplete"):
+        build_runtime_dag_factory(
+            tmp_path,
+            {"REDAGENT_DAG_EXECUTION_MODE": "owned_loopback"},
         )
 
 

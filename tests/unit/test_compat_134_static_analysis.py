@@ -57,6 +57,7 @@ def test_ruff_baseline_is_an_exact_ratchet_for_new_findings(tmp_path: Path) -> N
     source.write_text("def answer() -> int:\n    return 42\n", encoding="utf-8")
 
     sync_ruff_baseline(tmp_path, ("sample.py",), baseline)
+    assert b"\r\n" not in baseline.read_bytes()
     run_ruff_gate(tmp_path, ("sample.py",), baseline)
     source.write_text("def answer() -> int:\n    return missing_name\n", encoding="utf-8")
 

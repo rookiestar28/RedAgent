@@ -34,15 +34,34 @@ class TopologyContract:
 def certified_topology() -> TopologyContract:
     worker_network = NetworkContract(name="redagent-r106-worker-gateway", internal=True)
     target_network = NetworkContract(name="redagent-r106-gateway-target", internal=True)
-    common = {
-        "user": "65532:65532", "read_only": True, "cap_drop": ("ALL",),
-        "no_new_privileges": True, "published_ports": (),
-    }
     return TopologyContract(
-        worker_network=worker_network, target_network=target_network,
-        worker=WorkloadContract(name="redagent-r106-worker", networks=(worker_network.name,), **common),
-        gateway=WorkloadContract(
-            name="redagent-r106-gateway", networks=(worker_network.name, target_network.name), **common,
+        worker_network=worker_network,
+        target_network=target_network,
+        worker=WorkloadContract(
+            name="redagent-r106-worker",
+            networks=(worker_network.name,),
+            user="65532:65532",
+            read_only=True,
+            cap_drop=("ALL",),
+            no_new_privileges=True,
+            published_ports=(),
         ),
-        target=WorkloadContract(name="redagent-r106-target", networks=(target_network.name,), **common),
+        gateway=WorkloadContract(
+            name="redagent-r106-gateway",
+            networks=(worker_network.name, target_network.name),
+            user="65532:65532",
+            read_only=True,
+            cap_drop=("ALL",),
+            no_new_privileges=True,
+            published_ports=(),
+        ),
+        target=WorkloadContract(
+            name="redagent-r106-target",
+            networks=(target_network.name,),
+            user="65532:65532",
+            read_only=True,
+            cap_drop=("ALL",),
+            no_new_privileges=True,
+            published_ports=(),
+        ),
     )

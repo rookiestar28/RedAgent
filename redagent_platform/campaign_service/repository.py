@@ -6,6 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Mapping
 from uuid import uuid4
 
 from sqlalchemy import and_, insert, or_, select, text, update
@@ -750,7 +751,6 @@ class CampaignRepository:
         campaigns = metadata.tables["campaigns"]
         strategies = metadata.tables["campaign_strategy_revisions"]
         effects = metadata.tables["campaign_effects"]
-        outbox = metadata.tables["outbox_events"]
         campaign = (
             await self.session.execute(
                 select(campaigns)
@@ -2307,7 +2307,7 @@ class CampaignRepository:
                 id=record_id,
                 tenant_id=self.tenant_id,
                 actor_user_id=self.actor_user_id,
-                action=action,
+                action=_effect_lineage_action(row, action),
                 subject_type="campaign_effect",
                 subject_id=str(row["id"]),
                 correlation_id=self.correlation_id,
@@ -2339,6 +2339,12 @@ def _required(name: str, value: str, maximum: int) -> str:
     if not normalized or normalized != value or len(value) > maximum:
         raise ValueError(f"{name}_invalid")
     return value
+
+
+def _effect_lineage_action(row: Mapping[str, object], action: str) -> str:
+    if row["execution_run_id"] is not None:
+        return action.replace("campaign.r123.", "campaign.dag.", 1)
+    return action
 
 
 def _sha256(name: str, value: str) -> None:

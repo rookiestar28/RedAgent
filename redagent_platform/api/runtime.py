@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ipaddress
 import os
-import ssl
 from pathlib import Path
 from typing import Mapping
 
@@ -32,9 +31,8 @@ from redagent_platform.identity.http_transport import HttpOidcTransport
 from redagent_platform.identity.session_security import SessionCipher
 from redagent_platform.orchestration.config import load_temporal_settings
 from redagent_platform.persistence.database import load_database_settings
-from redagent_platform.policy_service.config import PolicySettings, load_policy_settings
-from redagent_platform.policy_service.fakes import DeterministicFakePolicyProvider
-from redagent_platform.policy_service.providers import OpaPolicyDecisionProvider
+from redagent_platform.policy_service.config import load_policy_settings
+from redagent_platform.policy_service.runtime import build_policy_provider
 
 
 class ApiRuntimeError(ValueError):
@@ -229,7 +227,7 @@ def build_runtime_app(
     if policy_present and len(policy_present) != len(policy_names):
         raise ApiRuntimeError("policy_runtime_configuration_incomplete")
     policy_settings = load_policy_settings(workspace, values) if policy_present else None
-    policy_provider = _policy_provider(policy_settings) if policy_settings else None
+    policy_provider = build_policy_provider(policy_settings) if policy_settings else None
     return create_app(
         database_settings=settings,
         test_issuer_enabled=test_issuer_enabled,
@@ -249,29 +247,6 @@ def build_runtime_app(
         r123_service_factory=r123_service_factory,
         operator_shell_context=operator_shell_context,
     )
-
-
-def _policy_provider(settings: PolicySettings):
-    if settings.provider == "fake":
-        return DeterministicFakePolicyProvider(revision="synthetic-r099-v1")
-    assert settings.endpoint is not None and settings.token_file is not None and settings.required_revision is not None
-    import httpx
-
-    verify: bool | ssl.SSLContext = True
-    if settings.profile == "local-conformance":
-        verify = False
-    elif settings.ca_file is not None:
-        context = ssl.create_default_context(cafile=str(settings.ca_file))
-        assert settings.client_cert_file is not None and settings.client_key_file is not None
-        context.load_cert_chain(str(settings.client_cert_file), str(settings.client_key_file))
-        verify = context
-    client = httpx.AsyncClient(verify=verify, timeout=2.0)
-    token_file = settings.token_file
-    return OpaPolicyDecisionProvider(
-        client, endpoint=settings.endpoint,
-        token_source=lambda: token_file.read_text(encoding="utf-8").strip(),
-    )
-
 
 def _workspace_path(workspace: Path, value: str, name: str) -> Path:
     path = Path(value)

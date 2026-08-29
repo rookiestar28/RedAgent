@@ -120,18 +120,6 @@ redagent_platform/api_differential_service/repository.py:0: note: def int(str | 
 redagent_platform/api_differential_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
 redagent_platform/api_differential_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
 redagent_platform/api_differential_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
-redagent_platform/api_differential_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
 redagent_platform/artifact_pipeline/analysis.py:0: error: Invalid index type "str | None" for "Mapping[str, tuple[str, str]]"; expected type "str"  [index]
 redagent_platform/artifact_pipeline/repository.py:0: error: Unsupported operand types for >= ("datetime" and "object")  [operator]
 redagent_platform/auth_sessions.py:0: error: Incompatible return value type (got "tuple[tuple[dict[str, str], ...], bool]", expected "tuple[tuple[dict[str, str], bool]]")  [return-value]
@@ -635,9 +623,6 @@ redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes 
 redagent_platform/finding_operations/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
 redagent_platform/gate_lease.py:0: error: Module has no attribute "LOCK_EX"  [attr-defined]
 redagent_platform/gate_lease.py:0: error: Module has no attribute "LOCK_NB"  [attr-defined]
-redagent_platform/gate_lease.py:0: error: Module has no attribute "LOCK_UN"  [attr-defined]
-redagent_platform/gate_lease.py:0: error: Module has no attribute "flock"  [attr-defined]
-redagent_platform/gate_lease.py:0: error: Module has no attribute "flock"  [attr-defined]
 redagent_platform/gate_runtime.py:0: error: Item "None" of "IO[Any] | None" has no attribute "read"  [union-attr]
 redagent_platform/gate_runtime.py:0: error: Module has no attribute "SIGKILL"; maybe "SIGILL"?  [attr-defined]
 redagent_platform/gate_runtime.py:0: error: Module has no attribute "killpg"  [attr-defined]
@@ -767,18 +752,6 @@ redagent_platform/network_service/repository.py:0: error: No overload variant of
 redagent_platform/network_service/repository.py:0: note: Possible overload variants:
 redagent_platform/network_service/repository.py:0: note: def int(str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = ..., /) -> int
 redagent_platform/network_service/repository.py:0: note: def int(str | bytes | bytearray, /, base: SupportsIndex) -> int
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "bool"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "str"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[int, ...]"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
-redagent_platform/network_service/topology.py:0: error: Argument 3 to "WorkloadContract" has incompatible type "**dict[str, object]"; expected "tuple[str, ...]"  [arg-type]
 redagent_platform/nuclei_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
 redagent_platform/nuclei_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
 redagent_platform/nuclei_service/campaign_transport.py:0: error: Value of type "object" is not indexable  [index]
@@ -972,7 +945,6 @@ redagent_platform/skill_invocation.py:0: error: Dict entry 0 has incompatible ty
 redagent_platform/skill_invocation.py:0: error: Dict entry 1 has incompatible type "str": "str | None"; expected "str": "str"  [dict-item]
 redagent_platform/skill_invocation.py:0: error: Dict entry 2 has incompatible type "str": "str | None"; expected "str": "str"  [dict-item]
 redagent_platform/skill_invocation.py:0: error: Dict entry 3 has incompatible type "str": "str | None"; expected "str": "str"  [dict-item]
-redagent_platform/skill_validation.py:0: error: Incompatible types in assignment (expression has type "tuple[str, str, str, str, str, str]", variable has type "tuple[str, str, str, str, str]")  [assignment]
 redagent_platform/telemetry_service/operations.py:0: error: Argument 1 to "_timeline" of "IncidentRepository" has incompatible type "dict[str, int | datetime | bool | str | None]"; expected "dict[str, object]"  [arg-type]
 redagent_platform/telemetry_service/operations.py:0: error: Argument 2 to "_open_alert" of "SloRepository" has incompatible type "dict[str, datetime | str | int | None]"; expected "dict[str, object]"  [arg-type]
 redagent_platform/telemetry_service/operations.py:0: error: Incompatible return value type (got "dict[str, datetime | str | int | None]", expected "dict[str, object]")  [return-value]

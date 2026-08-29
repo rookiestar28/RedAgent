@@ -9,12 +9,14 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     JSON,
     String,
     Table,
     UniqueConstraint,
 )
+from sqlalchemy.schema import conv
 
 from ._base import _owned_columns, metadata
 
@@ -56,7 +58,8 @@ Table(
     Column("id", String(64), primary_key=True),
     Column("effect_id", String(100), nullable=False),
     Column("campaign_id", String(64), ForeignKey("campaigns.id"), nullable=False),
-    Column("strategy_revision_id", String(64), ForeignKey("campaign_strategy_revisions.id"), nullable=False),
+    Column("strategy_revision_id", String(64), ForeignKey("campaign_strategy_revisions.id")),
+    Column("execution_run_id", String(64)),
     Column("node_id", String(100), nullable=False),
     Column("invocation_id", String(100), nullable=False),
     Column("effect_intent_sha256", String(64), nullable=False),
@@ -71,6 +74,10 @@ Table(
     Column("runner_id", String(100)),
     Column("workload_identity", String(300)),
     Column("request_sha256", String(64)),
+    Column("pre_io_policy_decision_id", String(64)),
+    Column("pre_io_policy_input_sha256", String(64)),
+    Column("pre_io_policy_valid_until", DateTime(timezone=True)),
+    Column("pre_io_authorized_at", DateTime(timezone=True)),
     Column("effect_receipt_sha256", String(64)),
     Column("effect_receipt_payload", JSON),
     Column("external_status", String(100)),
@@ -89,6 +96,23 @@ Table(
     UniqueConstraint("tenant_id", "effect_id", name="uq_campaign_effect_tenant_effect"),
     UniqueConstraint(
         "tenant_id", "campaign_id", "strategy_revision_id", "node_id", name="uq_campaign_effect_stable_node"
+    ),
+    UniqueConstraint(
+        "tenant_id", "execution_run_id", "node_id", name="uq_campaign_effect_execution_node"
+    ),
+    ForeignKeyConstraint(
+        ("tenant_id", "execution_run_id", "campaign_id"),
+        (
+            "campaign_execution_runs.tenant_id",
+            "campaign_execution_runs.id",
+            "campaign_execution_runs.campaign_id",
+        ),
+        name="fk_campaign_effect_tenant_execution_run_campaign",
+    ),
+    CheckConstraint(
+        "(strategy_revision_id IS NOT NULL AND execution_run_id IS NULL) OR "
+        "(strategy_revision_id IS NULL AND execution_run_id IS NOT NULL)",
+        name=conv("campaign_effect_lineage_exactly_one"),
     ),
     CheckConstraint("claim_version BETWEEN 0 AND 2147483647", name="campaign_effect_claim_version_bounded"),
     CheckConstraint("dispatch_attempt BETWEEN 0 AND 2", name="campaign_effect_dispatch_attempt_bounded"),

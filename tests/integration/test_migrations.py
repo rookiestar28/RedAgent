@@ -52,7 +52,7 @@ async def _migration_scenario() -> None:
             assert upgraded.returncode == 0, upgraded.stderr
             current = _alembic(secret_file, "current")
             assert current.returncode == 0
-            assert "0026_campaign_plan_admission (head)" in current.stdout
+            assert "0027_campaign_dag_execution (head)" in current.stdout
 
             async with engine.begin() as connection:
                 revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
@@ -135,11 +135,13 @@ async def _migration_scenario() -> None:
                         "'finding_connector_callbacks','finding_connector_reconciliations',"
                         "'campaign_strategy_revisions','campaign_effects',"
                         "'campaign_budget_ledgers','campaign_budget_reservations',"
-                        "'campaign_budget_events','plan_admission_receipts')"
+                        "'campaign_budget_events','plan_admission_receipts',"
+                        "'campaign_execution_runs','campaign_execution_nodes',"
+                        "'campaign_execution_authority_observations')"
                     )
                 )
                 assert revision == settings.expected_revision
-                assert int(table_count or 0) == 253
+                assert int(table_count or 0) == 256
                 for retired_table in (
                     "r118_campaign_controller_records",
                     "r118_campaign_controller_artifacts",
@@ -172,8 +174,8 @@ async def _migration_scenario() -> None:
                         is None
                     )
 
-            r158_reapplied = _alembic(secret_file, "upgrade", "0026_campaign_plan_admission")
-            assert r158_reapplied.returncode == 0, r158_reapplied.stderr
+            current_head_reapplied = _alembic(secret_file, "upgrade", "head")
+            assert current_head_reapplied.returncode == 0, current_head_reapplied.stderr
             async with engine.begin() as connection:
                 assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == (
                     settings.expected_revision
@@ -190,6 +192,18 @@ async def _migration_scenario() -> None:
                             {"table_name": f"public.{r158_table}"},
                         )
                         == r158_table
+                    )
+                for r159_table in (
+                    "campaign_execution_runs",
+                    "campaign_execution_nodes",
+                    "campaign_execution_authority_observations",
+                ):
+                    assert (
+                        await connection.scalar(
+                            text("SELECT to_regclass(:table_name)"),
+                            {"table_name": f"public.{r159_table}"},
+                        )
+                        == r159_table
                     )
 
             restored_r118 = _alembic(secret_file, "downgrade", "0023_r118_controller")

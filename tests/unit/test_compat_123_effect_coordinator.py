@@ -364,6 +364,44 @@ def test_effect_coordinator_uses_fresh_clock_for_pre_io_authority_recheck() -> N
     assert [event[0] for event in store.events] == ["claim", "dispatching", "ambiguity"]
 
 
+@pytest.mark.parametrize("failure", (RuntimeError("synthetic-current-authority-loss"), asyncio.CancelledError()))
+def test_effect_coordinator_persists_ambiguity_when_current_authority_recheck_aborts(
+    failure: BaseException,
+) -> None:
+    class AbortingAuthority(Authority):
+        async def recheck(
+            self, command: EffectDispatchCommand, *, now: datetime
+        ) -> AuthorityRecheck:
+            self.calls.append(command.effect_id)
+            self.times.append(now)
+            if len(self.calls) == 2:
+                raise failure
+            return AuthorityRecheck(
+                True,
+                "allowed",
+                "runner-r123",
+                "spiffe://redagent/runner/r123",
+            )
+
+    store = Store()
+    dispatcher = Dispatcher()
+    coordinator = CampaignEffectCoordinator(
+        AbortingAuthority(()),
+        store,
+        Issuer(),
+        dispatcher,
+        ResultOwner(),
+        clock=lambda: COMPLETED,
+    )
+
+    expected = asyncio.CancelledError if isinstance(failure, asyncio.CancelledError) else RuntimeError
+    with pytest.raises(expected):
+        asyncio.run(coordinator.dispatch(_command(), now=NOW))
+
+    assert dispatcher.calls == 0
+    assert store.events[-1] == ("ambiguity", "pre_io_authority_recheck_unknown")
+
+
 def test_effect_coordinator_records_ambiguity_and_never_redispatches_after_possible_acceptance() -> None:
     authority = Authority((
         AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),

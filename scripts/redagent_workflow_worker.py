@@ -21,6 +21,10 @@ from redagent_platform.campaign_service.composition import (  # noqa: E402
     build_stock_campaign_coordinator_factory,
     build_stock_campaign_relay_factory,
 )
+from redagent_platform.campaign_service.dag_composition import (  # noqa: E402
+    build_stock_campaign_dag_factory,
+    build_stock_campaign_dag_relay_factory,
+)
 from redagent_platform.orchestration.gateway import OrchestrationUnavailable  # noqa: E402
 from redagent_platform.orchestration.worker import run_workflow_worker  # noqa: E402
 from redagent_platform.persistence.database import DatabaseConfigError  # noqa: E402
@@ -37,6 +41,19 @@ def build_runtime_r123_factory(
 def build_runtime_r123_relay_factory(env: Mapping[str, str]):
     """Select the mandatory compat_123 outbox relay from the same startup environment."""
     return build_stock_campaign_relay_factory(env)
+
+
+def build_runtime_dag_factory(
+    workspace: Path,
+    env: Mapping[str, str],
+):
+    """Select the stock Phase 25 DAG graph from the immutable startup environment."""
+    return build_stock_campaign_dag_factory(workspace, env)
+
+
+def build_runtime_dag_relay_factory(env: Mapping[str, str]):
+    """Select the mandatory Phase 25 DAG relay from the startup environment."""
+    return build_stock_campaign_dag_relay_factory(env)
 
 
 def worker_health_response(path: str, *, ready: bool) -> tuple[int, bytes]:
@@ -89,12 +106,20 @@ async def _run(*, health_host: str, health_port: int, graceful_shutdown_seconds:
             values,
         )
         r123_relay_factory = build_runtime_r123_relay_factory(values)
+        dag_factory = await asyncio.to_thread(
+            build_runtime_dag_factory,
+            REPO_ROOT,
+            values,
+        )
+        dag_relay_factory = build_runtime_dag_relay_factory(values)
         await run_workflow_worker(
             REPO_ROOT,
             env=values,
             graceful_shutdown_seconds=graceful_shutdown_seconds,
             r123_coordinator_factory=r123_factory,
             r123_relay_factory=r123_relay_factory,
+            dag_activities_factory=dag_factory,
+            dag_relay_factory=dag_relay_factory,
             readiness_event=ready,
         )
 

@@ -71,6 +71,20 @@ _ALLOWED_ATTRIBUTES = frozenset(
         "campaign_lifecycle_state",
         "campaign_residual_budget_sha256",
         "campaign_target_id",
+        "campaign_admission_receipt_sha256",
+        "campaign_reservation_id",
+        "campaign_reserved_budget_sha256",
+        "campaign_node_id",
+        "campaign_node_sha256",
+        "campaign_effect_intent_sha256",
+        "campaign_rate_claimed_requests",
+        "campaign_active_concurrency",
+        "campaign_reservation_state",
+        "campaign_reservation_lease_expires_at",
+        "campaign_runner_binding_sha256",
+        "campaign_rate_limit",
+        "campaign_concurrency_limit",
+        "campaign_execution_run_id",
     }
 )
 

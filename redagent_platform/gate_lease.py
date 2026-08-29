@@ -406,7 +406,10 @@ class ValidationLease:
             return
         import fcntl
 
-        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # IMPORTANT: this branch is POSIX-only; win32 type stubs intentionally omit fcntl APIs.
+        fcntl.flock(  # type: ignore[attr-defined]
+            descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB
+        )
 
     @staticmethod
     def _release(descriptor: int) -> None:
@@ -418,4 +421,5 @@ class ValidationLease:
             return
         import fcntl
 
-        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        # IMPORTANT: this branch is POSIX-only; win32 type stubs intentionally omit fcntl APIs.
+        fcntl.flock(descriptor, fcntl.LOCK_UN)  # type: ignore[attr-defined]

@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import insert, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
 from redagent_platform.agent_kernel.contracts import ProjectedTool
@@ -81,6 +82,10 @@ class AuthorityRecheck:
     reason: str
     runner_id: str
     workload_identity: str
+    policy_decision_id: str | None = None
+    policy_bundle_revision: str | None = None
+    policy_input_sha256: str | None = None
+    policy_valid_until: datetime | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.allowed, bool):
@@ -91,6 +96,23 @@ class AuthorityRecheck:
             ("effect_workload_identity", self.workload_identity),
         ):
             _required(name, value, 300)
+        optional = (
+            self.policy_decision_id,
+            self.policy_bundle_revision,
+            self.policy_input_sha256,
+            self.policy_valid_until,
+        )
+        if any(value is not None for value in optional):
+            if any(value is None for value in optional):
+                raise ValueError("effect_authority_policy_binding_incomplete")
+            assert self.policy_decision_id is not None
+            assert self.policy_bundle_revision is not None
+            assert self.policy_input_sha256 is not None
+            assert self.policy_valid_until is not None
+            _required("effect_authority_policy_decision", self.policy_decision_id, 100)
+            _required("effect_authority_policy_revision", self.policy_bundle_revision, 100)
+            _sha256("effect_authority_policy_input", self.policy_input_sha256)
+            _aware(self.policy_valid_until)
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,6 +287,27 @@ class ManifestV2Issuer(Protocol):
         authority: AuthorityRecheck,
         now: datetime,
     ) -> SignedJobManifestV2: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestLineageContext:
+    campaign_id: str
+    engagement_id: str
+    roe_id: str
+    job_id: str
+    manifest_namespace: str
+
+
+class ManifestLineageOwner(Protocol):
+    async def prepare(
+        self,
+        session: AsyncSession,
+        command: EffectDispatchCommand,
+        *,
+        actor_user_id: str,
+        stable: str,
+        now: datetime,
+    ) -> ManifestLineageContext: ...
 
 
 class EffectDispatcher(Protocol):
@@ -552,6 +595,57 @@ class PostgresEffectResultOwner:
         return receipt
 
 
+class StrategyManifestLineageOwner:
+    """Default lineage adapter preserving the accepted strategy-revision path."""
+
+    async def prepare(
+        self,
+        session: AsyncSession,
+        command: EffectDispatchCommand,
+        *,
+        actor_user_id: str,
+        stable: str,
+        now: datetime,
+    ) -> ManifestLineageContext:
+        campaign_repo = CampaignRepository(
+            session,
+            tenant_id=command.tenant_id,
+            actor_user_id=actor_user_id,
+            correlation_id=f"r123-manifest-context-{stable[:12]}",
+        )
+        context = await campaign_repo.read_effect_manifest_context(
+            effect_id=command.effect_id,
+            claim_owner=command.claim_owner,
+            now=now,
+        )
+        if (
+            context.engagement_id != command.engagement_id
+            or context.envelope_sha256 != command.envelope_sha256
+        ):
+            raise ValueError("r123_manifest_effect_context_mismatch")
+        job = await ControlPlaneRepository(
+            session,
+            tenant_id=command.tenant_id,
+            actor_user_id=actor_user_id,
+            correlation_id=f"r123-manifest-job-{stable[:12]}",
+        ).create_runner_job(
+            campaign_id=context.campaign_id,
+            strategy_revision_id=context.strategy_revision_id,
+            effect_id=command.effect_id,
+            claim_owner=command.claim_owner,
+            capability_id=command.binding.capability_id,
+            envelope_sha256=command.envelope_sha256,
+            occurred_at=now,
+        )
+        return ManifestLineageContext(
+            campaign_id=context.campaign_id,
+            engagement_id=context.engagement_id,
+            roe_id=context.roe_id,
+            job_id=str(job.resource["job_id"]),
+            manifest_namespace="r123",
+        )
+
+
 class PostgresManifestV2Issuer:
     """Compose, sign, and persist one exact v2 manifest from canonical owners."""
 
@@ -564,6 +658,7 @@ class PostgresManifestV2Issuer:
         actor_user_id: str,
         signing_key: Ed25519PrivateKey,
         signing_key_id: str,
+        lineage_owner: ManifestLineageOwner | None = None,
     ) -> None:
         if not isinstance(signing_key, Ed25519PrivateKey):
             raise ValueError("r123_manifest_signing_key_invalid")
@@ -581,6 +676,7 @@ class PostgresManifestV2Issuer:
         self._signing_key_id = _required_value(
             "r123_manifest_signing_key_id", signing_key_id, 100
         )
+        self._lineage_owner = lineage_owner or StrategyManifestLineageOwner()
 
     async def issue(
         self,
@@ -614,39 +710,23 @@ class PostgresManifestV2Issuer:
         stable = hashlib.sha256(
             f"{tenant_id}\0{command.effect_id}".encode("utf-8")
         ).hexdigest()[:32]
-        idempotency_key = f"r123-manifest-{stable}"
         async with self._sessions() as session, session.begin():
-            campaign_repo = CampaignRepository(
+            context = await self._lineage_owner.prepare(
                 session,
-                tenant_id=tenant_id,
+                command,
                 actor_user_id=self._actor_user_id,
-                correlation_id=f"r123-manifest-context-{stable[:12]}",
-            )
-            context = await campaign_repo.read_effect_manifest_context(
-                effect_id=command.effect_id,
-                claim_owner=command.claim_owner,
+                stable=stable,
                 now=now,
             )
             if (
                 context.engagement_id != command.engagement_id
-                or context.envelope_sha256 != command.envelope_sha256
             ):
                 raise ValueError("r123_manifest_effect_context_mismatch")
-            job = await ControlPlaneRepository(
-                session,
-                tenant_id=tenant_id,
-                actor_user_id=self._actor_user_id,
-                correlation_id=f"r123-manifest-job-{stable[:12]}",
-            ).create_runner_job(
-                campaign_id=context.campaign_id,
-                strategy_revision_id=context.strategy_revision_id,
-                effect_id=command.effect_id,
-                claim_owner=command.claim_owner,
-                capability_id=command.binding.capability_id,
-                envelope_sha256=command.envelope_sha256,
-                occurred_at=now,
+            namespace = _required_value(
+                "manifest_lineage_namespace", context.manifest_namespace, 32
             )
-            job_id = str(job.resource["job_id"])
+            idempotency_key = f"{namespace}-manifest-{stable}"
+            job_id = context.job_id
             manifests = metadata.tables["runner_job_manifests"]
             existing = await session.scalar(
                 select(manifests.c.manifest_document).where(
@@ -708,14 +788,17 @@ class PostgresManifestV2Issuer:
             ):
                 raise RuntimeError("r123_manifest_capability_not_current")
             limits = ResourceLimits(**dict(capability["resource_limits"]))
-            expires_at = min(
+            expiry_candidates = [
                 snapshot.expires_at,
                 snapshot.lease_expires_at,
                 now + timedelta(minutes=5),
-            )
+            ]
+            if authority.policy_valid_until is not None:
+                expiry_candidates.append(authority.policy_valid_until)
+            expires_at = min(expiry_candidates)
             v1 = JobManifestDraft(
                 schema_version=CONTRACT_SCHEMA_VERSION,
-                manifest_id=f"manifest-r123-{stable}",
+                manifest_id=f"manifest-{namespace}-{stable}",
                 job_id=job_id,
                 tenant_id=tenant_id,
                 engagement_id=context.engagement_id,
@@ -728,8 +811,12 @@ class PostgresManifestV2Issuer:
                 capability_digest=command.binding.execution_manifest_sha256,
                 image_digest=str(capability["image_digest"]),
                 artifact_receipt_id=str(capability["artifact_receipt_id"]),
-                policy_revision=snapshot.policy_revision,
-                policy_decision_id=snapshot.policy_decision_id,
+                policy_revision=(
+                    authority.policy_bundle_revision or snapshot.policy_revision
+                ),
+                policy_decision_id=(
+                    authority.policy_decision_id or snapshot.policy_decision_id
+                ),
                 target_ids=(command.target_id,),
                 target_hashes=(snapshot.target_sha256,),
                 limits=limits,
@@ -738,7 +825,7 @@ class PostgresManifestV2Issuer:
                 secret_reference_ids=(),
                 issued_at=now,
                 expires_at=expires_at,
-                nonce=f"nonce-r123-{stable}",
+                nonce=f"nonce-{namespace}-{stable}",
             )
             draft = JobManifestDraftV2(
                 v1=v1,
@@ -1016,7 +1103,21 @@ class CampaignEffectCoordinator:
             if isinstance(exc, asyncio.CancelledError):
                 raise
             raise RuntimeError("effect_dispatch_reconciliation_required") from exc
-        current = await self._authority.recheck(command, now=pre_io_at)
+        try:
+            current = await self._authority.recheck(command, now=pre_io_at)
+        except BaseException as exc:
+            # CRITICAL: dispatching means later code may have observed the request; an aborted
+            # current-authority check must leave durable ambiguity, never a retryable claim.
+            await self._record_ambiguity(
+                command,
+                expected_claim_version=dispatching_version,
+                failure_code="pre_io_authority_recheck_unknown",
+                now=pre_io_at,
+                preserve=exc,
+            )
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+            raise RuntimeError("effect_dispatch_reconciliation_required") from exc
         if (
             not current.allowed
             or current.runner_id != first.runner_id

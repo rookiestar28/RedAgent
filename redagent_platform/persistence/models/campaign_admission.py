@@ -81,6 +81,9 @@ Table(
         name="fk_campaign_budget_reservation_tenant_ledger",
     ),
     UniqueConstraint("tenant_id", "id", name="uq_campaign_budget_reservation_tenant_identity"),
+    UniqueConstraint(
+        "tenant_id", "id", "campaign_id", name="uq_campaign_budget_reservation_tenant_campaign_identity"
+    ),
     UniqueConstraint("tenant_id", "campaign_id", "plan_sha256", name="uq_campaign_budget_reservation_plan"),
     UniqueConstraint("tenant_id", "campaign_id", "idempotency_key", name="uq_campaign_budget_reservation_idempotency"),
     CheckConstraint(
@@ -150,6 +153,9 @@ Table(
         name="fk_plan_admission_receipt_tenant_reservation",
     ),
     UniqueConstraint("tenant_id", "campaign_id", "idempotency_key", name="uq_plan_admission_receipt_idempotency"),
+    UniqueConstraint(
+        "tenant_id", "id", "campaign_id", name="uq_plan_admission_receipt_tenant_campaign_identity"
+    ),
     UniqueConstraint("tenant_id", "request_sha256", name="uq_plan_admission_receipt_request"),
     CheckConstraint("outcome IN ('admitted','denied')", name="plan_admission_outcome_closed"),
 )

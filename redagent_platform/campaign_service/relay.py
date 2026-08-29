@@ -56,7 +56,7 @@ class WorkflowQueryReceipt:
     workflow_run_id: str
 
     def __post_init__(self) -> None:
-        _required("workflow_id", self.workflow_id, 64)
+        _required("workflow_id", self.workflow_id, 100)
         _sha256("request_sha256", self.request_sha256)
         _required("workflow_run_id", self.workflow_run_id, 100)
 
