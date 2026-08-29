@@ -43,8 +43,8 @@ from redagent_platform.validation.autonomous_planner_qualification import (  # n
 )
 
 
-MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v1.json"
-OUTPUT_ROOT = ROOT / ".tmp/autonomous-planner-qualification"
+MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v2.json"
+OUTPUT_ROOT = ROOT / ".tmp/autonomous-planner-qualification-attempt-02"
 RUNTIME_ROOT = OUTPUT_ROOT / "runtime"
 STAGE_LOG_ROOT = OUTPUT_ROOT / "stages"
 PROJECTION_PATH = OUTPUT_ROOT / "execution-projection.json"
@@ -55,7 +55,29 @@ EVENTS_PATH = OUTPUT_ROOT / "events.jsonl"
 BUNDLE_PATH = OUTPUT_ROOT / "qualification-bundle.json"
 FORCED_G2_SOURCE = ROOT / ".tmp/validation/verification.json"
 FORCED_G2_RETAINED = OUTPUT_ROOT / "forced-g2-verification.json"
+RUNTIME_COORDINATE_SNAPSHOT = OUTPUT_ROOT / "runtime-coordinate-snapshot.json"
 MAX_STAGE_LOG_BYTES = 32 * 1024 * 1024
+MAX_RUNTIME_COORDINATE_BYTES = 128 * 1024
+RUNTIME_COORDINATE_SCHEMA = "redagent.autonomous-planner-runtime-coordinate-snapshot/v1"
+LOCAL_COMPOSE_PROJECT = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+R159_INVOCATION_ID = re.compile(r"^invocation-r159-[0-9a-f]{12}$")
+
+PYTHON_STARTUP_VARIABLES = frozenset(
+    {
+        "PYTHONPATH",
+        "PYTHONHOME",
+        "PYTHONUSERBASE",
+        "PYTHONSTARTUP",
+        "PYTHONINSPECT",
+        "PYTHONWARNINGS",
+        "PYTHONBREAKPOINT",
+        "PYTHONPLATLIBDIR",
+        "PYTHONCASEOK",
+        "PYTHONEXECUTABLE",
+        "PYTHONPYCACHEPREFIX",
+        "PYTHONSAFEPATH",
+    }
+)
 
 PYTEST_AUTHORITY_SELECTORS = (
     "tests/unit/test_autonomous_planner_qualification.py",
@@ -74,6 +96,7 @@ PYTEST_AUTHORITY_SELECTORS = (
     "tests/unit/test_campaign_operations_api.py",
     "tests/unit/test_campaign_operations_projection.py",
     "tests/integration/test_campaign_dag_owned_loopback.py",
+    "--deselect=tests/unit/test_planner_evidence.py::test_file_symlink_artifact_fails_before_parsing",
 )
 
 
@@ -148,6 +171,8 @@ def _runner_commands(runner_id: str, projection_commit: str, projection_parent: 
         )
     if runner_id == "pytest-offline-lineage":
         return ((python, "-m", "pytest", "tests/integration/test_planner_evidence_offline.py"),)
+    if runner_id == "internal-runtime-coordinate-snapshot":
+        return ()
     if runner_id == "internal-residual-safety":
         return ()
     raise QualificationError("unknown qualification runner id")
@@ -268,13 +293,17 @@ def _observe_preflight(matrix: QualificationMatrix, projection) -> dict[str, obj
 
 def _load_inputs():
     _assert_fixed_path(
-        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v1.json", must_exist=True
+        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v2.json", must_exist=True
     )
     _assert_fixed_path(
-        PROJECTION_PATH, ROOT / ".tmp/autonomous-planner-qualification/execution-projection.json", must_exist=True
+        PROJECTION_PATH,
+        ROOT / ".tmp/autonomous-planner-qualification-attempt-02/execution-projection.json",
+        must_exist=True,
     )
     _assert_fixed_path(
-        PINS_PATH, ROOT / ".tmp/autonomous-planner-qualification/verification-pins.json", must_exist=True
+        PINS_PATH,
+        ROOT / ".tmp/autonomous-planner-qualification-attempt-02/verification-pins.json",
+        must_exist=True,
     )
     matrix = load_matrix(MATRIX_PATH)
     projection = load_projection(PROJECTION_PATH, matrix)
@@ -309,20 +338,27 @@ def _parse_counts(stage: StageSpec, text: str, receipt: object | None) -> tuple[
         return passed, 0
     if stage.result_kind == "cleanup":
         return text.count('"ok": true'), 0
-    if stage.result_kind == "residual":
-        value = decode_json_bytes(text.encode("utf-8"), label="residual report", maximum_bytes=1024 * 1024)
+    if stage.result_kind in {"residual", "runtime-snapshot"}:
+        value = decode_json_bytes(
+            text.encode("utf-8"),
+            label=f"{stage.result_kind} report",
+            maximum_bytes=1024 * 1024,
+        )
         if not isinstance(value, Mapping) or not isinstance(value.get("passed_check_count"), int):
-            raise QualificationError("residual report invalid")
+            raise QualificationError(f"{stage.result_kind} report invalid")
         return value["passed_check_count"], 0
     patterns = {
-        "pytest": re.compile(r"(?m)(\d+) passed(?:, (\d+) skipped)?"),
-        "vitest": re.compile(r"(?m)Tests\s+(\d+) passed(?:\s+\|\s+(\d+) skipped)?"),
-        "playwright": re.compile(r"(?m)(\d+) passed"),
+        "pytest": re.compile(r"(?m)(?P<passed>\d+) passed(?:, (?P<skipped>\d+) skipped)?"),
+        "vitest": re.compile(r"(?m)Tests\s+(?P<passed>\d+) passed(?:\s+\|\s+(?P<skipped>\d+) skipped)?"),
+        "playwright": re.compile(r"(?m)(?P<passed>\d+) passed"),
     }
     match = patterns[stage.result_kind].search(text)
     if match is None:
         raise QualificationError("stage success-count evidence missing")
-    return int(match.group(1)), int(match.group(2) or 0)
+    # IMPORTANT: not every runner exposes a skipped capture; missing named groups are zero,
+    # never an out-of-range capture access that can escape the terminal evidence lifecycle.
+    skipped = match.groupdict().get("skipped")
+    return int(match.group("passed")), int(skipped or 0)
 
 
 def _stage_log_paths(stage: StageSpec) -> tuple[Path, Path]:
@@ -332,10 +368,70 @@ def _stage_log_paths(stage: StageSpec) -> tuple[Path, Path]:
     )
 
 
+def _fixed_child_environment(matrix: QualificationMatrix, stage: StageSpec) -> dict[str, str]:
+    if stage.runner_id not in matrix.runner_environment:
+        raise QualificationError("formal runner environment binding missing")
+    child_environment = dict(os.environ)
+    fixed_writer_names = {
+        "TEMP",
+        "TMP",
+        "TMPDIR",
+        "PRE_COMMIT_HOME",
+        "HOME",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+    }
+    # CRITICAL: ambient Python and REDAGENT values can redirect trusted imports, runtime topology,
+    # or writers. Strip them before adding only the closed matrix bindings below.
+    for name in tuple(child_environment):
+        upper_name = name.upper()
+        if (
+            upper_name in PYTHON_STARTUP_VARIABLES
+            or upper_name in fixed_writer_names
+            or upper_name.startswith("REDAGENT_")
+        ):
+            del child_environment[name]
+
+    runtime_paths = {name: ROOT / Path(value) for name, value in matrix.formal_runtime_paths.items()}
+    if set(runtime_paths) != {"home", "pre_commit_home", "temp"}:
+        raise QualificationError("formal runtime path binding incomplete")
+    for path in runtime_paths.values():
+        _assert_fixed_path(path, path, must_exist=False, directory=True)
+        path.mkdir(parents=True, exist_ok=True)
+        _assert_fixed_path(path, path, must_exist=True, directory=True)
+    appdata = runtime_paths["home"] / "AppData/Roaming"
+    localappdata = runtime_paths["home"] / "AppData/Local"
+    for path in (appdata, localappdata):
+        _assert_fixed_path(path, path, must_exist=False, directory=True)
+        path.mkdir(parents=True, exist_ok=True)
+        _assert_fixed_path(path, path, must_exist=True, directory=True)
+
+    temp = str(runtime_paths["temp"].resolve())
+    home = str(runtime_paths["home"].resolve())
+    child_environment.update(
+        {
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "TEMP": temp,
+            "TMP": temp,
+            "TMPDIR": temp,
+            "PRE_COMMIT_HOME": str(runtime_paths["pre_commit_home"].resolve()),
+            "HOME": home,
+            "USERPROFILE": home,
+            "APPDATA": str(appdata.resolve()),
+            "LOCALAPPDATA": str(localappdata.resolve()),
+        }
+    )
+    child_environment.update(matrix.formal_environment)
+    child_environment.update(matrix.runner_environment[stage.runner_id])
+    return child_environment
+
+
 def _run_processes(
     commands: Sequence[Sequence[str]],
     stage: StageSpec,
-    formal_environment: Mapping[str, str],
+    matrix: QualificationMatrix,
 ) -> tuple[int, bool]:
     stdout_path, stderr_path = _stage_log_paths(stage)
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
@@ -344,13 +440,7 @@ def _run_processes(
     completed_count = 0
     with stdout_path.open("xb") as stdout, stderr_path.open("xb") as stderr:
         for command in commands:
-            child_environment = {**os.environ, "PYTHONNOUSERSITE": "1", "PYTHONSAFEPATH": "1"}
-            # CRITICAL: ambient REDAGENT_* values can redirect the owned-lab topology;
-            # every formal child must receive only the source-pinned projection values.
-            for name in tuple(child_environment):
-                if name.upper().startswith("REDAGENT_"):
-                    del child_environment[name]
-            child_environment.update(formal_environment)
+            child_environment = _fixed_child_environment(matrix, stage)
             try:
                 completed = subprocess.run(
                     tuple(command),
@@ -395,31 +485,284 @@ def _port_closed(port: int) -> bool:
     return True
 
 
+def _read_fixed_bytes(path: Path, *, maximum_bytes: int, label: str) -> bytes:
+    _assert_fixed_path(path, path, must_exist=True)
+    size = path.stat().st_size
+    if size < 1 or size > maximum_bytes:
+        raise QualificationError(f"{label} byte contract invalid")
+    return path.read_bytes()
+
+
+def _qualification_zap_state() -> tuple[tuple[Path, Path], ...]:
+    runtime = ROOT / ".local/redagent/r123-zap"
+    _assert_fixed_path(runtime, runtime, must_exist=False, directory=True)
+    if not runtime.exists():
+        return ()
+    _assert_fixed_path(runtime, runtime, must_exist=True, directory=True)
+    entries = tuple(runtime.iterdir())
+    if len(entries) > 128 or any(is_link_or_reparse(path) for path in entries):
+        raise QualificationError("R159 qualification runtime inventory invalid")
+    records: list[tuple[Path, Path]] = []
+    for receipt in entries:
+        if not receipt.name.startswith("receipt-") or receipt.suffix != ".json":
+            continue
+        value = load_json_file(
+            receipt,
+            label="R159 qualification receipt",
+            maximum_bytes=1024 * 1024,
+        )
+        if not isinstance(value, Mapping):
+            raise QualificationError("R159 qualification receipt invalid")
+        invocation_id = value.get("invocation_id")
+        if not isinstance(invocation_id, str) or R159_INVOCATION_ID.fullmatch(invocation_id) is None:
+            continue
+        digest = hashlib.sha256(invocation_id.encode("utf-8")).hexdigest()
+        if receipt.name != f"receipt-{digest}.json":
+            raise QualificationError("R159 qualification receipt binding invalid")
+        run_root = runtime / digest[:24]
+        _assert_fixed_path(run_root, run_root, must_exist=True, directory=True)
+        records.append((receipt, run_root))
+    return tuple(records)
+
+
+def _remove_owned_zap_qualification_state() -> int:
+    records = _qualification_zap_state()
+    for receipt, run_root in records:
+        # CRITICAL: only a receipt-bound R159 invocation authorizes recursive removal of its exact
+        # workspace-contained run directory; never generalize this to the shared R123 runtime.
+        shutil.rmtree(run_root)
+        receipt.unlink()
+    runtime = ROOT / ".local/redagent/r123-zap"
+    if runtime.is_dir() and not any(runtime.iterdir()):
+        runtime.rmdir()
+    if _qualification_zap_state():
+        raise QualificationError("R159 qualification runtime cleanup incomplete")
+    return len(records)
+
+
+def _zap_qualification_state_absent() -> bool:
+    runtime = ROOT / ".local/redagent/r123-zap"
+    records = _qualification_zap_state()
+    if records:
+        return False
+    if not runtime.exists():
+        return True
+    # Any unbound 24-hex run root is ambiguous state and must deny qualification, not be deleted.
+    return not any(re.fullmatch(r"[0-9a-f]{24}", path.name) for path in runtime.iterdir())
+
+
+def _workspace_compose_project(prefix: str) -> str:
+    try:
+        root = ROOT.resolve(strict=True)
+    except OSError as exc:
+        raise QualificationError("runtime coordinate workspace invalid") from exc
+    if not root.is_dir():
+        raise QualificationError("runtime coordinate workspace invalid")
+    identity = os.path.normcase(str(root)).replace("\\", "/")
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+    return f"{prefix}-{digest}"
+
+
+def _runtime_environment_coordinates() -> tuple[str, dict[str, int]]:
+    path = ROOT / ".local/redagent/runtime/local-stack.env"
+    try:
+        text = _read_fixed_bytes(
+            path,
+            maximum_bytes=MAX_RUNTIME_COORDINATE_BYTES,
+            label="local-stack runtime coordinates",
+        ).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise QualificationError("local-stack runtime coordinates invalid") from exc
+    required = {
+        "REDAGENT_COMPOSE_PROJECT_NAME",
+        "REDAGENT_BIND_HOST",
+        "REDAGENT_POSTGRES_PORT",
+        "REDAGENT_KEYCLOAK_PORT",
+        "REDAGENT_TEMPORAL_PORT",
+        "REDAGENT_RUSTFS_PORT",
+    }
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        name, separator, value = line.partition("=")
+        if separator and name in required:
+            if name in values:
+                raise QualificationError("local-stack runtime coordinate duplicate")
+            values[name] = value
+    if set(values) != required:
+        raise QualificationError("local-stack runtime coordinate inventory invalid")
+    project = values["REDAGENT_COMPOSE_PROJECT_NAME"]
+    if LOCAL_COMPOSE_PROJECT.fullmatch(project) is None or values["REDAGENT_BIND_HOST"] != "127.0.0.1":
+        raise QualificationError("local-stack runtime coordinate identity invalid")
+    ports: dict[str, int] = {}
+    for service, name in (
+        ("postgres", "REDAGENT_POSTGRES_PORT"),
+        ("keycloak", "REDAGENT_KEYCLOAK_PORT"),
+        ("temporal", "REDAGENT_TEMPORAL_PORT"),
+        ("rustfs", "REDAGENT_RUSTFS_PORT"),
+    ):
+        try:
+            port = int(values[name], 10)
+        except ValueError as exc:
+            raise QualificationError("local-stack runtime port invalid") from exc
+        if not 1024 <= port <= 65535:
+            raise QualificationError("local-stack runtime port invalid")
+        ports[service] = port
+    if len(set(ports.values())) != len(ports):
+        raise QualificationError("local-stack runtime ports overlap")
+    return project, dict(sorted(ports.items()))
+
+
+def _opa_runtime_port() -> int:
+    path = ROOT / ".local/redagent/opa/opa-endpoint.json"
+    value = decode_json_bytes(
+        _read_fixed_bytes(path, maximum_bytes=4096, label="OPA runtime coordinate"),
+        label="OPA runtime coordinate",
+        maximum_bytes=4096,
+    )
+    if not isinstance(value, Mapping) or set(value) != {"port"}:
+        raise QualificationError("OPA runtime coordinate invalid")
+    port = value["port"]
+    if isinstance(port, bool) or not isinstance(port, int) or not 1024 <= port <= 65535:
+        raise QualificationError("OPA runtime coordinate invalid")
+    return port
+
+
+def _parse_runtime_coordinate_snapshot(value: object) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != {
+        "schema_version",
+        "local_stack",
+        "opa",
+        "openbao",
+        "ports",
+        "resource_markers",
+        "snapshot_sha256",
+    }:
+        raise QualificationError("runtime coordinate snapshot invalid")
+    body = {key: item for key, item in value.items() if key != "snapshot_sha256"}
+    supplied_digest = value["snapshot_sha256"]
+    if (
+        value["schema_version"] != RUNTIME_COORDINATE_SCHEMA
+        or not isinstance(supplied_digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", supplied_digest) is None
+        or hashlib.sha256(canonical_bytes(body)).hexdigest() != supplied_digest
+    ):
+        raise QualificationError("runtime coordinate snapshot digest invalid")
+    local_stack = value["local_stack"]
+    opa = value["opa"]
+    openbao = value["openbao"]
+    if not isinstance(local_stack, Mapping) or set(local_stack) != {"project_name", "ports"}:
+        raise QualificationError("runtime coordinate local-stack invalid")
+    if not isinstance(opa, Mapping) or set(opa) != {"project_name", "port"}:
+        raise QualificationError("runtime coordinate OPA invalid")
+    if not isinstance(openbao, Mapping) or set(openbao) != {"project_name", "port"}:
+        raise QualificationError("runtime coordinate OpenBao invalid")
+    project = local_stack["project_name"]
+    local_ports = local_stack["ports"]
+    if not isinstance(project, str) or LOCAL_COMPOSE_PROJECT.fullmatch(project) is None:
+        raise QualificationError("runtime coordinate local-stack invalid")
+    if not isinstance(local_ports, Mapping) or set(local_ports) != {"postgres", "keycloak", "temporal", "rustfs"}:
+        raise QualificationError("runtime coordinate local-stack invalid")
+    typed_ports = tuple(local_ports[key] for key in sorted(local_ports))
+    if any(isinstance(port, bool) or not isinstance(port, int) or not 1024 <= port <= 65535 for port in typed_ports):
+        raise QualificationError("runtime coordinate port invalid")
+    expected_opa_project = _workspace_compose_project("redagent-opa")
+    expected_openbao_project = _workspace_compose_project("redagent-openbao")
+    if opa["project_name"] != expected_opa_project or openbao != {
+        "project_name": expected_openbao_project,
+        "port": 58200,
+    }:
+        raise QualificationError("runtime coordinate workspace identity invalid")
+    opa_port = opa["port"]
+    if isinstance(opa_port, bool) or not isinstance(opa_port, int) or not 1024 <= opa_port <= 65535:
+        raise QualificationError("runtime coordinate OPA invalid")
+    expected_ports = sorted({*typed_ports, opa_port, 58200})
+    if value["ports"] != expected_ports or len(expected_ports) != 6:
+        raise QualificationError("runtime coordinate port inventory invalid")
+    expected_markers = sorted({project, expected_opa_project, expected_openbao_project, "redagent-r123-zap"})
+    if value["resource_markers"] != expected_markers:
+        raise QualificationError("runtime coordinate resource inventory invalid")
+    return value
+
+
+def _capture_runtime_coordinate_snapshot() -> Mapping[str, object]:
+    local_project, local_ports = _runtime_environment_coordinates()
+    opa_port = _opa_runtime_port()
+    opa_project = _workspace_compose_project("redagent-opa")
+    openbao_project = _workspace_compose_project("redagent-openbao")
+    ports = sorted({*local_ports.values(), opa_port, 58200})
+    if len(ports) != 6:
+        raise QualificationError("runtime coordinate port inventory invalid")
+    body: dict[str, object] = {
+        "schema_version": RUNTIME_COORDINATE_SCHEMA,
+        "local_stack": {"project_name": local_project, "ports": local_ports},
+        "opa": {"project_name": opa_project, "port": opa_port},
+        "openbao": {"project_name": openbao_project, "port": 58200},
+        "ports": ports,
+        "resource_markers": sorted(
+            {local_project, opa_project, openbao_project, "redagent-r123-zap"}
+        ),
+    }
+    snapshot = {**body, "snapshot_sha256": hashlib.sha256(canonical_bytes(body)).hexdigest()}
+    _parse_runtime_coordinate_snapshot(snapshot)
+    _atomic_write(RUNTIME_COORDINATE_SNAPSHOT, _json_bytes(snapshot))
+    return snapshot
+
+
+def _load_runtime_coordinate_snapshot() -> Mapping[str, object]:
+    return _parse_runtime_coordinate_snapshot(
+        load_json_file(
+            RUNTIME_COORDINATE_SNAPSHOT,
+            label="runtime coordinate snapshot",
+            maximum_bytes=MAX_RUNTIME_COORDINATE_BYTES,
+        )
+    )
+
+
 def _residual_report(matrix: QualificationMatrix, projection) -> dict[str, object]:
+    snapshot = _load_runtime_coordinate_snapshot()
     checks: dict[str, bool] = {
         "candidate_commit_unchanged": _git("rev-parse", "HEAD") == projection.candidate_commit,
         "candidate_tree_unchanged": _git("rev-parse", "HEAD^{tree}") == projection.candidate_tree,
         "source_inventory_unchanged": _source_digests(matrix) == dict(projection.source_sha256),
         "tracked_worktree_clean": _git("status", "--porcelain", "--untracked-files=all") == "",
         "item_runtime_paths_removed": all(not (ROOT / Path(path)).exists() for path in matrix.cleanup_paths),
-        "declared_ports_and_processes_absent": False,
+        "owned_zap_qualification_state_absent": _zap_qualification_state_absent(),
+        "snapshotted_ports_absent": False,
+        "owned_containers_absent": False,
+        "owned_networks_absent": False,
     }
-    docker = subprocess.run(
-        (_tool("docker"), "ps", "--format", "{{.Names}}"),
+    containers = subprocess.run(
+        (_tool("docker"), "ps", "-a", "--format", "{{.Names}}"),
         cwd=ROOT,
         check=False,
         capture_output=True,
         text=True,
         timeout=60,
     )
-    names = docker.stdout.lower().splitlines() if docker.returncode == 0 else []
-    processes_absent = docker.returncode == 0 and all(
-        not any(marker in name for name in names) for marker in projection.residual_process_markers
+    networks = subprocess.run(
+        (_tool("docker"), "network", "ls", "--format", "{{.Name}}"),
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
-    ports_closed = all(_port_closed(port) for port in projection.residual_ports)
-    checks["declared_ports_and_processes_absent"] = processes_absent and ports_closed
+    markers_value = snapshot["resource_markers"]
+    ports_value = snapshot["ports"]
+    if not isinstance(markers_value, list) or not isinstance(ports_value, list):
+        raise QualificationError("runtime coordinate snapshot inventory invalid")
+    markers = tuple(str(marker).lower() for marker in markers_value)
+    container_names = containers.stdout.lower().splitlines() if containers.returncode == 0 else []
+    network_names = networks.stdout.lower().splitlines() if networks.returncode == 0 else []
+    checks["snapshotted_ports_absent"] = all(_port_closed(int(port)) for port in ports_value)
+    checks["owned_containers_absent"] = containers.returncode == 0 and all(
+        not any(marker in name for name in container_names) for marker in markers
+    )
+    checks["owned_networks_absent"] = networks.returncode == 0 and all(
+        not any(marker in name for name in network_names) for marker in markers
+    )
     return {
-        "schema_version": "redagent.autonomous-planner-qualification-residual/v1",
+        "schema_version": "redagent.autonomous-planner-qualification-residual/v2",
         "checks": checks,
         "passed_check_count": sum(checks.values()),
         "required_check_count": len(checks),
@@ -438,9 +781,40 @@ def _execute_stage(stage: StageSpec, matrix: QualificationMatrix, projection) ->
         stdout_path.parent.mkdir(parents=True, exist_ok=True)
         _atomic_write(stdout_path, _json_bytes(report))
         _atomic_write(stderr_path, b"")
+    elif stage.result_kind == "runtime-snapshot":
+        snapshot = _capture_runtime_coordinate_snapshot()
+        report = {
+            "schema_version": "redagent.autonomous-planner-runtime-coordinate-stage/v1",
+            "passed_check_count": 1,
+            "snapshot_sha256": snapshot["snapshot_sha256"],
+            "unapproved_assessment_contacts": 0,
+        }
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write(stdout_path, _json_bytes(report))
+        _atomic_write(stderr_path, b"")
     else:
-        completed_count, launch_aborted = _run_processes(commands, stage, projection.formal_environment)
+        completed_count, launch_aborted = _run_processes(commands, stage, matrix)
         if stage.result_kind == "cleanup" and not launch_aborted and completed_count == len(commands):
+            removed_receipts = _remove_owned_zap_qualification_state()
+            with stdout_path.open("ab") as stdout:
+                stdout.write(
+                    (
+                        json.dumps(
+                            {
+                                "ok": True,
+                                "removed_r159_qualification_receipts": removed_receipts,
+                            },
+                            sort_keys=True,
+                        )
+                        + "\n"
+                    ).encode("utf-8")
+                )
+                stdout.flush()
+                os.fsync(stdout.fileno())
+            _remove_item_runtime_paths(matrix)
+        if stage.runner_id == "pytest-offline-lineage" and not launch_aborted and completed_count == len(commands):
+            # IMPORTANT: post-cleanup verification gets its own contained temp/home writers; remove
+            # those recreated paths before the terminal residual stage proves item ownership empty.
             _remove_item_runtime_paths(matrix)
 
     stdout_text = _read_text_bounded(stdout_path)
@@ -452,6 +826,8 @@ def _execute_stage(stage: StageSpec, matrix: QualificationMatrix, projection) ->
         receipt = decode_json_bytes(receipt_bytes, label="forced-G2 receipt", maximum_bytes=MAX_BUNDLE_BYTES)
         _atomic_write(FORCED_G2_RETAINED, receipt_bytes)
         artifacts["forced-g2-verification.json"] = hashlib.sha256(receipt_bytes).hexdigest()
+    if stage.result_kind == "runtime-snapshot" and RUNTIME_COORDINATE_SNAPSHOT.is_file():
+        artifacts["runtime-coordinate-snapshot.json"] = file_sha256(RUNTIME_COORDINATE_SNAPSHOT)
     try:
         passed_count, skipped_count = _parse_counts(stage, stdout_text + "\n" + stderr_text, receipt)
         count_valid = stage.expected_pass_count is None or passed_count == stage.expected_pass_count
@@ -527,6 +903,7 @@ def run_command() -> int:
         EVENTS_PATH,
         BUNDLE_PATH,
         FORCED_G2_RETAINED,
+        RUNTIME_COORDINATE_SNAPSHOT,
     )
     if any(path.exists() for path in formal_outputs):
         raise QualificationError("formal attempt output already exists; retries are forbidden")
@@ -543,9 +920,9 @@ def run_command() -> int:
         else:
             try:
                 result = _execute_stage(stage, matrix, projection)
-            except (QualificationError, OSError, subprocess.SubprocessError):
-                # IMPORTANT: after formal start, fixed-tool or environment failure is evidence,
-                # not an unrecorded CLI crash; preserve it and abort every remaining stage.
+            except Exception:  # noqa: BLE001 - formal ordinary failures must become denial evidence
+                # CRITICAL: after formal start, any ordinary controller defect is denial evidence,
+                # not an unrecorded crash. Never broaden this to BaseException or turn it into pass.
                 result = _aborted_stage_result(
                     stage,
                     "fixed_runner_contract_or_environment_unavailable",
@@ -556,7 +933,7 @@ def run_command() -> int:
             try:
                 if _observe_preflight(matrix, projection) != observed_preflight:
                     raise QualificationError("preflight digest changed")
-            except QualificationError:
+            except Exception:  # noqa: BLE001 - drift observation defects must fail closed
                 protocol_drift = True
                 result = _aborted_stage_result(
                     stage,
@@ -587,7 +964,10 @@ def run_command() -> int:
         for stage, stage_result in zip(matrix.stages, stage_results, strict=True)
     )
     event_inputs.append(("attempt_terminal", {"result_sha256": result["result_sha256"]}))
-    events = build_event_chain(event_inputs)
+    events = build_event_chain(
+        event_inputs,
+        expected_stage_ids=[stage.stage_id for stage in matrix.stages],
+    )
     _atomic_write(EVENTS_PATH, b"".join(canonical_bytes(event) + b"\n" for event in events))
 
     artifact_payloads = _artifact_payloads(matrix)

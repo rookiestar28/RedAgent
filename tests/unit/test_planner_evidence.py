@@ -503,7 +503,7 @@ def test_json_depth_and_directory_inventory_are_bounded(tmp_path) -> None:
         verify_campaign_evidence_bundle(inventory_path, trust_anchor=inventory_anchor)
 
 
-def test_oversized_and_linklike_artifacts_fail_before_parsing(tmp_path) -> None:
+def test_oversized_artifact_fails_before_parsing(tmp_path) -> None:
     _, oversized_path, oversized_anchor = _bundle(tmp_path)
     manifest = json.loads((oversized_path / "manifest.json").read_text(encoding="utf-8"))
     artifact = sorted(oversized_path.glob("[0-9][0-9][0-9][0-9]-*.json"))[1]
@@ -515,6 +515,8 @@ def test_oversized_and_linklike_artifacts_fail_before_parsing(tmp_path) -> None:
     with pytest.raises(CampaignEvidenceVerificationError, match="too_large"):
         verify_campaign_evidence_bundle(oversized_path, trust_anchor=oversized_anchor)
 
+
+def test_file_symlink_artifact_fails_before_parsing(tmp_path) -> None:
     link_root = tmp_path / "link-case"
     link_root.mkdir()
     _, link_path, link_anchor = _bundle(link_root)

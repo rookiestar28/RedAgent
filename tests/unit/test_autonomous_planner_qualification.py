@@ -11,9 +11,11 @@ from redagent_platform.validation.autonomous_planner_qualification import (
     ABORTED,
     AUTONOMOUS_PLANNER_QUALIFIED,
     EXPECTED_FORMAL_ENVIRONMENT,
+    MATRIX_SCHEMA_V2,
     NOT_QUALIFIED,
     PINS_SCHEMA,
     PROJECTION_SCHEMA,
+    PROJECTION_SCHEMA_V2,
     QualificationError,
     build_bundle,
     build_event_chain,
@@ -32,13 +34,15 @@ from redagent_platform.validation.autonomous_planner_qualification import (
 
 ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v1.json"
+MATRIX_V2_PATH = ROOT / "config/validation/autonomous-planner-qualification-v2.json"
 ZERO_SHA = "0" * 64
 
 
 def _projection_payload(matrix) -> dict[str, object]:
+    is_v2 = matrix.schema_version == MATRIX_SCHEMA_V2
     body: dict[str, object] = {
-        "schema_version": PROJECTION_SCHEMA,
-        "attempt_id": "r163-formal-attempt-1",
+        "schema_version": PROJECTION_SCHEMA_V2 if is_v2 else PROJECTION_SCHEMA,
+        "attempt_id": "r164-formal-attempt-2" if is_v2 else "r163-formal-attempt-1",
         "candidate_commit": "1" * 40,
         "candidate_tree": "2" * 40,
         "candidate_parent_commit": matrix.candidate_parent_commit,
@@ -60,9 +64,14 @@ def _projection_payload(matrix) -> dict[str, object]:
         "max_concurrency": 1,
         "scorer_sha256": matrix.scorer_sha256,
         "retained_artifacts": list(matrix.retained_artifacts),
-        "residual_ports": [43161, 43162, 43163, 43164],
+        "residual_ports": [] if is_v2 else [43161, 43162, 43163, 43164],
         "residual_process_markers": ["redagent-opa", "redagent-openbao", "redagent-stack"],
     }
+    if is_v2:
+        body["runner_environment"] = {
+            runner_id: dict(environment) for runner_id, environment in matrix.runner_environment.items()
+        }
+        body["formal_runtime_paths"] = dict(matrix.formal_runtime_paths)
     return {**body, "projection_sha256": canonical_sha256(body)}
 
 
@@ -94,6 +103,8 @@ def _stage_log_payloads(matrix) -> dict[str, bytes]:
     for stage in matrix.stages:
         payloads[f"stages/{stage.stage_id}.stdout.log"] = f"{stage.stage_id}: passed\n".encode()
         payloads[f"stages/{stage.stage_id}.stderr.log"] = b""
+        for artifact in stage.expected_artifacts:
+            payloads[artifact] = b'{"fixture":"retained"}\n'
     payloads["forced-g2-verification.json"] = b'{"aggregate_result":"passed"}\n'
     return payloads
 
@@ -137,7 +148,7 @@ def _events(matrix, projection, preflight, stage_results, result):
         for stage, stage_result in zip(matrix.stages, stage_results, strict=True)
     )
     inputs.append(("attempt_terminal", {"result_sha256": result["result_sha256"]}))
-    return build_event_chain(inputs)
+    return build_event_chain(inputs, expected_stage_ids=[stage.stage_id for stage in matrix.stages])
 
 
 def _accepted_ceremony():
@@ -178,6 +189,34 @@ def _accepted_ceremony():
     return matrix, projection, preflight, payloads, stage_results, events, bundle, pins
 
 
+def _accepted_ceremony_for(matrix_path: Path):
+    matrix = load_matrix(matrix_path)
+    projection = _projection(matrix)
+    preflight = _preflight(matrix, projection)
+    payloads = _stage_log_payloads(matrix)
+    stage_results = _passed_stage_results(matrix, payloads)
+    result = compute_disposition(matrix, stage_results, protocol_drift=False, artifacts_complete=True)
+    events = _events(matrix, projection, preflight, stage_results, result)
+    payloads.update(
+        {
+            "preflight.json": canonical_bytes(preflight) + b"\n",
+            "stage-results.json": canonical_bytes(stage_results) + b"\n",
+            "events.jsonl": b"".join(canonical_bytes(event) + b"\n" for event in events),
+        }
+    )
+    artifact_sha256 = {path: hashlib.sha256(payload).hexdigest() for path, payload in sorted(payloads.items())}
+    bundle = build_bundle(
+        matrix,
+        projection,
+        preflight,
+        stage_results,
+        artifact_sha256,
+        events,
+        protocol_drift=False,
+    )
+    return matrix, projection, events, bundle
+
+
 def _rehash_projection(payload: dict[str, object]) -> None:
     body = {key: value for key, value in payload.items() if key != "projection_sha256"}
     payload["projection_sha256"] = canonical_sha256(body)
@@ -197,14 +236,49 @@ def test_matrix_is_source_pinned_closed_and_complete() -> None:
     assert matrix.retained_artifacts == tuple(sorted(matrix.retained_artifacts))
 
 
-def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> None:
-    payload = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
-    payload["max_concurrency"] = 2
-    body = {key: value for key, value in payload.items() if key != "matrix_sha256"}
-    payload["matrix_sha256"] = canonical_sha256(body)
+def test_v2_matrix_is_fresh_closed_and_binds_runner_and_runtime_environments() -> None:
+    matrix = load_matrix(MATRIX_V2_PATH)
 
-    with pytest.raises(QualificationError, match="trusted matrix digest mismatch"):
-        parse_matrix(payload)
+    assert matrix.schema_version == MATRIX_SCHEMA_V2
+    expected_parent = "07255fae5ae9f899a79e0c5b9cbe33c863c056e8"  # pragma: allowlist secret
+    assert matrix.candidate_parent_commit == expected_parent
+    assert len(matrix.stages) == 8
+    assert [stage.stage_id for stage in matrix.stages][3:6] == [
+        "windows-full-gate",
+        "runtime-coordinate-snapshot",
+        "owned-runtime-cleanup",
+    ]
+    assert dict(matrix.runner_environment["pytest-authority-to-terminal"]) == {
+        "REDAGENT_R159_LIVE_QUALIFICATION": "owned-loopback-zap-v1"
+    }
+    assert all(
+        not environment
+        for runner_id, environment in matrix.runner_environment.items()
+        if runner_id != "pytest-authority-to-terminal"
+    )
+    assert set(matrix.formal_runtime_paths) == {"home", "pre_commit_home", "temp"}
+    assert all(
+        path.startswith(".tmp/autonomous-planner-qualification-attempt-02/runtime/")
+        for path in (*matrix.formal_runtime_paths.values(), *matrix.cleanup_paths)
+    )
+    assert matrix.stages[0].expected_pass_count == 262
+    assert all(stage.allowed_skip_count == 0 for stage in matrix.stages)
+    assert "runtime-coordinate-snapshot.json" in matrix.retained_artifacts
+
+    _matrix, _projection_value, events, bundle = _accepted_ceremony_for(MATRIX_V2_PATH)
+    assert len(events) == len(matrix.stages) + 3
+    assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
+
+
+def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> None:
+    for path in (MATRIX_PATH, MATRIX_V2_PATH):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["max_concurrency"] = 2
+        body = {key: value for key, value in payload.items() if key != "matrix_sha256"}
+        payload["matrix_sha256"] = canonical_sha256(body)
+
+        with pytest.raises(QualificationError, match="trusted matrix digest mismatch"):
+            parse_matrix(payload)
 
 
 def test_json_decoder_rejects_duplicates_bom_empty_and_unbounded_nesting() -> None:
@@ -232,6 +306,28 @@ def test_projection_denies_target_runner_identity_and_candidate_lineage_drift() 
             "formal_environment",
             {**dict(matrix.formal_environment), "REDAGENT_OPA_HOST_PORT": "9999"},
         ),
+    )
+    for field, value in cases:
+        mutated = deepcopy(payload)
+        mutated[field] = value
+        _rehash_projection(mutated)
+        with pytest.raises(QualificationError):
+            parse_projection(mutated, matrix)
+
+
+def test_v2_projection_denies_runner_runtime_and_snapshot_input_drift() -> None:
+    matrix = load_matrix(MATRIX_V2_PATH)
+    payload = _projection_payload(matrix)
+    cases = (
+        (
+            "runner_environment",
+            {**payload["runner_environment"], "windows-full-gate": {"REDAGENT_R159_LIVE_QUALIFICATION": "owned-loopback-zap-v1"}},
+        ),
+        (
+            "formal_runtime_paths",
+            {**payload["formal_runtime_paths"], "temp": "../outside"},
+        ),
+        ("residual_ports", [58191]),
     )
     for field, value in cases:
         mutated = deepcopy(payload)
@@ -366,7 +462,8 @@ def test_bundle_builder_rejects_cross_attempt_log_event_and_preflight_splicing()
                 "attempt_terminal",
                 {"result_sha256": compute_disposition(matrix, stage_results, protocol_drift=False)["result_sha256"]},
             ),
-        ]
+        ],
+        expected_stage_ids=[stage.stage_id for stage in matrix.stages],
     )
     wrong_payloads = dict(payloads)
     wrong_payloads["events.jsonl"] = b"".join(canonical_bytes(event) + b"\n" for event in wrong_events)
@@ -408,13 +505,16 @@ def test_event_chain_rejects_missing_reordered_or_tampered_lifecycle() -> None:
                 ("preflight_passed", {"preflight_sha256": preflight["preflight_sha256"]}),
                 *((events[index]["kind"], events[index]["payload"]) for index in range(2, len(events) - 1)),
                 ("attempt_terminal", {"result_sha256": result["result_sha256"]}),
-            ]
+            ],
+            expected_stage_ids=[stage.stage_id for stage in matrix.stages],
         )
 
 
 def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> None:
     from scripts import autonomous_planner_qualification as cli
 
+    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v2.json"
+    assert cli.OUTPUT_ROOT.name == "autonomous-planner-qualification-attempt-02"
     assert cli.build_parser().parse_args(["preflight"]).command == "preflight"
     assert cli.build_parser().parse_args(["run"]).command == "run"
     assert cli.build_parser().parse_args(["verify"]).command == "verify"
@@ -422,6 +522,10 @@ def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> N
         cli.build_parser().parse_args(["run", "--target", "https://example.com"])
     commands = cli._runner_commands("pytest-authority-to-terminal", "1" * 40, "2" * 40)
     assert commands[0][1:3] == ("-m", "pytest")
+    assert (
+        "--deselect=tests/unit/test_planner_evidence.py::test_file_symlink_artifact_fails_before_parsing"
+        in commands[0]
+    )
     assert all("http://" not in argument and "https://" not in argument for command in commands for argument in command)
     with pytest.raises(QualificationError, match="unknown qualification runner"):
         cli._runner_commands("operator-selected", "1" * 40, "2" * 40)
@@ -434,17 +538,44 @@ def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> N
     ]
 
 
+def test_count_parser_is_capture_safe_for_every_output_kind() -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V2_PATH)
+    stages = {stage.result_kind: stage for stage in matrix.stages}
+
+    assert cli._parse_counts(stages["pytest"], "301 passed", None) == (301, 0)
+    assert cli._parse_counts(stages["pytest"], "300 passed, 1 skipped", None) == (300, 1)
+    assert cli._parse_counts(stages["vitest"], "Tests  11 passed", None) == (11, 0)
+    assert cli._parse_counts(stages["playwright"], "8 passed (22.1s)", None) == (8, 0)
+    assert cli._parse_counts(
+        stages["forced-g2"],
+        "ignored",
+        {"stages": [{"status": "passed"}] * 22},
+    ) == (22, 0)
+    assert cli._parse_counts(stages["cleanup"], '{"ok": true}\n' * 4, None) == (4, 0)
+    residual = '{"passed_check_count":9}'
+    assert cli._parse_counts(stages["residual"], residual, None) == (9, 0)
+    snapshot = '{"passed_check_count":1}'
+    assert cli._parse_counts(stages["runtime-snapshot"], snapshot, None) == (1, 0)
+    with pytest.raises(QualificationError, match="success-count evidence missing"):
+        cli._parse_counts(stages["playwright"], "all good", None)
+
+
 def test_formal_children_receive_only_the_source_pinned_redagent_environment(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    matrix = load_matrix(MATRIX_PATH)
+    matrix = load_matrix(MATRIX_V2_PATH)
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     monkeypatch.setattr(cli, "STAGE_LOG_ROOT", tmp_path / "stages")
     monkeypatch.setenv("REDAGENT_COMPOSE_PROJECT_NAME", "ambient-project-must-not-survive")
     monkeypatch.setenv("RedAgent_Unexpected_Override", "must-not-survive")
+    monkeypatch.setenv("PYTHONPATH", "poisoned")
+    monkeypatch.setenv("PYTHONHOME", "poisoned")
+    monkeypatch.setenv("PYTHONSAFEPATH", "1")
     captured: dict[str, object] = {}
 
     def fixed_run(command, **kwargs):
@@ -456,7 +587,7 @@ def test_formal_children_receive_only_the_source_pinned_redagent_environment(
     completed_count, launch_aborted = cli._run_processes(
         (("fixed-tool", "fixed-argument"),),
         matrix.stages[0],
-        matrix.formal_environment,
+        matrix,
     )
 
     assert completed_count == 1
@@ -464,7 +595,182 @@ def test_formal_children_receive_only_the_source_pinned_redagent_environment(
     environment = captured["environment"]
     assert isinstance(environment, dict)
     observed = {key: value for key, value in environment.items() if key.upper().startswith("REDAGENT_")}
-    assert observed == EXPECTED_FORMAL_ENVIRONMENT
+    assert observed == {
+        **EXPECTED_FORMAL_ENVIRONMENT,
+        "REDAGENT_R159_LIVE_QUALIFICATION": "owned-loopback-zap-v1",
+    }
+    assert environment["PYTHONNOUSERSITE"] == "1"
+    assert environment["PYTHONDONTWRITEBYTECODE"] == "1"
+    assert "PYTHONSAFEPATH" not in environment
+    assert "PYTHONPATH" not in environment
+    assert "PYTHONHOME" not in environment
+    runtime_root = tmp_path / ".tmp/autonomous-planner-qualification-attempt-02/runtime"
+    assert Path(environment["TEMP"]).is_relative_to(runtime_root)
+    assert environment["TMP"] == environment["TEMP"] == environment["TMPDIR"]
+    assert Path(environment["PRE_COMMIT_HOME"]).is_relative_to(runtime_root)
+    assert Path(environment["HOME"]).is_relative_to(runtime_root)
+
+    captured.clear()
+    completed_count, launch_aborted = cli._run_processes(
+        (("fixed-tool", "fixed-argument"),),
+        matrix.stages[1],
+        matrix,
+    )
+    assert completed_count == 1
+    assert launch_aborted is False
+    second_environment = captured["environment"]
+    assert isinstance(second_environment, dict)
+    assert "REDAGENT_R159_LIVE_QUALIFICATION" not in second_environment
+
+
+def test_fixed_child_environment_supports_nested_repository_imports_and_strips_poison(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V2_PATH)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setenv("PYTHONPATH", "Z:/ambient-poison")
+    monkeypatch.setenv("PYTHONSAFEPATH", "1")
+    monkeypatch.setenv("REDAGENT_UNDECLARED", "must-not-survive")
+    environment = cli._fixed_child_environment(matrix, matrix.stages[0])
+    completed = cli.subprocess.run(
+        (
+            str(Path(cli.sys.executable).resolve()),
+            "-c",
+            "import redagent_platform; import scripts.autonomous_planner_qualification",
+        ),
+        cwd=ROOT,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "PYTHONSAFEPATH" not in environment
+    assert "PYTHONPATH" not in environment
+    assert "REDAGENT_UNDECLARED" not in environment
+
+
+def test_runtime_coordinate_snapshot_is_closed_secret_free_and_workspace_scoped(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    runtime = tmp_path / ".local/redagent/runtime"
+    opa = tmp_path / ".local/redagent/opa"
+    runtime.mkdir(parents=True)
+    opa.mkdir(parents=True)
+    runtime_env = runtime / "local-stack.env"
+    runtime_env.write_text(
+        "\n".join(
+            (
+                "REDAGENT_COMPOSE_PROJECT_NAME=redagent-r164-local",  # pragma: allowlist secret
+                "REDAGENT_BIND_HOST=127.0.0.1",
+                "REDAGENT_POSTGRES_PORT=55433",
+                "REDAGENT_KEYCLOAK_PORT=58081",
+                "REDAGENT_TEMPORAL_PORT=57234",
+                "REDAGENT_RUSTFS_PORT=59001",
+                "AWS_SECRET_ACCESS_KEY=must-never-be-retained",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (opa / "opa-endpoint.json").write_text('{"port":58182}\n', encoding="utf-8")
+    retained = tmp_path / ".tmp/autonomous-planner-qualification-attempt-02/runtime-coordinate-snapshot.json"
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "RUNTIME_COORDINATE_SNAPSHOT", retained)
+
+    snapshot = cli._capture_runtime_coordinate_snapshot()
+
+    encoded = canonical_bytes(snapshot)
+    assert b"must-never-be-retained" not in encoded
+    assert snapshot["local_stack"]["project_name"] == "redagent-r164-local"
+    assert snapshot["ports"] == [55433, 57234, 58081, 58182, 58200, 59001]
+    assert snapshot["opa"]["project_name"].startswith("redagent-opa-")
+    assert snapshot["openbao"]["project_name"].startswith("redagent-openbao-")
+    assert retained.read_bytes() == canonical_bytes(snapshot) + b"\n"
+
+    runtime_env.write_text(runtime_env.read_text(encoding="utf-8") + "REDAGENT_POSTGRES_PORT=55434\n")
+    retained.unlink()
+    with pytest.raises(QualificationError, match="duplicate"):
+        cli._capture_runtime_coordinate_snapshot()
+
+    monkeypatch.setattr(
+        cli,
+        "is_link_or_reparse",
+        lambda path: path.name == "local-stack.env",
+    )
+    with pytest.raises(QualificationError, match="link or reparse"):
+        cli._capture_runtime_coordinate_snapshot()
+
+
+def test_residual_report_uses_only_retained_actual_ports_and_owned_resource_markers(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V2_PATH)
+    projection = _projection(matrix)
+    runtime = tmp_path / ".local/redagent/runtime"
+    opa = tmp_path / ".local/redagent/opa"
+    runtime.mkdir(parents=True)
+    opa.mkdir(parents=True)
+    (runtime / "local-stack.env").write_text(
+        "\n".join(
+            (
+                "REDAGENT_COMPOSE_PROJECT_NAME=redagent-r164-local",  # pragma: allowlist secret
+                "REDAGENT_BIND_HOST=127.0.0.1",
+                "REDAGENT_POSTGRES_PORT=55433",
+                "REDAGENT_KEYCLOAK_PORT=58081",
+                "REDAGENT_TEMPORAL_PORT=57234",
+                "REDAGENT_RUSTFS_PORT=59001",
+            )
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (opa / "opa-endpoint.json").write_text('{"port":58182}\n', encoding="utf-8")
+    retained = tmp_path / ".tmp/autonomous-planner-qualification-attempt-02/runtime-coordinate-snapshot.json"
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "OUTPUT_ROOT", retained.parent)
+    monkeypatch.setattr(cli, "RUNTIME_COORDINATE_SNAPSHOT", retained)
+    snapshot = cli._capture_runtime_coordinate_snapshot()
+    monkeypatch.setattr(
+        cli,
+        "_git",
+        lambda *args: {
+            ("rev-parse", "HEAD"): projection.candidate_commit,
+            ("rev-parse", "HEAD^{tree}"): projection.candidate_tree,
+            ("status", "--porcelain", "--untracked-files=all"): "",
+        }[args],
+    )
+    monkeypatch.setattr(cli, "_source_digests", lambda _matrix: dict(projection.source_sha256))
+    probed: list[int] = []
+
+    def closed(port: int) -> bool:
+        probed.append(port)
+        return True
+
+    monkeypatch.setattr(cli, "_port_closed", closed)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+
+    def docker(command, **_kwargs):
+        assert command[1:3] in (("ps", "-a"), ("network", "ls"))
+        return cli.subprocess.CompletedProcess(command, 0, stdout="unrelated-resource\n", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", docker)
+    report = cli._residual_report(matrix, projection)
+
+    assert report["cleanup_complete"] is True
+    assert report["passed_check_count"] == report["required_check_count"] == 9
+    assert sorted(probed) == snapshot["ports"]
 
 
 def test_cli_atomic_writer_never_replaces_a_named_artifact(tmp_path: Path, monkeypatch) -> None:
@@ -503,8 +809,24 @@ def test_declared_item_runtime_paths_are_removed_without_touching_other_outputs(
     assert all(not (tmp_path / Path(relative)).exists() for relative in matrix.cleanup_paths)
     assert unrelated.read_text(encoding="utf-8") == "retained"
 
+    invocation_id = "invocation-r159-0123456789ab"
+    digest = hashlib.sha256(invocation_id.encode("utf-8")).hexdigest()
+    zap_runtime = tmp_path / ".local/redagent/r123-zap"
+    run_root = zap_runtime / digest[:24]
+    run_root.mkdir(parents=True)
+    (run_root / "zap-report.json").write_text("fixture", encoding="utf-8")
+    receipt = zap_runtime / f"receipt-{digest}.json"
+    receipt.write_text(json.dumps({"invocation_id": invocation_id}), encoding="utf-8")
+    unrelated_receipt = zap_runtime / "unrelated.keep"
+    unrelated_receipt.write_text("preserve", encoding="utf-8")
 
-def test_formal_stage_environment_failure_is_retained_as_terminal_aborted_evidence(
+    assert cli._remove_owned_zap_qualification_state() == 1
+    assert not run_root.exists()
+    assert not receipt.exists()
+    assert unrelated_receipt.read_text(encoding="utf-8") == "preserve"
+
+
+def test_unexpected_formal_stage_exception_is_retained_as_terminal_aborted_evidence(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -524,6 +846,7 @@ def test_formal_stage_environment_failure_is_retained_as_terminal_aborted_eviden
         "EVENTS_PATH": output_root / "events.jsonl",
         "BUNDLE_PATH": output_root / "qualification-bundle.json",
         "FORCED_G2_RETAINED": output_root / "forced-g2-verification.json",
+        "RUNTIME_COORDINATE_SNAPSHOT": output_root / "runtime-coordinate-snapshot.json",
     }
     for name, value in replacements.items():
         monkeypatch.setattr(cli, name, value)
@@ -532,7 +855,7 @@ def test_formal_stage_environment_failure_is_retained_as_terminal_aborted_eviden
     monkeypatch.setattr(cli, "_observe_preflight", lambda *_args: preflight)
 
     def unavailable(*_args):
-        raise QualificationError("required fixed tool unavailable")
+        raise IndexError("unexpected controller defect")
 
     monkeypatch.setattr(cli, "_execute_stage", unavailable)
 
@@ -544,3 +867,45 @@ def test_formal_stage_environment_failure_is_retained_as_terminal_aborted_eviden
     assert bundle["result"]["disposition"] == ABORTED
     assert bundle["result"]["protocol_drift"] is True
     assert len(bundle["events"]) == len(matrix.stages) + 3
+
+
+def test_terminal_writer_failure_exits_without_fabricating_a_bundle(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_PATH)
+    projection = _projection(matrix)
+    preflight = _preflight(matrix, projection)
+    output_root = tmp_path / ".tmp/autonomous-planner-qualification"
+    replacements = {
+        "ROOT": tmp_path,
+        "OUTPUT_ROOT": output_root,
+        "RUNTIME_ROOT": output_root / "runtime",
+        "STAGE_LOG_ROOT": output_root / "stages",
+        "PREFLIGHT_PATH": output_root / "preflight.json",
+        "STAGE_RESULTS_PATH": output_root / "stage-results.json",
+        "EVENTS_PATH": output_root / "events.jsonl",
+        "BUNDLE_PATH": output_root / "qualification-bundle.json",
+        "FORCED_G2_RETAINED": output_root / "forced-g2-verification.json",
+        "RUNTIME_COORDINATE_SNAPSHOT": output_root / "runtime-coordinate-snapshot.json",
+    }
+    for name, value in replacements.items():
+        monkeypatch.setattr(cli, name, value)
+    cli._atomic_write(cli.PREFLIGHT_PATH, canonical_bytes(preflight) + b"\n")
+    monkeypatch.setattr(cli, "_load_inputs", lambda: (matrix, projection, {}))
+    monkeypatch.setattr(cli, "_observe_preflight", lambda *_args: preflight)
+    monkeypatch.setattr(cli, "_execute_stage", lambda *_args: (_ for _ in ()).throw(IndexError("defect")))
+    original_write = cli._atomic_write
+
+    def fail_stage_results(path: Path, payload: bytes) -> None:
+        if path == cli.STAGE_RESULTS_PATH:
+            raise OSError("simulated immutable writer failure")
+        original_write(path, payload)
+
+    monkeypatch.setattr(cli, "_atomic_write", fail_stage_results)
+
+    with pytest.raises(OSError, match="writer failure"):
+        cli.run_command()
+    assert not cli.BUNDLE_PATH.exists()
