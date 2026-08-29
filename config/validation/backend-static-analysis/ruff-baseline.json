@@ -1590,12 +1590,6 @@
       "count": 13
     },
     {
-      "path": "redagent_platform/campaign_service/api.py",
-      "code": "F401",
-      "message": "`fastapi.Response` imported but unused",
-      "count": 1
-    },
-    {
       "path": "redagent_platform/campaign_service/status.py",
       "code": "F821",
       "message": "Undefined name `import_records`",
