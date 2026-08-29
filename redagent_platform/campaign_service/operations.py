@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.sql.elements import ColumnElement
 
 from redagent_platform.campaign_service.status import CampaignStatusNotFound
 from redagent_platform.persistence.models import metadata
@@ -106,6 +107,7 @@ async def _read_source(
     )
     if campaign is None:
         raise CampaignStatusNotFound("campaign_operations_not_found")
+    campaign_row = dict(campaign)
 
     admission = await _latest(
         session,
@@ -189,7 +191,9 @@ async def _read_source(
         order_column="created_at",
     )
     audits_table = metadata.tables["audit_events"]
-    subject_filter = (audits_table.c.subject_type == "campaign") & (audits_table.c.subject_id == campaign_id)
+    subject_filter: ColumnElement[bool] = (audits_table.c.subject_type == "campaign") & (
+        audits_table.c.subject_id == campaign_id
+    )
     if execution_id is not None:
         subject_filter = or_(
             subject_filter,
@@ -210,7 +214,7 @@ async def _read_source(
     if len(audit_rows) > _MAX_ROWS:
         raise CampaignOperationsProjectionInvalid("operations_audits_unbounded")
     return CampaignOperationsSource(
-        campaign=campaign,
+        campaign=campaign_row,
         admission=admission,
         ledger=ledger,
         reservations=reservations,
@@ -218,7 +222,7 @@ async def _read_source(
         nodes=nodes,
         observations=observations,
         proposals=tuple(proposals),
-        audits=tuple(audit_rows),
+        audits=tuple(dict(row) for row in audit_rows),
         effects=effects,
     )
 
@@ -230,7 +234,7 @@ async def _latest(
     tenant_id: str,
     campaign_id: str,
 ) -> Mapping[str, Any] | None:
-    return (
+    row = (
         (
             await session.execute(
                 select(table)
@@ -242,6 +246,7 @@ async def _latest(
         .mappings()
         .one_or_none()
     )
+    return dict(row) if row is not None else None
 
 
 async def _single(
@@ -267,7 +272,7 @@ async def _single(
     )
     if len(rows) > 1:
         raise CampaignOperationsProjectionInvalid("operations_store_identity_ambiguous")
-    return rows[0] if rows else None
+    return dict(rows[0]) if rows else None
 
 
 async def _bounded_rows(
@@ -296,7 +301,7 @@ async def _bounded_rows(
     rows = (await session.execute(query)).mappings().all()
     if len(rows) > _MAX_ROWS:
         raise CampaignOperationsProjectionInvalid(f"operations_{table.name}_unbounded")
-    return tuple(rows)
+    return tuple(dict(row) for row in rows)
 
 
 def project_campaign_operations(

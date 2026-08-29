@@ -7,12 +7,13 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import subprocess
-from typing import Awaitable, Callable, Mapping
+from typing import Awaitable, Callable, Mapping, cast
 from uuid import uuid4
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from redagent_platform.artifact_pipeline.campaign_adapter import ArtifactCampaignAdapter
 from redagent_platform.campaign_service.activity_coordinator import CampaignActivityCoordinator
@@ -402,7 +403,9 @@ def build_stock_campaign_api_service_factory(
                 ),
                 create_enabled=_campaign_core_create_enabled(env),
             ),
-            campaign_operations_owner=PostgresCampaignOperationsOwner(sessions),
+            campaign_operations_owner=PostgresCampaignOperationsOwner(
+                cast(async_sessionmaker[AsyncSession], sessions)
+            ),
         )
 
     setattr(factory, "_redagent_temporal_readiness_factory", True)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Callable, Literal
+from typing import Any, Callable, Literal, cast
 
 from fastapi import APIRouter, Depends, Header, Path, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -721,7 +721,7 @@ def build_campaign_router(
         request: Request,
         response: Response,
         campaign_id: str = Path(min_length=1, max_length=64),
-        guard=Depends(require_guard("campaign:inspect")),
+        guard=Depends(cast(Callable[..., Any], require_guard("campaign:inspect"))),
     ) -> object:
         try:
             read_at = clock()
