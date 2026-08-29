@@ -9,7 +9,7 @@ REVISION = ROOT / "migrations/versions/0014_r107_network_assessment.py"
 
 
 def test_revision_0014_is_expected_database_head() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0027_campaign_dag_execution"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0028_observation_replanning"
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0014_r107_network"' in source
     assert 'down_revision = "0013_r106_api_diff"' in source

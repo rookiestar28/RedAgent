@@ -20,7 +20,7 @@ def test_r115_revision_exists_and_advances_head() -> None:
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0022_r115_findings"' in source
     assert 'down_revision = "0021_r114_mcp"' in source
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0027_campaign_dag_execution"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0028_observation_replanning"
 
 
 def test_revision_0022_defines_force_rls_owned_tables() -> None:

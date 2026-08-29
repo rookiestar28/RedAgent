@@ -21,7 +21,7 @@ class DatabaseSettings:
     driver: str
     host: str
     database: str
-    expected_revision: str = "0027_campaign_dag_execution"
+    expected_revision: str = "0028_observation_replanning"
     pool_size: int = 10
     max_overflow: int = 10
     pool_timeout_seconds: int = 30

@@ -10,7 +10,7 @@ TABLES = (
 
 
 def test_r101_tables_are_tenant_owned_and_revision_0008_is_required() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0027_campaign_dag_execution"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0028_observation_replanning"
     for name in TABLES:
         assert name in metadata.tables
         assert {"tenant_id", "version", "created_at", "updated_at"} <= set(metadata.tables[name].c.keys())

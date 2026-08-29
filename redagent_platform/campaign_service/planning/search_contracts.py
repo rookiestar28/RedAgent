@@ -121,7 +121,7 @@ class PredictedGoalClaimV1:
 class AttackPathDagRevisionV1:
     schema_version: str
     revision_id: str
-    parent_revision_id: None
+    parent_revision_id: str | None
     planner_version: str
     planner_sha256: str
     tenant_id: str
@@ -146,8 +146,10 @@ class AttackPathDagRevisionV1:
             raise ValueError("attack_path_dag_schema_unsupported")
         for name in ("revision_id", "planner_version", "tenant_id", "engagement_id"):
             _identifier(f"attack_path_dag_{name}", getattr(self, name))
+        # CRITICAL: initial planner output is parentless; only the bounded replan binder may supply
+        # a direct immutable parent identity for a derived child revision.
         if self.parent_revision_id is not None:
-            raise ValueError("attack_path_dag_parent_must_be_none")
+            _identifier("attack_path_dag_parent", self.parent_revision_id)
         for name in (
             "planner_sha256",
             "authority_sha256",
