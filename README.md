@@ -65,4 +65,5 @@ By downloading, installing, running, using, or contributing to this project, you
 
 ## License
 
-RedAgent is released under the MIT License. See the [LICENSE](LICENSE) file for the full text.
+RedAgent is released under the Apache License, Version 2.0. See the [LICENSE](LICENSE) file for the
+full text and [NOTICE](NOTICE) for attribution information.
