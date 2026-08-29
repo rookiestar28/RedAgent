@@ -2,6 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+import type { CampaignOperations } from "../../lib/apiClient";
+
 import {
   CampaignAttentionFeature,
   CampaignCoreFeature,
@@ -81,7 +83,7 @@ describe("compat_124 portable campaign core", () => {
     expect(activations).toEqual(["engagement", "target", "objective", "risk", "start"]);
     expect(screen.queryByLabelText(/\b(?:campaign|target|engagement|job|runner|workflow) id\b/i)).toBeNull();
     expect(await screen.findByText("Stop remains available.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Stop & revoke" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Request containment" })).toBeVisible();
   });
 
   it("shows denied/unavailable reasons and never enables an ineligible option", async () => {
@@ -150,6 +152,7 @@ describe("compat_124 portable campaign core", () => {
         page: { limit: 50, next_cursor: null },
       }),
       getCampaignCoreCampaign: vi.fn().mockResolvedValue(campaignTruth()),
+      getCampaignOperations: vi.fn().mockResolvedValue(campaignOperations()),
       listCampaignCoreAttention: vi.fn(),
       recoverCampaignCore: vi.fn().mockResolvedValue({
         campaign_id: "campaign-internal-hidden",
@@ -165,21 +168,152 @@ describe("compat_124 portable campaign core", () => {
 
     expect(await screen.findByRole("complementary", { name: "Selected campaign truth" })).toBeVisible();
     expect(screen.getByText("Primary web posture assessment")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Stop & revoke" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Stop & revoke" }));
+    expect(screen.getByRole("button", { name: "Request containment" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Request containment" }));
+    expect(screen.getByRole("dialog", { name: "Confirm containment request" })).toBeVisible();
+    expect(screen.getByText(/does not claim that active effects are already contained/i)).toBeVisible();
+    const confirm = screen.getByRole("button", { name: "Confirm containment request" });
+    expect(confirm).toHaveFocus();
+    await user.click(confirm);
     await waitFor(() => expect(readClient.recoverCampaignCore).toHaveBeenCalledWith(
       "stop",
       "campaign-internal-hidden",
       '"campaign-internal-hidden:2"',
       expect.stringContaining("persistent status"),
     ));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Request containment" })).toHaveFocus());
     expect(screen.queryByText("campaign-internal-hidden")).toBeNull();
+  });
+
+  it("renders the bounded autonomous operations workspace without raw identifiers or false export authority", async () => {
+    const user = userEvent.setup();
+    const getCampaignOperations = vi.fn().mockResolvedValue(campaignOperations());
+    const readClient = {
+      listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
+        data: [{
+          campaign_id: "campaign-internal-hidden",
+          label: "Owned loopback posture",
+          status: "workflow_started",
+          authority_state: "current_at_last_resolution",
+          attention_reason: null,
+          aggregate_sequence: 2,
+        }],
+        page: { limit: 50, next_cursor: null },
+      }),
+      getCampaignCoreCampaign: vi.fn().mockResolvedValue(campaignTruth()),
+      getCampaignOperations,
+      listCampaignCoreAttention: vi.fn(),
+      recoverCampaignCore: vi.fn(),
+    } as unknown as CampaignReadClient;
+
+    render(<CampaignStatusFeature client={readClient} />);
+    await user.click(await screen.findByRole("button", { name: "View current status" }));
+
+    expect(await screen.findByRole("heading", { name: "Autonomous campaign operations" })).toBeVisible();
+    expect(getCampaignOperations).toHaveBeenCalledWith("campaign-internal-hidden");
+    expect(screen.getAllByText("Admitted")).toHaveLength(2);
+    expect(screen.getByText("Valid")).toBeVisible();
+    await user.click(screen.getByText("Exact authority binding"));
+    expect(screen.getByText("a".repeat(64))).toBeVisible();
+    expect(screen.getByText("c".repeat(64))).toBeVisible();
+    expect(screen.getByText("Step 1")).toBeVisible();
+    expect(screen.getByText("HTTP posture")).toBeVisible();
+    expect(screen.getByText(/75 of 100 requests remaining/i)).toBeVisible();
+    expect(screen.getByText(/1 invalidated · 1 retained · 1 substitution/i)).toBeVisible();
+    expect(screen.getByText(/verified retained bundle is not available/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Request containment" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Revoke future authority" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /export/i })).toBeNull();
+    expect(document.body).not.toHaveTextContent(/campaign-internal-hidden|node-internal|target-internal|operator-internal/i);
+  });
+
+  it("never retains a higher operations version from a different selected campaign", async () => {
+    const user = userEvent.setup();
+    const firstOperations = campaignOperations();
+    firstOperations.aggregate_version = 99;
+    firstOperations.plan.nodes[0]!.capability = "First campaign capability";
+    const secondOperations = campaignOperations();
+    secondOperations.aggregate_version = 2;
+    secondOperations.plan.nodes[0]!.capability = "Second campaign capability";
+    const readClient = {
+      listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
+        data: [
+          {
+            campaign_id: "campaign-first-hidden", label: "First campaign", status: "workflow_started",
+            authority_state: "current_at_last_resolution", attention_reason: null, aggregate_sequence: 99,
+          },
+          {
+            campaign_id: "campaign-second-hidden", label: "Second campaign", status: "workflow_started",
+            authority_state: "current_at_last_resolution", attention_reason: null, aggregate_sequence: 2,
+          },
+        ],
+        page: { limit: 50, next_cursor: null },
+      }),
+      getCampaignCoreCampaign: vi.fn().mockImplementation((campaignId: string) => Promise.resolve({
+        ...campaignTruth(),
+        campaign_id: campaignId,
+        label: campaignId === "campaign-first-hidden" ? "First campaign truth" : "Second campaign truth",
+      })),
+      getCampaignOperations: vi.fn().mockImplementation((campaignId: string) => Promise.resolve(
+        campaignId === "campaign-first-hidden" ? firstOperations : secondOperations
+      )),
+      listCampaignCoreAttention: vi.fn(),
+      recoverCampaignCore: vi.fn(),
+    } as unknown as CampaignReadClient;
+
+    render(<CampaignStatusFeature client={readClient} />);
+    const viewButtons = await screen.findAllByRole("button", { name: "View current status" });
+    await user.click(viewButtons[0]!);
+    expect(await screen.findByText("First campaign capability")).toBeVisible();
+    await user.click(viewButtons[1]!);
+
+    expect(await screen.findByText("Second campaign truth")).toBeVisible();
+    expect(await screen.findByText("Second campaign capability")).toBeVisible();
+    expect(screen.queryByText("First campaign capability")).toBeNull();
+  });
+
+  it("renders bounded validator counterexamples for denied preparation", async () => {
+    const user = userEvent.setup();
+    const operations = campaignOperations();
+    operations.preparation_state = "denied";
+    operations.validation = {
+      result: "invalid",
+      reason: null,
+      counterexample_codes: ["scope-expansion-denied"],
+    };
+    operations.authority.state = "revoked";
+    operations.authority.kill_switch_epoch = 1;
+    const readClient = {
+      listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
+        data: [{
+          campaign_id: "campaign-internal-hidden",
+          label: "Owned loopback posture",
+          status: "dispatch_pending",
+          authority_state: "current_at_last_resolution",
+          attention_reason: null,
+          aggregate_sequence: 2,
+        }],
+        page: { limit: 50, next_cursor: null },
+      }),
+      getCampaignCoreCampaign: vi.fn().mockResolvedValue(campaignTruth()),
+      getCampaignOperations: vi.fn().mockResolvedValue(operations),
+      listCampaignCoreAttention: vi.fn(),
+      recoverCampaignCore: vi.fn(),
+    } as unknown as CampaignReadClient;
+
+    render(<CampaignStatusFeature client={readClient} />);
+    await user.click(await screen.findByRole("button", { name: "View current status" }));
+
+    expect(await screen.findByText("Scope expansion denied")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Request containment" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Revoke future authority" })).toBeNull();
   });
 
   it("shows governed recovery guidance for bounded attention categories", async () => {
     const readClient: CampaignReadClient = {
       listCampaignCoreCampaigns: vi.fn(),
       getCampaignCoreCampaign: vi.fn(),
+      getCampaignOperations: vi.fn(),
       listCampaignCoreAttention: vi.fn().mockResolvedValue({
         data: [{
           binding: "opaque-attention-binding",
@@ -254,7 +388,7 @@ describe("compat_124 portable campaign core", () => {
     await user.click(screen.getByRole("button", { name: "Start authorized campaign" }));
 
     expect(await screen.findByText(/campaign start was accepted/i)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Stop & revoke" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Request containment" })).toBeVisible();
     expect(screen.queryByText("campaign-server-generated")).toBeNull();
   });
 });
@@ -295,6 +429,76 @@ function campaignTruth() {
       revoke_visible: true,
       cleanup_required: false,
       guidance: "Stop remains available.",
+    },
+  };
+}
+
+
+function campaignOperations(): CampaignOperations {
+  return {
+    schema_version: "redagent.campaign-operations/v1",
+    aggregate_version: 7,
+    etag: '"campaign-internal-hidden:7"',
+    preparation_state: "executing",
+    authority: {
+      state: "admitted",
+      signed_authority_sha256: "a".repeat(64),
+      authority_sha256: "b".repeat(64),
+      lifecycle_epoch: 4,
+      policy_revocation_epoch: 2,
+      roe_revocation_epoch: 1,
+      kill_switch_epoch: 0,
+      expires_at: "2026-08-29T13:00:00Z",
+    },
+    plan: {
+      revision_label: "Current revision",
+      parent_revision_present: false,
+      nodes: [{ label: "Step 1", capability: "HTTP posture", state: "running", order: 0 }],
+      edges: [],
+    },
+    validation: { result: "valid", reason: null, counterexample_codes: [] },
+    admission: { outcome: "admitted", reason: "admitted", receipt_sha256: "c".repeat(64) },
+    budget: {
+      state: "available",
+      dimensions: {
+        requests: { authorized: 100, committed: 25, residual: 75, unit: "requests" },
+      },
+    },
+    execution: {
+      state: "running",
+      transition_count: 3,
+      max_transitions: 20,
+      stop_requested: false,
+      terminal_reason: null,
+      frontier: { running: 1 },
+    },
+    observations: [{
+      fact: "Http header present",
+      producer_kind: "dag_runner_result",
+      observation_sha256: "d".repeat(64),
+      provenance_sha256: "e".repeat(64),
+      freshness: "current",
+    }],
+    revisions: [{
+      label: "Revision 1",
+      state: "proposed",
+      proposal_sha256: "f".repeat(64),
+      invalidated_count: 1,
+      retained_count: 1,
+      substitution_count: 1,
+    }],
+    audit: [{
+      action: "campaign.dag.start.requested",
+      occurred_at: "2026-08-29T12:00:00Z",
+      correlation_id: "safe-correlation",
+      details_sha256: "1".repeat(64),
+    }],
+    evidence: {
+      effect_count: 1,
+      evidence_count: 1,
+      cleanup_state: "complete",
+      terminal_receipt_present: false,
+      export_state: "unavailable_without_verified_bundle",
     },
   };
 }

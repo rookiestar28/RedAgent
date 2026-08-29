@@ -129,6 +129,7 @@ export type R124CampaignSummary = components["schemas"]["R124CampaignSummaryData
 export type R124Attention = components["schemas"]["R124AttentionData"];
 export type R124CampaignAggregate = components["schemas"]["R124CampaignAggregateData"];
 export type R124CampaignInspector = components["schemas"]["R124CampaignInspectorData"];
+export type CampaignOperations = components["schemas"]["CampaignOperationsData"];
 
 export type PageResult<T> = {
   readonly data: readonly T[];
@@ -1211,6 +1212,13 @@ export function createConsoleClient(options: ClientOptions = {}) {
 
     async inspectCampaignCoreCampaign(campaignId: string): Promise<R124CampaignInspector> {
       const result = await client.GET("/api/v1/campaign-core/campaigns/{campaign_id}/inspector", {
+        params: { path: { campaign_id: campaignId } },
+      });
+      return unwrap(result).data;
+    },
+
+    async getCampaignOperations(campaignId: string): Promise<CampaignOperations> {
+      const result = await client.GET("/api/v1/campaign-core/campaigns/{campaign_id}/operations", {
         params: { path: { campaign_id: campaignId } },
       });
       return unwrap(result).data;

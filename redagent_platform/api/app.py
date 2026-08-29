@@ -147,6 +147,7 @@ def create_app(
     r123_campaign_status_owner: CampaignStatusOwner | None = None,
     r123_service_factory: R123ApiServiceFactory | None = None,
     r124_campaign_core_service: object | None = None,
+    campaign_operations_owner: object | None = None,
     operator_shell_context: OperatorShellContextData | None = None,
 ) -> FastAPI:
     if r123_service_factory is not None and database_settings is None:
@@ -157,6 +158,8 @@ def create_app(
             r123_qualification_service,
             r123_status_service,
             r123_campaign_status_owner,
+            r124_campaign_core_service,
+            campaign_operations_owner,
         )
     ):
         raise ValueError("r123_api_runtime_services_ambiguous")
@@ -203,12 +206,14 @@ def create_app(
                         or services.status_service.mode is not StrategyLoopMode.TWO_CAPABILITY
                         or not callable(getattr(services.campaign_status_owner, "read", None))
                         or not callable(getattr(services.campaign_core_service, "start_campaign", None))
+                        or not callable(getattr(services.campaign_operations_owner, "read", None))
                     ):
                         raise RuntimeError("r123_api_factory_result_invalid")
                     application.state.r123_qualification_service = services.qualification_service
                     application.state.r123_status_service = services.status_service
                     application.state.r123_campaign_status_owner = services.campaign_status_owner
                     application.state.r124_campaign_core_service = services.campaign_core_service
+                    application.state.campaign_operations_owner = services.campaign_operations_owner
             yield
         finally:
             if r123_service_factory is not None:
@@ -219,6 +224,7 @@ def create_app(
                     None,
                 )
                 application.state.r124_campaign_core_service = r124_campaign_core_service
+                application.state.campaign_operations_owner = campaign_operations_owner
             application.state.session_factory = None
             if engine is not None:
                 await engine.dispose()
@@ -249,6 +255,7 @@ def create_app(
         None,
     )
     app.state.r124_campaign_core_service = r124_campaign_core_service
+    app.state.campaign_operations_owner = campaign_operations_owner
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):

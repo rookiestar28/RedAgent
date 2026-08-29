@@ -63,6 +63,7 @@ from redagent_platform.campaign_service.qualification import (
     CampaignQualificationService,
     CampaignStatusService,
 )
+from redagent_platform.campaign_service.operations import PostgresCampaignOperationsOwner
 from redagent_platform.campaign_service.status import (
     PostgresCampaignCorePresentationOwner,
     PostgresCampaignStatusOwner,
@@ -219,6 +220,7 @@ class CampaignApiRuntimeServices:
     status_service: CampaignStatusService
     campaign_status_owner: CampaignStatusOwner
     campaign_core_service: CampaignCoreService
+    campaign_operations_owner: PostgresCampaignOperationsOwner
 
 
 def load_campaign_signing_identity(
@@ -400,6 +402,7 @@ def build_stock_campaign_api_service_factory(
                 ),
                 create_enabled=_campaign_core_create_enabled(env),
             ),
+            campaign_operations_owner=PostgresCampaignOperationsOwner(sessions),
         )
 
     setattr(factory, "_redagent_temporal_readiness_factory", True)

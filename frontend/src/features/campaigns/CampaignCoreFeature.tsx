@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   ConsoleApiError,
   createConsoleClient,
+  type CampaignOperations,
   type R124CampaignMutation,
   type R124CampaignOption,
   type R124CampaignOptionPage,
@@ -24,6 +25,7 @@ export type CampaignCoreClient = Pick<ReturnType<typeof createConsoleClient>,
 export type CampaignReadClient = Pick<ReturnType<typeof createConsoleClient>,
   | "listCampaignCoreCampaigns"
   | "getCampaignCoreCampaign"
+  | "getCampaignOperations"
   | "listCampaignCoreAttention"
   | "recoverCampaignCore"
 >;
@@ -181,8 +183,8 @@ export function CampaignCoreFeature({
       <p>{text(recovery.guidance) ?? "Review current evidence and recovery state."}</p>
       {error && <p className="inline-error" role="alert">{error}</p>}
       <div className="button-row">
-        {(!campaign || recovery.stop_visible !== false) && <button className="danger-action" disabled={busy} onClick={() => void recover("stop")}>Stop &amp; revoke</button>}
-        {(!campaign || recovery.revoke_visible !== false) && <button disabled={busy} onClick={() => void recover("revoke")}>Revoke authority</button>}
+        {(!campaign || recovery.stop_visible !== false) && <button className="danger-action" disabled={busy} onClick={() => void recover("stop")}>Request containment</button>}
+        {(!campaign || recovery.revoke_visible !== false) && <button disabled={busy} onClick={() => void recover("revoke")}>Revoke future authority</button>}
       </div>
     </section>;
   }
@@ -233,8 +235,13 @@ export function CampaignStatusFeature({
 }: { client?: CampaignReadClient }) {
   const [page, setPage] = useState<R124CampaignSummaryPage | null>(null);
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
+  const [operations, setOperations] = useState<CampaignOperations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"stop" | "revoke" | null>(null);
+  const selectedCampaignBinding = useRef<string | null>(null);
+  const recoveryTrigger = useRef<HTMLButtonElement | null>(null);
+  const confirmationButton = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -243,6 +250,48 @@ export function CampaignStatusFeature({
       .catch((cause: unknown) => { if (active) setError(projectError(cause)); });
     return () => { active = false; };
   }, [client]);
+
+  useEffect(() => {
+    if (pendingAction) confirmationButton.current?.focus();
+  }, [pendingAction]);
+
+  function recover(action: "stop" | "revoke") {
+    const campaignId = text(selected?.campaign_id);
+    const etag = text(selected?.etag);
+    if (!campaignId || !etag) {
+      setError("Current campaign recovery metadata is unavailable.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    void client.recoverCampaignCore(
+      action,
+      campaignId,
+      etag,
+      action === "stop"
+        ? "Operator requested campaign containment from persistent status."
+        : "Operator revoked campaign authority from persistent status.",
+    ).then((updated) => Promise.all([
+      client.getCampaignCoreCampaign(updated.campaign_id),
+      client.getCampaignOperations(updated.campaign_id),
+    ]))
+      .then(([value, currentOperations]) => {
+        if (selectedCampaignBinding.current !== campaignId) return;
+        setSelected(value);
+        setOperations((prior) => prior && prior.aggregate_version > currentOperations.aggregate_version
+          ? prior : currentOperations);
+      })
+      .catch((cause: unknown) => {
+        if (selectedCampaignBinding.current === campaignId) setError(projectError(cause));
+      })
+      .finally(() => {
+        setBusy(false);
+        // IMPORTANT: defer focus until React commits busy=false; disabled controls cannot receive focus.
+        if (selectedCampaignBinding.current === campaignId) {
+          globalThis.setTimeout(() => recoveryTrigger.current?.focus(), 0);
+        }
+      });
+  }
 
   return <section className="work-panel campaign-core" aria-labelledby="campaign-status-list-title">
     <span className="eyebrow">Unified objective-to-retest core</span>
@@ -256,37 +305,55 @@ export function CampaignStatusFeature({
         <span>{human(campaign.status)} · {human(campaign.authority_state)}</span>
         {campaign.attention_reason && <span>{human(campaign.attention_reason)}</span>}
         <button type="button" onClick={() => {
+          selectedCampaignBinding.current = campaign.campaign_id;
+          setSelected(null);
+          setOperations(null);
           setError(null);
-          void client.getCampaignCoreCampaign(campaign.campaign_id)
-            .then((value) => setSelected(value))
-            .catch((cause: unknown) => setError(projectError(cause)));
+          void Promise.all([
+            client.getCampaignCoreCampaign(campaign.campaign_id),
+            client.getCampaignOperations(campaign.campaign_id),
+          ])
+            .then(([value, currentOperations]) => {
+              // CRITICAL: aggregate versions are campaign-local; never retain or apply a response
+              // after the operator selected a different campaign or cross-campaign truth is mixed.
+              if (selectedCampaignBinding.current !== campaign.campaign_id) return;
+              setSelected(value);
+              setOperations(currentOperations);
+            })
+            .catch((cause: unknown) => {
+              if (selectedCampaignBinding.current === campaign.campaign_id) setError(projectError(cause));
+            });
         }}>View current status</button>
       </li>)}</ul>}
     {selected && <CampaignTruthSummary
       campaign={selected}
       busy={busy}
-      onRecover={(action) => {
-        const campaignId = text(selected.campaign_id);
-        const etag = text(selected.etag);
-        if (!campaignId || !etag) {
-          setError("Current campaign recovery metadata is unavailable.");
-          return;
-        }
-        setBusy(true);
-        setError(null);
-        void client.recoverCampaignCore(
-          action,
-          campaignId,
-          etag,
-          action === "stop"
-            ? "Operator requested campaign containment from persistent status."
-            : "Operator revoked campaign authority from persistent status.",
-        ).then((updated) => client.getCampaignCoreCampaign(updated.campaign_id))
-          .then((value) => setSelected(value))
-          .catch((cause: unknown) => setError(projectError(cause)))
-          .finally(() => setBusy(false));
+      futureAuthorityRevoked={operations?.authority.state === "revoked"}
+      onRecover={(action, trigger) => {
+        recoveryTrigger.current = trigger;
+        setPendingAction(action);
       }}
     />}
+    {pendingAction && <div className="campaign-recovery-dialog" role="dialog" aria-labelledby="campaign-recovery-dialog-title">
+      <h3 id="campaign-recovery-dialog-title">
+        {pendingAction === "stop" ? "Confirm containment request" : "Confirm future-authority revocation"}
+      </h3>
+      <p>{pendingAction === "stop"
+        ? "This requests server-owned containment. It does not claim that active effects are already contained."
+        : "This revokes future campaign authority. Existing effects still require server-owned reconciliation and cleanup."}</p>
+      <div className="button-row">
+        <button ref={confirmationButton} className="danger-action" onClick={() => {
+          const action = pendingAction;
+          setPendingAction(null);
+          recover(action);
+        }}>{pendingAction === "stop" ? "Confirm containment request" : "Confirm future-authority revocation"}</button>
+        <button onClick={() => {
+          setPendingAction(null);
+          globalThis.setTimeout(() => recoveryTrigger.current?.focus(), 0);
+        }}>Cancel</button>
+      </div>
+    </div>}
+    {selected && operations && <CampaignOperationsWorkspace operations={operations} />}
   </section>;
 }
 
@@ -322,11 +389,13 @@ export function CampaignAttentionFeature({
 function CampaignTruthSummary({
   campaign,
   busy,
+  futureAuthorityRevoked,
   onRecover,
 }: {
   campaign: Record<string, unknown>;
   busy: boolean;
-  onRecover: (action: "stop" | "revoke") => void;
+  futureAuthorityRevoked: boolean;
+  onRecover: (action: "stop" | "revoke", trigger: HTMLButtonElement) => void;
 }) {
   const authority = record(campaign.authority);
   const context = record(campaign.context);
@@ -337,6 +406,7 @@ function CampaignTruthSummary({
   const findings = Array.isArray(campaign.findings) ? campaign.findings : [];
   return <aside aria-label="Selected campaign truth">
     <h3>{text(campaign.label) ?? "Selected campaign"}</h3>
+    <p role="status">{human(text(campaign.status) ?? "unavailable")}</p>
     <dl className="record-grid">
       <div><dt>Authority</dt><dd>{human(text(authority.state) ?? "unavailable")}</dd></div>
       <div><dt>Snapshot</dt><dd>{text(context.freshness) ?? "Unavailable"}</dd></div>
@@ -348,10 +418,140 @@ function CampaignTruthSummary({
     </dl>
     <p>{text(recovery.guidance) ?? "Review current evidence and governed recovery state."}</p>
     <div className="button-row">
-      {recovery.stop_visible !== false && <button className="danger-action" disabled={busy} onClick={() => onRecover("stop")}>Stop &amp; revoke</button>}
-      {recovery.revoke_visible !== false && <button disabled={busy} onClick={() => onRecover("revoke")}>Revoke authority</button>}
+      {recovery.stop_visible !== false && <button className="danger-action" disabled={busy} onClick={(event) => onRecover("stop", event.currentTarget)}>Request containment</button>}
+      {recovery.revoke_visible !== false && !futureAuthorityRevoked && <button disabled={busy} onClick={(event) => onRecover("revoke", event.currentTarget)}>Revoke future authority</button>}
     </div>
   </aside>;
+}
+
+
+function CampaignOperationsWorkspace({ operations }: { operations: CampaignOperations }) {
+  const budgetDimensions = Object.entries(operations.budget.dimensions);
+  return <section className="campaign-operations" aria-labelledby="campaign-operations-title">
+    <header className="campaign-operations__header">
+      <div>
+        <span className="eyebrow">Server-owned operational truth</span>
+        <h3 id="campaign-operations-title">Autonomous campaign operations</h3>
+      </div>
+      <span className={`status-chip status-chip--${statusTone(operations.preparation_state)}`}>
+        {human(operations.preparation_state)}
+      </span>
+    </header>
+
+    <div className="campaign-operations__summary" aria-label="Authority validation and admission status">
+      <article>
+        <span>Approval binding</span>
+        <strong>{title(operations.authority.state)}</strong>
+        <small>{operations.authority.expires_at ? `Expires ${formatTime(operations.authority.expires_at)}` : "No retained expiry is available"}</small>
+      </article>
+      <article>
+        <span>Independent validation</span>
+        <strong>{title(operations.validation.result)}</strong>
+        <small>{operations.validation.reason ? human(operations.validation.reason) : "No validator exception reported"}</small>
+      </article>
+      <article>
+        <span>Admission</span>
+        <strong>{title(operations.admission.outcome)}</strong>
+        <small>{operations.admission.reason ? human(operations.admission.reason) : "No admission receipt is available"}</small>
+      </article>
+      <article>
+        <span>Execution</span>
+        <strong>{title(operations.execution.state)}</strong>
+        <small>{operations.execution.transition_count} of {operations.execution.max_transitions} bounded transitions</small>
+      </article>
+    </div>
+
+    <details className="campaign-operations__binding">
+      <summary>Exact authority binding</summary>
+      <dl className="record-grid">
+        <div><dt>Signed authority SHA-256</dt><dd><code>{operations.authority.signed_authority_sha256 ?? "Unavailable"}</code></dd></div>
+        <div><dt>Authority SHA-256</dt><dd><code>{operations.authority.authority_sha256 ?? "Unavailable"}</code></dd></div>
+        <div><dt>Admission receipt SHA-256</dt><dd><code>{operations.admission.receipt_sha256 ?? "Unavailable"}</code></dd></div>
+        <div><dt>Lifecycle epoch</dt><dd>{operations.authority.lifecycle_epoch ?? "Unavailable"}</dd></div>
+        <div><dt>Policy revocation epoch</dt><dd>{operations.authority.policy_revocation_epoch ?? "Unavailable"}</dd></div>
+        <div><dt>Rules-of-engagement epoch</dt><dd>{operations.authority.roe_revocation_epoch ?? "Unavailable"}</dd></div>
+        <div><dt>Kill-switch epoch</dt><dd>{operations.authority.kill_switch_epoch ?? "Unavailable"}</dd></div>
+      </dl>
+    </details>
+
+    {operations.validation.counterexample_codes.length > 0 && <aside className="campaign-operations__denial" aria-label="Validator counterexamples">
+      <strong>Preparation was denied by bounded validation</strong>
+      <ul>{operations.validation.counterexample_codes.map((code) => <li key={code}>{title(code.replaceAll("-", "_"))}</li>)}</ul>
+    </aside>}
+
+    <div className="campaign-operations__grid">
+      <article className="campaign-operations__panel campaign-operations__plan">
+        <div className="campaign-operations__panel-heading">
+          <div><span className="eyebrow">Plan and live frontier</span><h4>{operations.plan.revision_label}</h4></div>
+          <span>{operations.plan.nodes.length} steps</span>
+        </div>
+        {operations.plan.nodes.length === 0
+          ? <p>No accepted planner revision is available for this campaign.</p>
+          : <ol className="campaign-plan-list" aria-label="Plan ordered steps">
+            {operations.plan.nodes.map((node) => <li key={`${node.order}-${node.label}`}>
+              <span className="campaign-plan-list__index" aria-hidden="true">{node.order + 1}</span>
+              <div><strong>{node.label}</strong><span>{node.capability}</span></div>
+              <span className={`status-chip status-chip--${statusTone(node.state)}`}>{human(node.state)}</span>
+            </li>)}
+          </ol>}
+        {operations.plan.edges.length > 0 && <ul className="campaign-plan-edges" aria-label="Plan relationships">
+          {operations.plan.edges.map((edge) => <li key={`${edge.source}-${edge.target}`}>{edge.source} → {edge.target}</li>)}
+        </ul>}
+        {Object.keys(operations.execution.frontier).length > 0 && <p className="campaign-operations__note">
+          Frontier: {Object.entries(operations.execution.frontier).map(([state, count]) => `${count} ${human(state)}`).join(" · ")}
+        </p>}
+      </article>
+
+      <article className="campaign-operations__panel">
+        <div className="campaign-operations__panel-heading"><div><span className="eyebrow">Residual authority</span><h4>Budget</h4></div></div>
+        {budgetDimensions.length === 0 || operations.budget.state === "unavailable"
+          ? <p>No admitted campaign budget is available.</p>
+          : <ul className="campaign-budget-list">{budgetDimensions.map(([name, dimension]) => <li key={name}>
+            <strong>{human(name)}</strong>
+            <span>{dimension.residual ?? 0} of {dimension.authorized ?? 0} {dimension.unit} remaining</span>
+          </li>)}</ul>}
+      </article>
+
+      <article className="campaign-operations__panel">
+        <div className="campaign-operations__panel-heading"><div><span className="eyebrow">Trusted only</span><h4>Observations</h4></div></div>
+        {operations.observations.length === 0 ? <p>No trusted observation has been promoted.</p> : <ul className="campaign-detail-list">
+          {operations.observations.map((observation, index) => <li key={`${observation.observation_sha256 ?? "observation"}-${index}`}>
+            <strong>{observation.fact}</strong><span>{human(observation.producer_kind)} · {human(observation.freshness)}</span>
+          </li>)}
+        </ul>}
+      </article>
+
+      <article className="campaign-operations__panel">
+        <div className="campaign-operations__panel-heading"><div><span className="eyebrow">Bounded lineage</span><h4>Revision differences</h4></div></div>
+        {operations.revisions.length === 0 ? <p>No bounded replan proposal is available.</p> : <ul className="campaign-detail-list">
+          {operations.revisions.map((revision) => <li key={`${revision.label}-${revision.proposal_sha256 ?? "unavailable"}`}>
+            <strong>{revision.label} · {human(revision.state)}</strong>
+            <span>{revision.invalidated_count} invalidated · {revision.retained_count} retained · {revision.substitution_count} substitution</span>
+          </li>)}
+        </ul>}
+      </article>
+
+      <article className="campaign-operations__panel">
+        <div className="campaign-operations__panel-heading"><div><span className="eyebrow">Allowlisted lineage</span><h4>Audit</h4></div></div>
+        {operations.audit.length === 0 ? <p>No campaign operations audit event is available.</p> : <ol className="campaign-detail-list">
+          {operations.audit.map((event, index) => <li key={`${event.details_sha256}-${index}`}>
+            <strong>{human(event.action)}</strong><span>{event.occurred_at ? formatTime(event.occurred_at) : "Time unavailable"}</span>
+          </li>)}
+        </ol>}
+      </article>
+
+      <article className="campaign-operations__panel">
+        <div className="campaign-operations__panel-heading"><div><span className="eyebrow">Evidence boundary</span><h4>Cleanup and export</h4></div></div>
+        <dl className="record-grid">
+          <div><dt>Effect receipts</dt><dd>{operations.evidence.effect_count}</dd></div>
+          <div><dt>Evidence records</dt><dd>{operations.evidence.evidence_count}</dd></div>
+          <div><dt>Cleanup</dt><dd>{human(operations.evidence.cleanup_state)}</dd></div>
+          <div><dt>Terminal receipt</dt><dd>{operations.evidence.terminal_receipt_present ? "Present" : "Not present"}</dd></div>
+        </dl>
+        <p className="campaign-operations__note">A verified retained bundle is not available. Export remains disabled until the server verifies the bundle and independent trust anchor.</p>
+      </article>
+    </div>
+  </section>;
 }
 
 function campaignStartKey(): string {
@@ -373,6 +573,25 @@ function text(value: unknown): string | null {
 
 function human(value: string): string {
   return value.replaceAll("_", " ");
+}
+
+
+function title(value: string): string {
+  const normalized = human(value);
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+
+function formatTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+
+function statusTone(value: string): "good" | "warn" | "bad" | "neutral" {
+  if (["admitted", "valid", "running", "confirmed", "complete", "terminal"].includes(value)) return "good";
+  if (["denied", "failed", "expired", "revoked"].includes(value)) return "bad";
+  if (["unavailable", "not_prepared", "manual_review_required", "reconciliation_required", "stopping"].includes(value)) return "warn";
+  return "neutral";
 }
 
 function projectError(cause: unknown): string {

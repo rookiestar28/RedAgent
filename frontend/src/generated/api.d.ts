@@ -345,6 +345,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/campaign-core/campaigns/{campaign_id}/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Campaign Operations */
+        get: operations["get_campaign_operations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaign-core/campaigns/{campaign_id}/revoke": {
         parameters: {
             query?: never;
@@ -3090,6 +3107,195 @@ export interface components {
         CampaignMutationResponse: {
             data: components["schemas"]["CampaignData"];
             meta: components["schemas"]["MutationMeta"];
+        };
+        /** CampaignOperationsAdmissionData */
+        CampaignOperationsAdmissionData: {
+            /** Outcome */
+            outcome: string;
+            /** Reason */
+            reason?: string | null;
+            /** Receipt Sha256 */
+            receipt_sha256?: string | null;
+        };
+        /** CampaignOperationsAuditData */
+        CampaignOperationsAuditData: {
+            /** Action */
+            action: string;
+            /** Correlation Id */
+            correlation_id: string;
+            /** Details Sha256 */
+            details_sha256: string;
+            /** Occurred At */
+            occurred_at?: string | null;
+        };
+        /** CampaignOperationsAuthorityData */
+        CampaignOperationsAuthorityData: {
+            /** Authority Sha256 */
+            authority_sha256?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Kill Switch Epoch */
+            kill_switch_epoch?: number | null;
+            /** Lifecycle Epoch */
+            lifecycle_epoch?: number | null;
+            /** Policy Revocation Epoch */
+            policy_revocation_epoch?: number | null;
+            /** Roe Revocation Epoch */
+            roe_revocation_epoch?: number | null;
+            /** Signed Authority Sha256 */
+            signed_authority_sha256?: string | null;
+            /** State */
+            state: string;
+        };
+        /** CampaignOperationsBudgetData */
+        CampaignOperationsBudgetData: {
+            /** Dimensions */
+            dimensions: {
+                [key: string]: components["schemas"]["CampaignOperationsBudgetDimensionData"];
+            };
+            /** State */
+            state: string;
+        };
+        /** CampaignOperationsBudgetDimensionData */
+        CampaignOperationsBudgetDimensionData: {
+            /** Authorized */
+            authorized?: number | null;
+            /** Committed */
+            committed?: number | null;
+            /** Residual */
+            residual?: number | null;
+            /** Unit */
+            unit: string;
+        };
+        /** CampaignOperationsData */
+        CampaignOperationsData: {
+            admission: components["schemas"]["CampaignOperationsAdmissionData"];
+            /** Aggregate Version */
+            aggregate_version: number;
+            /** Audit */
+            audit: components["schemas"]["CampaignOperationsAuditData"][];
+            authority: components["schemas"]["CampaignOperationsAuthorityData"];
+            budget: components["schemas"]["CampaignOperationsBudgetData"];
+            /** Etag */
+            etag: string;
+            evidence: components["schemas"]["CampaignOperationsEvidenceData"];
+            execution: components["schemas"]["CampaignOperationsExecutionData"];
+            /** Observations */
+            observations: components["schemas"]["CampaignOperationsObservationData"][];
+            plan: components["schemas"]["CampaignOperationsPlanData"];
+            /** Preparation State */
+            preparation_state: string;
+            /** Revisions */
+            revisions: components["schemas"]["CampaignOperationsRevisionData"][];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "redagent.campaign-operations/v1";
+            validation: components["schemas"]["CampaignOperationsValidationData"];
+        };
+        /** CampaignOperationsEvidenceData */
+        CampaignOperationsEvidenceData: {
+            /** Cleanup State */
+            cleanup_state: string;
+            /** Effect Count */
+            effect_count: number;
+            /** Evidence Count */
+            evidence_count: number;
+            /**
+             * Export State
+             * @constant
+             */
+            export_state: "unavailable_without_verified_bundle";
+            /** Terminal Receipt Present */
+            terminal_receipt_present: boolean;
+        };
+        /** CampaignOperationsExecutionData */
+        CampaignOperationsExecutionData: {
+            /** Frontier */
+            frontier: {
+                [key: string]: number;
+            };
+            /** Max Transitions */
+            max_transitions: number;
+            /** State */
+            state: string;
+            /** Stop Requested */
+            stop_requested: boolean;
+            /** Terminal Reason */
+            terminal_reason?: string | null;
+            /** Transition Count */
+            transition_count: number;
+        };
+        /** CampaignOperationsObservationData */
+        CampaignOperationsObservationData: {
+            /** Fact */
+            fact: string;
+            /** Freshness */
+            freshness: string;
+            /** Observation Sha256 */
+            observation_sha256?: string | null;
+            /** Producer Kind */
+            producer_kind: string;
+            /** Provenance Sha256 */
+            provenance_sha256?: string | null;
+        };
+        /** CampaignOperationsPlanData */
+        CampaignOperationsPlanData: {
+            /** Edges */
+            edges: components["schemas"]["CampaignOperationsPlanEdgeData"][];
+            /** Nodes */
+            nodes: components["schemas"]["CampaignOperationsPlanNodeData"][];
+            /** Parent Revision Present */
+            parent_revision_present: boolean;
+            /** Revision Label */
+            revision_label: string;
+        };
+        /** CampaignOperationsPlanEdgeData */
+        CampaignOperationsPlanEdgeData: {
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /** CampaignOperationsPlanNodeData */
+        CampaignOperationsPlanNodeData: {
+            /** Capability */
+            capability: string;
+            /** Label */
+            label: string;
+            /** Order */
+            order: number;
+            /** State */
+            state: string;
+        };
+        /** CampaignOperationsResponse */
+        CampaignOperationsResponse: {
+            data: components["schemas"]["CampaignOperationsData"];
+        };
+        /** CampaignOperationsRevisionData */
+        CampaignOperationsRevisionData: {
+            /** Invalidated Count */
+            invalidated_count: number;
+            /** Label */
+            label: string;
+            /** Proposal Sha256 */
+            proposal_sha256?: string | null;
+            /** Retained Count */
+            retained_count: number;
+            /** State */
+            state: string;
+            /** Substitution Count */
+            substitution_count: number;
+        };
+        /** CampaignOperationsValidationData */
+        CampaignOperationsValidationData: {
+            /** Counterexample Codes */
+            counterexample_codes: string[];
+            /** Reason */
+            reason?: string | null;
+            /** Result */
+            result: string;
         };
         /** CampaignResponse */
         CampaignResponse: {
@@ -8704,6 +8910,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["R124CampaignInspectorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_campaign_operations: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOperationsResponse"];
                 };
             };
             /** @description Validation Error */

@@ -14,9 +14,9 @@ from redagent_platform.api.app import create_app
 
 
 WORKSPACE = Path(__file__).resolve().parents[2]
-EXPECTED_ROUTE_COUNT = 137
+EXPECTED_ROUTE_COUNT = 138
 EXPECTED_ROUTE_MANIFEST_SHA256 = (
-    "99c85d6f1763bedafa0c80bef89f593665800c73001c6aef049fa616fbacc0d5"  # pragma: allowlist secret
+    "e5902a36a3a383f81ebb7c33757e48b8c6f471c91f8f98d23692bb156c67ae92"  # pragma: allowlist secret
 )
 EXPECTED_SCHEMA_EXPORT_COUNT = 337
 EXPECTED_SCHEMA_EXPORT_SHA256 = (

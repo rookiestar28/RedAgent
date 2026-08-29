@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Callable, Literal
 
 from fastapi import APIRouter, Depends, Header, Path, Query, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from redagent_platform.campaign_service.qualification import (
     OwnedLoopbackQualificationIntentV1,
@@ -14,6 +14,7 @@ from redagent_platform.campaign_service.qualification import (
     CampaignQualificationService,
     CampaignStatusService,
 )
+from redagent_platform.campaign_service.operations import CampaignOperationsProjectionInvalid
 from redagent_platform.campaign_service.status import (
     CampaignStatusNotFound,
     CampaignStatusOwner,
@@ -34,6 +35,7 @@ CAMPAIGN_CORE_INSPECT_OPERATION_ID = "inspect_r124_campaign"
 CAMPAIGN_CORE_ATTENTION_OPERATION_ID = "list_r124_attention"
 CAMPAIGN_CORE_STOP_OPERATION_ID = "stop_r124_campaign"
 CAMPAIGN_CORE_REVOKE_OPERATION_ID = "revoke_r124_campaign"
+CAMPAIGN_OPERATIONS_GET_OPERATION_ID = "get_campaign_operations"
 
 
 class _StrictModel(BaseModel):
@@ -277,6 +279,122 @@ class CampaignCoreAttentionPageResponse(_StrictModel):
     page: CampaignCorePageData
 
 
+class CampaignOperationsAuthorityData(_StrictModel):
+    state: str = Field(min_length=1, max_length=32)
+    signed_authority_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    authority_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    lifecycle_epoch: int | None = Field(default=None, ge=0)
+    policy_revocation_epoch: int | None = Field(default=None, ge=0)
+    roe_revocation_epoch: int | None = Field(default=None, ge=0)
+    kill_switch_epoch: int | None = Field(default=None, ge=0)
+    expires_at: datetime | None = None
+
+
+class CampaignOperationsPlanNodeData(_StrictModel):
+    label: str = Field(min_length=1, max_length=100)
+    capability: str = Field(min_length=1, max_length=150)
+    state: str = Field(min_length=1, max_length=32)
+    order: int = Field(ge=0, le=1_000_000)
+
+
+class CampaignOperationsPlanEdgeData(_StrictModel):
+    source: str = Field(min_length=1, max_length=100)
+    target: str = Field(min_length=1, max_length=100)
+
+
+class CampaignOperationsPlanData(_StrictModel):
+    revision_label: str = Field(min_length=1, max_length=100)
+    parent_revision_present: bool
+    nodes: tuple[CampaignOperationsPlanNodeData, ...] = Field(max_length=100)
+    edges: tuple[CampaignOperationsPlanEdgeData, ...] = Field(max_length=200)
+
+
+class CampaignOperationsValidationData(_StrictModel):
+    result: str = Field(min_length=1, max_length=32)
+    reason: str | None = Field(default=None, max_length=150)
+    counterexample_codes: tuple[str, ...] = Field(max_length=100)
+
+
+class CampaignOperationsAdmissionData(_StrictModel):
+    outcome: str = Field(min_length=1, max_length=32)
+    reason: str | None = Field(default=None, max_length=100)
+    receipt_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+
+
+class CampaignOperationsBudgetDimensionData(_StrictModel):
+    authorized: int | None = Field(default=None, ge=0)
+    committed: int | None = Field(default=None, ge=0)
+    residual: int | None = Field(default=None, ge=0)
+    unit: str = Field(min_length=1, max_length=32)
+
+
+class CampaignOperationsBudgetData(_StrictModel):
+    state: str = Field(min_length=1, max_length=32)
+    dimensions: dict[str, CampaignOperationsBudgetDimensionData]
+
+
+class CampaignOperationsExecutionData(_StrictModel):
+    state: str = Field(min_length=1, max_length=32)
+    transition_count: int = Field(ge=0)
+    max_transitions: int = Field(ge=0)
+    stop_requested: bool
+    terminal_reason: str | None = Field(default=None, max_length=100)
+    frontier: dict[str, int]
+
+
+class CampaignOperationsObservationData(_StrictModel):
+    fact: str = Field(min_length=1, max_length=150)
+    producer_kind: str = Field(min_length=1, max_length=32)
+    observation_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    provenance_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    freshness: str = Field(min_length=1, max_length=32)
+
+
+class CampaignOperationsRevisionData(_StrictModel):
+    label: str = Field(min_length=1, max_length=100)
+    state: str = Field(min_length=1, max_length=32)
+    proposal_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    invalidated_count: int = Field(ge=0, le=100)
+    retained_count: int = Field(ge=0, le=100)
+    substitution_count: int = Field(ge=0, le=100)
+
+
+class CampaignOperationsAuditData(_StrictModel):
+    action: str = Field(min_length=1, max_length=100)
+    occurred_at: datetime | None = None
+    correlation_id: str = Field(min_length=1, max_length=100)
+    details_sha256: str = Field(min_length=64, max_length=64)
+
+
+class CampaignOperationsEvidenceData(_StrictModel):
+    effect_count: int = Field(ge=0, le=100)
+    evidence_count: int = Field(ge=0)
+    cleanup_state: str = Field(min_length=1, max_length=32)
+    terminal_receipt_present: bool
+    export_state: Literal["unavailable_without_verified_bundle"]
+
+
+class CampaignOperationsData(_StrictModel):
+    schema_version: Literal["redagent.campaign-operations/v1"]
+    aggregate_version: int = Field(ge=1)
+    etag: str = Field(min_length=3, max_length=100)
+    preparation_state: str = Field(min_length=1, max_length=32)
+    authority: CampaignOperationsAuthorityData
+    plan: CampaignOperationsPlanData
+    validation: CampaignOperationsValidationData
+    admission: CampaignOperationsAdmissionData
+    budget: CampaignOperationsBudgetData
+    execution: CampaignOperationsExecutionData
+    observations: tuple[CampaignOperationsObservationData, ...] = Field(max_length=100)
+    revisions: tuple[CampaignOperationsRevisionData, ...] = Field(max_length=100)
+    audit: tuple[CampaignOperationsAuditData, ...] = Field(max_length=100)
+    evidence: CampaignOperationsEvidenceData
+
+
+class CampaignOperationsResponse(_StrictModel):
+    data: CampaignOperationsData
+
+
 def build_campaign_router(
     *,
     require_guard: Callable[..., object],
@@ -324,9 +442,7 @@ def build_campaign_router(
         ),
         guard=Depends(require_guard("campaign:read", safety_preserving=True)),
     ) -> CampaignStatusResponse:
-        owner: CampaignStatusOwner | None = (
-            request.app.state.r123_campaign_status_owner
-        )
+        owner: CampaignStatusOwner | None = request.app.state.r123_campaign_status_owner
         if owner is None:
             raise api_error(
                 503,
@@ -381,9 +497,7 @@ def build_campaign_router(
         request: Request,
         guard=Depends(require_guard("campaign:create", mutation=True)),
     ) -> CampaignQualificationResponse:
-        service: CampaignQualificationService | None = (
-            request.app.state.r123_qualification_service
-        )
+        service: CampaignQualificationService | None = request.app.state.r123_qualification_service
         if service is None:
             raise api_error(
                 503,
@@ -399,12 +513,14 @@ def build_campaign_router(
         if not isinstance(receipt, QualificationStartReceiptV1):
             raise ValueError("r123_qualification_start_receipt_invalid")
         return CampaignQualificationResponse(
-            data=CampaignQualificationData(**{
-                "schema_version": receipt.schema_version,
-                "campaign_id": receipt.campaign_id,
-                "aggregate_sequence": receipt.aggregate_sequence,
-                "status": receipt.status,
-            })
+            data=CampaignQualificationData(
+                **{
+                    "schema_version": receipt.schema_version,
+                    "campaign_id": receipt.campaign_id,
+                    "aggregate_sequence": receipt.aggregate_sequence,
+                    "status": receipt.status,
+                }
+            )
         )
 
     def core_service(request: Request):
@@ -416,6 +532,16 @@ def build_campaign_router(
                 "The campaign core is unavailable.",
             )
         return service
+
+    def operations_owner(request: Request):
+        owner = getattr(request.app.state, "campaign_operations_owner", None)
+        if owner is None or not callable(getattr(owner, "read", None)):
+            raise api_error(
+                503,
+                "campaign_operations_unavailable",
+                "The campaign operations projection is unavailable.",
+            )
+        return owner
 
     @selected_router.get(
         "/api/v1/campaign-core/options/engagements",
@@ -586,6 +712,48 @@ def build_campaign_router(
             raise api_error(403, "principal_inactive", "Current principal is inactive.") from exc
 
     @selected_router.get(
+        "/api/v1/campaign-core/campaigns/{campaign_id}/operations",
+        operation_id=CAMPAIGN_OPERATIONS_GET_OPERATION_ID,
+        name=CAMPAIGN_OPERATIONS_GET_OPERATION_ID,
+        response_model=CampaignOperationsResponse,
+    )
+    async def get_campaign_operations(
+        request: Request,
+        response: Response,
+        campaign_id: str = Path(min_length=1, max_length=64),
+        guard=Depends(require_guard("campaign:inspect")),
+    ) -> object:
+        try:
+            read_at = clock()
+            # IMPORTANT: retain the campaign-core principal activity and campaign existence check;
+            # the operations owner is a projection, not a replacement authorization source.
+            await core_service(request).read_campaign(
+                tenant_id=guard.security.tenant_id,
+                principal_id=guard.security.subject,
+                campaign_id=campaign_id,
+                now=read_at,
+            )
+            projected = await operations_owner(request).read(
+                tenant_id=guard.security.tenant_id,
+                campaign_id=campaign_id,
+                now=read_at,
+            )
+            validated = CampaignOperationsData.model_validate(projected)
+        except CampaignStatusNotFound as exc:
+            raise api_error(404, "campaign_not_found", "Campaign was not found.") from exc
+        except CampaignCorePrincipalInactive as exc:
+            raise api_error(403, "principal_inactive", "Current principal is inactive.") from exc
+        except (CampaignOperationsProjectionInvalid, ValidationError) as exc:
+            raise api_error(
+                503,
+                "campaign_operations_projection_invalid",
+                "Stored campaign operations material cannot be projected safely.",
+            ) from exc
+        response.headers["ETag"] = validated.etag
+        response.headers["Cache-Control"] = "private, no-store"
+        return CampaignOperationsResponse(data=validated)
+
+    @selected_router.get(
         "/api/v1/campaign-core/attention",
         operation_id=CAMPAIGN_CORE_ATTENTION_OPERATION_ID,
         name=CAMPAIGN_CORE_ATTENTION_OPERATION_ID,
@@ -656,8 +824,12 @@ def build_campaign_router(
         guard=Depends(require_guard("campaign:stop", mutation=True, safety_preserving=True)),
     ) -> object:
         return await recover_campaign(
-            action="stop", payload=payload, request=request, campaign_id=campaign_id,
-            if_match=if_match, guard=guard,
+            action="stop",
+            payload=payload,
+            request=request,
+            campaign_id=campaign_id,
+            if_match=if_match,
+            guard=guard,
         )
 
     @selected_router.post(
@@ -675,8 +847,12 @@ def build_campaign_router(
         guard=Depends(require_guard("campaign:stop", mutation=True, safety_preserving=True)),
     ) -> object:
         return await recover_campaign(
-            action="revoke", payload=payload, request=request, campaign_id=campaign_id,
-            if_match=if_match, guard=guard,
+            action="revoke",
+            payload=payload,
+            request=request,
+            campaign_id=campaign_id,
+            if_match=if_match,
+            guard=guard,
         )
 
     return selected_router

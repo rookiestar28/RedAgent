@@ -2475,6 +2475,712 @@
         "title": "CampaignMutationResponse",
         "type": "object"
       },
+      "CampaignOperationsAdmissionData": {
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "receipt_sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Sha256"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "CampaignOperationsAdmissionData",
+        "type": "object"
+      },
+      "CampaignOperationsAuditData": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Action",
+            "type": "string"
+          },
+          "correlation_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "details_sha256": {
+            "maxLength": 64,
+            "minLength": 64,
+            "title": "Details Sha256",
+            "type": "string"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
+          }
+        },
+        "required": [
+          "action",
+          "correlation_id",
+          "details_sha256"
+        ],
+        "title": "CampaignOperationsAuditData",
+        "type": "object"
+      },
+      "CampaignOperationsAuthorityData": {
+        "additionalProperties": false,
+        "properties": {
+          "authority_sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authority Sha256"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "kill_switch_epoch": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kill Switch Epoch"
+          },
+          "lifecycle_epoch": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifecycle Epoch"
+          },
+          "policy_revocation_epoch": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Revocation Epoch"
+          },
+          "roe_revocation_epoch": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe Revocation Epoch"
+          },
+          "signed_authority_sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed Authority Sha256"
+          },
+          "state": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "CampaignOperationsAuthorityData",
+        "type": "object"
+      },
+      "CampaignOperationsBudgetData": {
+        "additionalProperties": false,
+        "properties": {
+          "dimensions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CampaignOperationsBudgetDimensionData"
+            },
+            "title": "Dimensions",
+            "type": "object"
+          },
+          "state": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "dimensions"
+        ],
+        "title": "CampaignOperationsBudgetData",
+        "type": "object"
+      },
+      "CampaignOperationsBudgetDimensionData": {
+        "additionalProperties": false,
+        "properties": {
+          "authorized": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authorized"
+          },
+          "committed": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed"
+          },
+          "residual": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Residual"
+          },
+          "unit": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit"
+        ],
+        "title": "CampaignOperationsBudgetDimensionData",
+        "type": "object"
+      },
+      "CampaignOperationsData": {
+        "additionalProperties": false,
+        "properties": {
+          "admission": {
+            "$ref": "#/components/schemas/CampaignOperationsAdmissionData"
+          },
+          "aggregate_version": {
+            "minimum": 1.0,
+            "title": "Aggregate Version",
+            "type": "integer"
+          },
+          "audit": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignOperationsAuditData"
+            },
+            "maxItems": 100,
+            "title": "Audit",
+            "type": "array"
+          },
+          "authority": {
+            "$ref": "#/components/schemas/CampaignOperationsAuthorityData"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/CampaignOperationsBudgetData"
+          },
+          "etag": {
+            "maxLength": 100,
+            "minLength": 3,
+            "title": "Etag",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/CampaignOperationsEvidenceData"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/CampaignOperationsExecutionData"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignOperationsObservationData"
+            },
+            "maxItems": 100,
+            "title": "Observations",
+            "type": "array"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/CampaignOperationsPlanData"
+          },
+          "preparation_state": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Preparation State",
+            "type": "string"
+          },
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignOperationsRevisionData"
+            },
+            "maxItems": 100,
+            "title": "Revisions",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "redagent.campaign-operations/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/CampaignOperationsValidationData"
+          }
+        },
+        "required": [
+          "schema_version",
+          "aggregate_version",
+          "etag",
+          "preparation_state",
+          "authority",
+          "plan",
+          "validation",
+          "admission",
+          "budget",
+          "execution",
+          "observations",
+          "revisions",
+          "audit",
+          "evidence"
+        ],
+        "title": "CampaignOperationsData",
+        "type": "object"
+      },
+      "CampaignOperationsEvidenceData": {
+        "additionalProperties": false,
+        "properties": {
+          "cleanup_state": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Cleanup State",
+            "type": "string"
+          },
+          "effect_count": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Effect Count",
+            "type": "integer"
+          },
+          "evidence_count": {
+            "minimum": 0.0,
+            "title": "Evidence Count",
+            "type": "integer"
+          },
+          "export_state": {
+            "const": "unavailable_without_verified_bundle",
+            "title": "Export State",
+            "type": "string"
+          },
+          "terminal_receipt_present": {
+            "title": "Terminal Receipt Present",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "effect_count",
+          "evidence_count",
+          "cleanup_state",
+          "terminal_receipt_present",
+          "export_state"
+        ],
+        "title": "CampaignOperationsEvidenceData",
+        "type": "object"
+      },
+      "CampaignOperationsExecutionData": {
+        "additionalProperties": false,
+        "properties": {
+          "frontier": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Frontier",
+            "type": "object"
+          },
+          "max_transitions": {
+            "minimum": 0.0,
+            "title": "Max Transitions",
+            "type": "integer"
+          },
+          "state": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "State",
+            "type": "string"
+          },
+          "stop_requested": {
+            "title": "Stop Requested",
+            "type": "boolean"
+          },
+          "terminal_reason": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Reason"
+          },
+          "transition_count": {
+            "minimum": 0.0,
+            "title": "Transition Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "state",
+          "transition_count",
+          "max_transitions",
+          "stop_requested",
+          "frontier"
+        ],
+        "title": "CampaignOperationsExecutionData",
+        "type": "object"
+      },
+      "CampaignOperationsObservationData": {
+        "additionalProperties": false,
+        "properties": {
+          "fact": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Fact",
+            "type": "string"
+          },
+          "freshness": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Freshness",
+            "type": "string"
+          },
+          "observation_sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observation Sha256"
+          },
+          "producer_kind": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Producer Kind",
+            "type": "string"
+          },
+          "provenance_sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Sha256"
+          }
+        },
+        "required": [
+          "fact",
+          "producer_kind",
+          "freshness"
+        ],
+        "title": "CampaignOperationsObservationData",
+        "type": "object"
+      },
+      "CampaignOperationsPlanData": {
+        "additionalProperties": false,
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignOperationsPlanEdgeData"
+            },
+            "maxItems": 200,
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignOperationsPlanNodeData"
+            },
+            "maxItems": 100,
+            "title": "Nodes",
+            "type": "array"
+          },
+          "parent_revision_present": {
+            "title": "Parent Revision Present",
+            "type": "boolean"
+          },
+          "revision_label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Revision Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_label",
+          "parent_revision_present",
+          "nodes",
+          "edges"
+        ],
+        "title": "CampaignOperationsPlanData",
+        "type": "object"
+      },
+      "CampaignOperationsPlanEdgeData": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "title": "CampaignOperationsPlanEdgeData",
+        "type": "object"
+      },
+      "CampaignOperationsPlanNodeData": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Capability",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "order": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Order",
+            "type": "integer"
+          },
+          "state": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "capability",
+          "state",
+          "order"
+        ],
+        "title": "CampaignOperationsPlanNodeData",
+        "type": "object"
+      },
+      "CampaignOperationsResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CampaignOperationsData"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "CampaignOperationsResponse",
+        "type": "object"
+      },
+      "CampaignOperationsRevisionData": {
+        "additionalProperties": false,
+        "properties": {
+          "invalidated_count": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Invalidated Count",
+            "type": "integer"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "proposal_sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposal Sha256"
+          },
+          "retained_count": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Retained Count",
+            "type": "integer"
+          },
+          "state": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "State",
+            "type": "string"
+          },
+          "substitution_count": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Substitution Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "state",
+          "invalidated_count",
+          "retained_count",
+          "substitution_count"
+        ],
+        "title": "CampaignOperationsRevisionData",
+        "type": "object"
+      },
+      "CampaignOperationsValidationData": {
+        "additionalProperties": false,
+        "properties": {
+          "counterexample_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Counterexample Codes",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "result": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result",
+          "counterexample_codes"
+        ],
+        "title": "CampaignOperationsValidationData",
+        "type": "object"
+      },
       "CampaignResponse": {
         "additionalProperties": false,
         "properties": {
@@ -18497,6 +19203,143 @@
           }
         },
         "summary": "Inspect R124 Campaign"
+      }
+    },
+    "/api/v1/campaign-core/campaigns/{campaign_id}/operations": {
+      "get": {
+        "operationId": "get_campaign_operations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Policy-Reference",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Policy-Reference"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-ROE-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Roe-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Subject",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Subject"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Permissions",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Permissions"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOperationsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Campaign Operations"
       }
     },
     "/api/v1/campaign-core/campaigns/{campaign_id}/revoke": {
