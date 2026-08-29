@@ -8,6 +8,11 @@ import json
 from sqlalchemy import insert, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from redagent_platform.campaign_service.admission_contracts import AdmissionOutcome
+from redagent_platform.campaign_service.admission_repository import (
+    AdmissionConflict,
+    _receipt_from_payload,
+)
 from redagent_platform.campaign_service.planning.contracts import canonical_planning_bytes
 from redagent_platform.campaign_service.replanning_contracts import (
     AcceptedBoundedReplanV1,
@@ -16,6 +21,7 @@ from redagent_platform.campaign_service.replanning_contracts import (
 from redagent_platform.campaign_service.trusted_observations import (
     ObservationCandidateV1,
     ObservationPromotionDecisionV1,
+    ObservationProducerKind,
 )
 from redagent_platform.persistence.models import metadata
 
@@ -43,7 +49,49 @@ class CampaignReplanningRepository:
             or decision.candidate_sha256 != candidate.candidate_sha256
         ):
             raise ReplanningPersistenceConflict("observation_persistence_binding_mismatch")
+        trusted = decision.trusted_observation
+        if trusted is not None and trusted.candidate != candidate:
+            raise ReplanningPersistenceConflict("observation_persistence_trusted_candidate_mismatch")
         await self._set_tenant()
+        if trusted is not None and candidate.producer.kind is ObservationProducerKind.DAG_RUNNER_RESULT:
+            effects = metadata.tables["campaign_effects"]
+            nodes = metadata.tables["campaign_execution_nodes"]
+            persisted_source = (
+                await self.session.execute(
+                    select(
+                        effects.c.effect_receipt_sha256,
+                        effects.c.effect_state,
+                        effects.c.reconciliation_state,
+                        effects.c.execution_run_id,
+                        effects.c.node_id,
+                        nodes.c.node_state,
+                    ).select_from(
+                        effects.join(
+                            nodes,
+                            (nodes.c.tenant_id == effects.c.tenant_id)
+                            & (nodes.c.execution_run_id == effects.c.execution_run_id)
+                            & (nodes.c.campaign_id == effects.c.campaign_id)
+                            & (nodes.c.node_id == effects.c.node_id),
+                        )
+                    ).where(
+                        effects.c.tenant_id == self.tenant_id,
+                        effects.c.campaign_id == campaign_id,
+                        effects.c.effect_id == trusted.source_record_id,
+                        effects.c.execution_run_id == trusted.source_execution_run_id,
+                        effects.c.node_id == trusted.source_node_id,
+                    )
+                )
+            ).mappings().one_or_none()
+            if (
+                persisted_source is None
+                or persisted_source["effect_receipt_sha256"] != candidate.source_result_sha256
+                or persisted_source["effect_receipt_sha256"] != candidate.evidence_sha256
+                or persisted_source["effect_state"] not in {"confirmed", "not_applied"}
+                or persisted_source["reconciliation_state"]
+                != persisted_source["effect_state"]
+                or persisted_source["node_state"] != persisted_source["effect_state"]
+            ):
+                raise ReplanningPersistenceConflict("observation_persistence_source_receipt_mismatch")
         decisions = metadata.tables["campaign_observation_decisions"]
         existing = (
             await self.session.execute(
@@ -74,7 +122,6 @@ class CampaignReplanningRepository:
                 **owned,
             )
         )
-        trusted = decision.trusted_observation
         if trusted is not None:
             item = trusted.candidate
             await self.session.execute(
@@ -87,6 +134,9 @@ class CampaignReplanningRepository:
                     producer_kind=item.producer.kind.value,
                     producer_id=item.producer.producer_id,
                     producer_version=item.producer.producer_version,
+                    source_record_id=trusted.source_record_id,
+                    source_execution_run_id=trusted.source_execution_run_id,
+                    source_node_id=trusted.source_node_id,
                     observation_sha256=trusted.observation_sha256,
                     provenance_sha256=trusted.provenance_sha256,
                     source_result_sha256=item.source_result_sha256,
@@ -109,9 +159,31 @@ class CampaignReplanningRepository:
         occurred_at: datetime,
     ) -> str:
         child = proposal.child_revision
-        if child.tenant_id != self.tenant_id:
+        if (
+            child.tenant_id != self.tenant_id
+            or proposal.campaign_id != campaign_id
+            or proposal.engagement_id != child.engagement_id
+        ):
             raise ReplanningPersistenceConflict("replan_persistence_tenant_mismatch")
         await self._set_tenant()
+        parent_receipt = await self._admission_receipt(
+            receipt_id=proposal.parent_admission_receipt_id,
+            campaign_id=campaign_id,
+            receipt_sha256=proposal.parent_admission_receipt_sha256,
+        )
+        if (
+            parent_receipt.outcome is not AdmissionOutcome.ADMITTED
+            or parent_receipt.engagement_id != proposal.engagement_id
+            or parent_receipt.plan_sha256 != proposal.parent_plan_sha256
+            or parent_receipt.authority_sha256 != proposal.parent_authority_sha256
+            or parent_receipt.domain_sha256 != proposal.parent_domain_sha256
+            or parent_receipt.lifecycle_epoch != proposal.lifecycle_epoch
+            or parent_receipt.policy_revocation_epoch != proposal.policy_revocation_epoch
+            or parent_receipt.roe_revocation_epoch != proposal.roe_revocation_epoch
+            or parent_receipt.kill_switch_epoch != proposal.kill_switch_epoch
+            or not parent_receipt.issued_at <= occurred_at < parent_receipt.expires_at
+        ):
+            raise ReplanningPersistenceConflict("replan_persistence_parent_admission_mismatch")
         table = metadata.tables["campaign_replan_proposals"]
         existing = (
             await self.session.execute(
@@ -141,10 +213,14 @@ class CampaignReplanningRepository:
             insert(table).values(
                 id=proposal_id,
                 campaign_id=campaign_id,
+                engagement_id=proposal.engagement_id,
                 request_sha256=proposal.request_sha256,
                 proposal_sha256=proposal.proposal_sha256,
                 parent_revision_id=proposal.parent_revision_id,
                 parent_revision_sha256=proposal.parent_revision_sha256,
+                parent_plan_sha256=proposal.parent_plan_sha256,
+                parent_authority_sha256=proposal.parent_authority_sha256,
+                parent_domain_sha256=proposal.parent_domain_sha256,
                 parent_admission_receipt_id=proposal.parent_admission_receipt_id,
                 parent_admission_receipt_sha256=proposal.parent_admission_receipt_sha256,
                 child_revision_id=child.revision_id,
@@ -190,6 +266,31 @@ class CampaignReplanningRepository:
         # CRITICAL: an admission-bound child cannot be attached to a different persisted proposal.
         if persisted_proposal != accepted.proposal.proposal_sha256:
             raise ReplanningPersistenceConflict("replan_acceptance_proposal_binding_mismatch")
+        child_receipt = await self._admission_receipt(
+            receipt_id=accepted.child_admission_receipt_id,
+            campaign_id=campaign_id,
+            receipt_sha256=accepted.child_admission_receipt_sha256,
+        )
+        proposal = accepted.proposal
+        if (
+            child_receipt.outcome is not AdmissionOutcome.ADMITTED
+            or child_receipt.engagement_id != proposal.engagement_id
+            or child_receipt.plan_sha256 != proposal.child_revision.candidate_plan.plan_sha256
+            or child_receipt.authority_sha256 != proposal.child_revision.authority_sha256
+            or child_receipt.domain_sha256 != proposal.child_revision.domain_sha256
+            or child_receipt.certificate_sha256
+            != proposal.validation_certificate.certificate_sha256
+            or child_receipt.subset_proof_sha256 != proposal.subset_proof.proof_sha256
+            or child_receipt.pre_residual_budget_sha256 != proposal.residual_budget.budget_sha256
+            or child_receipt.reserved_budget != proposal.planned_budget
+            or child_receipt.reservation_id != accepted.reservation_id
+            or child_receipt.lifecycle_epoch != proposal.lifecycle_epoch
+            or child_receipt.policy_revocation_epoch != proposal.policy_revocation_epoch
+            or child_receipt.roe_revocation_epoch != proposal.roe_revocation_epoch
+            or child_receipt.kill_switch_epoch != proposal.kill_switch_epoch
+            or not child_receipt.issued_at <= occurred_at < child_receipt.expires_at
+        ):
+            raise ReplanningPersistenceConflict("replan_acceptance_admission_binding_mismatch")
         table = metadata.tables["campaign_replan_acceptances"]
         existing = (
             await self.session.execute(
@@ -208,6 +309,7 @@ class CampaignReplanningRepository:
             insert(table).values(
                 id=acceptance_id,
                 proposal_id=proposal_id,
+                proposal_sha256=accepted.proposal.proposal_sha256,
                 campaign_id=campaign_id,
                 admission_receipt_id=accepted.child_admission_receipt_id,
                 admission_receipt_sha256=accepted.child_admission_receipt_sha256,
@@ -218,6 +320,33 @@ class CampaignReplanningRepository:
             )
         )
         return acceptance_id
+
+    async def _admission_receipt(
+        self,
+        *,
+        receipt_id: str,
+        campaign_id: str,
+        receipt_sha256: str,
+    ):
+        table = metadata.tables["plan_admission_receipts"]
+        row = (
+            await self.session.execute(
+                select(table.c.receipt_sha256, table.c.receipt_payload).where(
+                    table.c.tenant_id == self.tenant_id,
+                    table.c.id == receipt_id,
+                    table.c.campaign_id == campaign_id,
+                )
+            )
+        ).mappings().one_or_none()
+        if row is None or row["receipt_sha256"] != receipt_sha256:
+            raise ReplanningPersistenceConflict("replan_persistence_admission_digest_mismatch")
+        try:
+            receipt = _receipt_from_payload(row["receipt_payload"])
+        except (AdmissionConflict, KeyError, TypeError, ValueError) as exc:
+            raise ReplanningPersistenceConflict("replan_persistence_admission_payload_invalid") from exc
+        if receipt.receipt_sha256 != receipt_sha256:
+            raise ReplanningPersistenceConflict("replan_persistence_admission_payload_digest_mismatch")
+        return receipt
 
     async def _set_tenant(self) -> None:
         await self.session.execute(

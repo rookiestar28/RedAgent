@@ -20,6 +20,11 @@ def _owned_columns() -> tuple[sa.Column, ...]:
 
 
 def upgrade() -> None:
+    op.create_unique_constraint(
+        "uq_plan_admission_receipt_tenant_campaign_digest",
+        "plan_admission_receipts",
+        ("tenant_id", "id", "campaign_id", "receipt_sha256"),
+    )
     op.create_table(
         "campaign_observation_decisions",
         sa.Column("id", sa.String(64), primary_key=True),
@@ -60,6 +65,9 @@ def upgrade() -> None:
         sa.Column("producer_kind", sa.String(32), nullable=False),
         sa.Column("producer_id", sa.String(150), nullable=False),
         sa.Column("producer_version", sa.String(150), nullable=False),
+        sa.Column("source_record_id", sa.String(150), nullable=False),
+        sa.Column("source_execution_run_id", sa.String(64)),
+        sa.Column("source_node_id", sa.String(100)),
         sa.Column("observation_sha256", sa.String(64), nullable=False),
         sa.Column("provenance_sha256", sa.String(64), nullable=False),
         sa.Column("source_result_sha256", sa.String(64), nullable=False),
@@ -79,16 +87,33 @@ def upgrade() -> None:
             ),
             name="fk_trusted_campaign_observation_tenant_decision_campaign",
         ),
+        sa.ForeignKeyConstraint(
+            ("tenant_id", "source_execution_run_id", "source_node_id"),
+            (
+                "campaign_execution_nodes.tenant_id",
+                "campaign_execution_nodes.execution_run_id",
+                "campaign_execution_nodes.node_id",
+            ),
+            name="fk_trusted_observation_tenant_execution_node",
+        ),
+        sa.CheckConstraint(
+            "(source_execution_run_id IS NULL) = (source_node_id IS NULL)",
+            name="trusted_observation_execution_source_complete",
+        ),
         sa.UniqueConstraint("tenant_id", "observation_sha256", name="uq_trusted_campaign_observation_digest"),
     )
     op.create_table(
         "campaign_replan_proposals",
         sa.Column("id", sa.String(64), primary_key=True),
         sa.Column("campaign_id", sa.String(64), nullable=False),
+        sa.Column("engagement_id", sa.String(64), nullable=False),
         sa.Column("request_sha256", sa.String(64), nullable=False),
         sa.Column("proposal_sha256", sa.String(64), nullable=False),
         sa.Column("parent_revision_id", sa.String(150), nullable=False),
         sa.Column("parent_revision_sha256", sa.String(64), nullable=False),
+        sa.Column("parent_plan_sha256", sa.String(64), nullable=False),
+        sa.Column("parent_authority_sha256", sa.String(64), nullable=False),
+        sa.Column("parent_domain_sha256", sa.String(64), nullable=False),
         sa.Column("parent_admission_receipt_id", sa.String(64), nullable=False),
         sa.Column("parent_admission_receipt_sha256", sa.String(64), nullable=False),
         sa.Column("child_revision_id", sa.String(150), nullable=False),
@@ -112,16 +137,22 @@ def upgrade() -> None:
             name="fk_campaign_replan_proposal_tenant_campaign",
         ),
         sa.ForeignKeyConstraint(
-            ("tenant_id", "parent_admission_receipt_id", "campaign_id"),
+            (
+                "tenant_id",
+                "parent_admission_receipt_id",
+                "campaign_id",
+                "parent_admission_receipt_sha256",
+            ),
             (
                 "plan_admission_receipts.tenant_id",
                 "plan_admission_receipts.id",
                 "plan_admission_receipts.campaign_id",
+                "plan_admission_receipts.receipt_sha256",
             ),
             name="fk_campaign_replan_proposal_tenant_parent_admission_campaign",
         ),
         sa.UniqueConstraint(
-            "tenant_id", "id", "campaign_id", name="uq_campaign_replan_proposal_identity"
+            "tenant_id", "id", "campaign_id", "proposal_sha256", name="uq_campaign_replan_proposal_identity"
         ),
         sa.UniqueConstraint("tenant_id", "request_sha256", name="uq_campaign_replan_request"),
         sa.UniqueConstraint("tenant_id", "proposal_sha256", name="uq_campaign_replan_proposal_digest"),
@@ -145,6 +176,7 @@ def upgrade() -> None:
         "campaign_replan_acceptances",
         sa.Column("id", sa.String(64), primary_key=True),
         sa.Column("proposal_id", sa.String(64), nullable=False),
+        sa.Column("proposal_sha256", sa.String(64), nullable=False),
         sa.Column("campaign_id", sa.String(64), nullable=False),
         sa.Column("admission_receipt_id", sa.String(64), nullable=False),
         sa.Column("admission_receipt_sha256", sa.String(64), nullable=False),
@@ -153,20 +185,22 @@ def upgrade() -> None:
         sa.Column("acceptance_payload", sa.JSON(), nullable=False),
         *_owned_columns(),
         sa.ForeignKeyConstraint(
-            ("tenant_id", "proposal_id", "campaign_id"),
+            ("tenant_id", "proposal_id", "campaign_id", "proposal_sha256"),
             (
                 "campaign_replan_proposals.tenant_id",
                 "campaign_replan_proposals.id",
                 "campaign_replan_proposals.campaign_id",
+                "campaign_replan_proposals.proposal_sha256",
             ),
             name="fk_campaign_replan_acceptance_tenant_proposal_campaign",
         ),
         sa.ForeignKeyConstraint(
-            ("tenant_id", "admission_receipt_id", "campaign_id"),
+            ("tenant_id", "admission_receipt_id", "campaign_id", "admission_receipt_sha256"),
             (
                 "plan_admission_receipts.tenant_id",
                 "plan_admission_receipts.id",
                 "plan_admission_receipts.campaign_id",
+                "plan_admission_receipts.receipt_sha256",
             ),
             name="fk_campaign_replan_acceptance_tenant_admission_campaign",
         ),
@@ -202,6 +236,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    connection = op.get_bind()
+    populated = tuple(
+        table_name
+        for table_name in (
+            "campaign_observation_decisions",
+            "trusted_campaign_observations",
+            "campaign_replan_proposals",
+            "campaign_replan_acceptances",
+        )
+        if connection.execute(sa.text(f"SELECT 1 FROM {table_name} LIMIT 1")).first()
+        is not None
+    )
+    # CRITICAL: immutable observation/replan evidence survives rollback; populated downgrade refuses.
+    if populated:
+        raise RuntimeError("observation_replanning_downgrade_requires_empty_lineage")
     for table_name in reversed(
         (
             "campaign_observation_decisions",
@@ -216,3 +265,8 @@ def downgrade() -> None:
     op.drop_table("campaign_replan_proposals")
     op.drop_table("trusted_campaign_observations")
     op.drop_table("campaign_observation_decisions")
+    op.drop_constraint(
+        "uq_plan_admission_receipt_tenant_campaign_digest",
+        "plan_admission_receipts",
+        type_="unique",
+    )

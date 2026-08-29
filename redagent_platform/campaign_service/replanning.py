@@ -51,11 +51,13 @@ def bind_replan_admission(
     *,
     proposal: BoundedReplanProposalV1,
     admission_receipt: PlanAdmissionReceiptV1,
+    now: datetime,
 ) -> AcceptedBoundedReplanV1:
     if not isinstance(proposal, BoundedReplanProposalV1) or not isinstance(
         admission_receipt, PlanAdmissionReceiptV1
     ):
         raise ValueError("replan_admission_input_invalid")
+    _aware(now)
     if (
         admission_receipt.receipt_id == proposal.parent_admission_receipt_id
         or admission_receipt.receipt_sha256 == proposal.parent_admission_receipt_sha256
@@ -67,6 +69,8 @@ def bind_replan_admission(
     if (
         admission_receipt.outcome is not AdmissionOutcome.ADMITTED
         or admission_receipt.tenant_id != child.tenant_id
+        or admission_receipt.campaign_id != proposal.campaign_id
+        or admission_receipt.engagement_id != proposal.engagement_id
         or admission_receipt.plan_sha256 != child.candidate_plan.plan_sha256
         or admission_receipt.authority_sha256 != child.authority_sha256
         or admission_receipt.domain_sha256 != child.domain_sha256
@@ -81,6 +85,7 @@ def bind_replan_admission(
         or admission_receipt.policy_revocation_epoch != proposal.policy_revocation_epoch
         or admission_receipt.roe_revocation_epoch != proposal.roe_revocation_epoch
         or admission_receipt.kill_switch_epoch != proposal.kill_switch_epoch
+        or not admission_receipt.issued_at <= now < admission_receipt.expires_at
     ):
         raise ValueError("replan_child_admission_binding_mismatch")
     return _build_accepted_bounded_replan(
@@ -100,7 +105,6 @@ def prepare_bounded_replan(
     lifecycle: CampaignAuthorityLifecycleV2,
     domain: PlanningDomainV1,
     residual_budget: CampaignBudgetVectorV1,
-    search_limits: PlannerSearchLimitsV1,
     now: datetime,
 ) -> BoundedReplanResultV1:
     if (
@@ -111,10 +115,10 @@ def prepare_bounded_replan(
         or not isinstance(lifecycle, CampaignAuthorityLifecycleV2)
         or not isinstance(domain, PlanningDomainV1)
         or not isinstance(residual_budget, CampaignBudgetVectorV1)
-        or not isinstance(search_limits, PlannerSearchLimitsV1)
     ):
         raise ValueError("replan_input_invalid")
     _aware(now)
+    search_limits = derive_replan_search_limits(authority)
     if (
         request.parent_revision_id != parent_revision.revision_id
         or request.parent_revision_sha256 != parent_revision.revision_sha256
@@ -134,6 +138,7 @@ def prepare_bounded_replan(
         or parent_admission_receipt.plan_sha256 != parent_revision.candidate_plan.plan_sha256
         or parent_admission_receipt.authority_sha256 != parent_revision.authority_sha256
         or parent_admission_receipt.domain_sha256 != parent_revision.domain_sha256
+        or not parent_admission_receipt.issued_at <= now < parent_admission_receipt.expires_at
     ):
         # CRITICAL: a same-campaign receipt for another plan is not parent execution authority.
         return _result(
@@ -211,8 +216,13 @@ def prepare_bounded_replan(
     proposal = BoundedReplanProposalV1(
         schema_version=REPLAN_PROPOSAL_SCHEMA_VERSION,
         request_sha256=request.request_sha256,
+        campaign_id=request.campaign_id,
+        engagement_id=request.engagement_id,
         parent_revision_id=parent_revision.revision_id,
         parent_revision_sha256=parent_revision.revision_sha256,
+        parent_plan_sha256=parent_revision.candidate_plan.plan_sha256,
+        parent_authority_sha256=parent_revision.authority_sha256,
+        parent_domain_sha256=parent_revision.domain_sha256,
         parent_admission_receipt_id=request.parent_admission_receipt_id,
         parent_admission_receipt_sha256=request.parent_admission_receipt_sha256,
         child_revision=child_revision,
@@ -240,6 +250,21 @@ def prepare_bounded_replan(
         outcome=ReplanOutcome.CHILD_PROPOSED,
         reason_code="child_proposed",
         proposal=proposal,
+    )
+
+
+def derive_replan_search_limits(authority: CampaignAuthorityEnvelopeV2) -> PlannerSearchLimitsV1:
+    if not isinstance(authority, CampaignAuthorityEnvelopeV2):
+        raise ValueError("replan_search_authority_required")
+    bounds = authority.bounds
+    # CRITICAL: autonomous callers cannot widen search; limits derive only from signed authority.
+    return PlannerSearchLimitsV1(
+        max_expanded_states=bounds.max_nodes,
+        max_generated_states=min(10_000_000, bounds.max_nodes * bounds.max_width),
+        max_frontier=bounds.max_frontier,
+        max_search_ticks=min(1_000_000_000, bounds.max_search_seconds * 1_000),
+        max_memory_units=min(1_000_000_000, bounds.max_nodes + bounds.max_frontier),
+        max_action_variants=bounds.max_width,
     )
 
 

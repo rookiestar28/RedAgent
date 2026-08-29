@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 from datetime import timedelta
+import inspect
 
 import pytest
 
@@ -22,10 +23,10 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
     DagNodeState,
     DagRunState,
 )
-from redagent_platform.campaign_service.planning.contracts import ScalarType
 from redagent_platform.campaign_service.planning.search import plan_attack_path
 from redagent_platform.campaign_service.replanning import (
     bind_replan_admission,
+    derive_replan_search_limits,
     prepare_bounded_replan,
 )
 from redagent_platform.campaign_service.replanning_contracts import (
@@ -39,7 +40,7 @@ from redagent_platform.campaign_service.replanning_contracts import (
 )
 from redagent_platform.campaign_service.trusted_observations import evaluate_observation_history
 from tests.unit.test_campaign_attack_path_planner import search_limits
-from tests.unit.test_campaign_planning_contracts import NOW, authority, domain, scalar, world
+from tests.unit.test_campaign_planning_contracts import NOW, authority, domain, world
 from tests.unit.test_trusted_observations import _candidate, _policy, _trusted
 
 
@@ -122,7 +123,6 @@ def _request(**overrides: object) -> ReplanRequestV1:
             policy_revocation_epoch=authority().policy_revocation_epoch,
             roe_revocation_epoch=authority().roe_revocation_epoch,
             kill_switch_epoch=authority().kill_switch_epoch,
-            value=scalar(ScalarType.INTEGER, 1),
         )
     observed = _trusted(
         observed_candidate,
@@ -164,7 +164,6 @@ def test_replan_is_parent_linked_deterministic_and_residual_bound() -> None:
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=residual,
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     second = prepare_bounded_replan(
@@ -175,7 +174,6 @@ def test_replan_is_parent_linked_deterministic_and_residual_bound() -> None:
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=residual,
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     storm_replay = prepare_bounded_replan(
@@ -186,7 +184,6 @@ def test_replan_is_parent_linked_deterministic_and_residual_bound() -> None:
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=residual,
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert first.outcome is ReplanOutcome.CHILD_PROPOSED
@@ -199,6 +196,15 @@ def test_replan_is_parent_linked_deterministic_and_residual_bound() -> None:
     )
     assert first.proposal.child_revision.parent_revision_id == parent.revision_id
     assert first.proposal.parent_revision_sha256 == parent.revision_sha256
+    assert first.proposal.campaign_id == "campaign-a"
+    assert first.proposal.engagement_id == "engagement-a"
+    assert first.proposal.parent_plan_sha256 == parent.candidate_plan.plan_sha256
+    assert first.proposal.parent_authority_sha256 == parent.authority_sha256
+    assert first.proposal.parent_domain_sha256 == parent.domain_sha256
+    assert (
+        first.proposal.search_receipt.limits_sha256
+        == derive_replan_search_limits(current_authority).limits_sha256
+    )
     assert first.proposal.observation_history_sha256 == _request().observation_history.history_sha256
     assert first.proposal.validation_certificate.admissible is True
     assert first.proposal.subset_proof.admissible is True
@@ -219,7 +225,8 @@ def test_replan_is_parent_linked_deterministic_and_residual_bound() -> None:
         "time_window",
     )
     assert first.proposal.planned_budget.fits_within(residual)
-    assert first.proposal.child_revision.initial_state_sha256 != parent.initial_state_sha256
+    assert first.proposal.child_revision.initial_state_sha256 == parent.initial_state_sha256
+    assert first.proposal.child_revision.revision_sha256 != parent.revision_sha256
     assert first.proposal.parent_admission_receipt_id == "admission-parent"
     with pytest.raises(FrozenInstanceError):
         first.proposal.parent_revision_sha256 = "f" * 64  # type: ignore[misc]
@@ -236,7 +243,6 @@ def test_replan_limit_lifecycle_drift_and_residual_exhaustion_fail_closed() -> N
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=authority_budget(current_authority),
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert exhausted.outcome is ReplanOutcome.REPLAN_LIMIT_EXHAUSTED
@@ -249,7 +255,6 @@ def test_replan_limit_lifecycle_drift_and_residual_exhaustion_fail_closed() -> N
         lifecycle=_lifecycle(state=CampaignAuthorityLifecycleState.REVOKED, revoked_at=NOW, reason_code="owner_revoked"),
         domain=domain(),
         residual_budget=authority_budget(current_authority),
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert revoked.outcome is ReplanOutcome.MANUAL_REVIEW_REQUIRED
@@ -264,7 +269,6 @@ def test_replan_limit_lifecycle_drift_and_residual_exhaustion_fail_closed() -> N
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=zero,
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert budget.outcome is ReplanOutcome.EXPANSION_REQUIRED
@@ -284,7 +288,6 @@ def test_replan_requires_exact_parent_admission_and_current_observation_freshnes
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=authority_budget(current_authority),
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert swapped.outcome is ReplanOutcome.MANUAL_REVIEW_REQUIRED
@@ -317,7 +320,6 @@ def test_replan_requires_exact_parent_admission_and_current_observation_freshnes
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=authority_budget(current_authority),
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=6),
     )
     assert expired.outcome is ReplanOutcome.MANUAL_REVIEW_REQUIRED
@@ -377,7 +379,6 @@ def test_planned_budget_is_not_reset_to_original_authority() -> None:
         lifecycle=_lifecycle(),
         domain=current_domain,
         residual_budget=residual,
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert result.outcome in {ReplanOutcome.CHILD_PROPOSED, ReplanOutcome.EXPANSION_REQUIRED}
@@ -410,7 +411,6 @@ def test_each_residual_budget_dimension_fails_closed_without_reset(dimension: st
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=residual,
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert result.outcome is ReplanOutcome.EXPANSION_REQUIRED
@@ -426,7 +426,6 @@ def test_child_requires_new_exact_r158_admission_and_parent_receipt_cannot_trans
         lifecycle=_lifecycle(),
         domain=domain(),
         residual_budget=authority_budget(authority()),
-        search_limits=search_limits(),
         now=NOW + timedelta(seconds=3),
     )
     assert result.proposal is not None
@@ -467,7 +466,11 @@ def test_child_requires_new_exact_r158_admission_and_parent_receipt_cannot_trans
         audit_id="audit-child",
         outbox_id="outbox-child",
     )
-    accepted = bind_replan_admission(proposal=proposal, admission_receipt=receipt)
+    accepted = bind_replan_admission(
+        proposal=proposal,
+        admission_receipt=receipt,
+        now=NOW + timedelta(seconds=5),
+    )
     assert accepted.schema_version == ACCEPTED_REPLAN_SCHEMA_VERSION
     assert accepted.child_admission_receipt_sha256 == receipt.receipt_sha256
     with pytest.raises(ValueError, match="accepted_replan_admission_binding_required"):
@@ -482,9 +485,40 @@ def test_child_requires_new_exact_r158_admission_and_parent_receipt_cannot_trans
         bind_replan_admission(
             proposal=proposal,
             admission_receipt=replace(receipt, receipt_id=proposal.parent_admission_receipt_id),
+            now=NOW + timedelta(seconds=5),
         )
     with pytest.raises(ValueError, match="replan_child_admission_binding_mismatch"):
         bind_replan_admission(
             proposal=proposal,
             admission_receipt=replace(receipt, plan_sha256="f" * 64),
+            now=NOW + timedelta(seconds=5),
         )
+
+    with pytest.raises(ValueError, match="replan_child_admission_binding_mismatch"):
+        bind_replan_admission(
+            proposal=proposal,
+            admission_receipt=replace(receipt, campaign_id="campaign-swapped"),
+            now=NOW + timedelta(seconds=5),
+        )
+    with pytest.raises(ValueError, match="replan_child_admission_binding_mismatch"):
+        bind_replan_admission(
+            proposal=proposal,
+            admission_receipt=replace(receipt, engagement_id="engagement-swapped"),
+            now=NOW + timedelta(seconds=5),
+        )
+    with pytest.raises(ValueError, match="replan_child_admission_binding_mismatch"):
+        bind_replan_admission(
+            proposal=proposal,
+            admission_receipt=receipt,
+            now=receipt.expires_at,
+        )
+    with pytest.raises(ValueError, match="replan_child_admission_binding_mismatch"):
+        bind_replan_admission(
+            proposal=proposal,
+            admission_receipt=receipt,
+            now=receipt.issued_at - timedelta(microseconds=1),
+        )
+
+
+def test_replan_search_limits_are_server_owned_not_a_caller_parameter() -> None:
+    assert "search_limits" not in inspect.signature(prepare_bounded_replan).parameters

@@ -254,6 +254,52 @@ async def _migration_scenario() -> None:
                     await connection.scalar(text("SELECT version_num FROM alembic_version"))
                     == settings.expected_revision
                 )
+                for statement in (
+                        "INSERT INTO tenants (id,name,version,created_at,updated_at) "
+                        "VALUES ('migration-retention-tenant','retention',1,now(),now())",
+                        "INSERT INTO engagements "
+                        "(id,name,owner_user_id,tenant_id,version,created_at,updated_at) VALUES "
+                        "('migration-retention-engagement','retention','owner',"
+                        "'migration-retention-tenant',1,now(),now())",
+                        "INSERT INTO roe_versions "
+                        "(id,engagement_id,revision,status,document,tenant_id,version,created_at,updated_at) "
+                        "VALUES ('migration-retention-roe','migration-retention-engagement',1,"
+                        "'active','{}','migration-retention-tenant',1,now(),now())",
+                        "INSERT INTO campaigns "
+                        "(id,engagement_id,roe_version_id,name,status,workflow_id,"
+                        "orchestration_revision,aggregate_sequence,replan_count,tenant_id,version,"
+                        "created_at,updated_at) VALUES ('migration-retention-campaign',"
+                        "'migration-retention-engagement','migration-retention-roe','retention',"
+                        "'active','migration-retention-workflow',1,0,0,"
+                        "'migration-retention-tenant',1,now(),now())",
+                        "INSERT INTO campaign_observation_decisions "
+                        "(id,campaign_id,candidate_sha256,decision_sha256,outcome,reason_code,"
+                        "candidate_payload,decision_payload,decided_at,tenant_id,version,created_at,updated_at) "
+                        "VALUES ('migration-retention-decision','migration-retention-campaign',"
+                        "repeat('a',64),repeat('b',64),'stale','observation_stale','{}','{}',now(),"
+                        "'migration-retention-tenant',1,now(),now())",
+                ):
+                    await connection.execute(text(statement))
+
+            populated_downgrade = _alembic(
+                secret_file,
+                "downgrade",
+                "0027_campaign_dag_execution",
+            )
+            assert populated_downgrade.returncode != 0
+            assert "observation_replanning_downgrade_requires_empty_lineage" in (
+                populated_downgrade.stdout + populated_downgrade.stderr
+            )
+            async with engine.begin() as connection:
+                assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == (
+                    settings.expected_revision
+                )
+                assert await connection.scalar(
+                    text(
+                        "SELECT count(*) FROM campaign_observation_decisions "
+                        "WHERE id = 'migration-retention-decision'"
+                    )
+                ) == 1
         finally:
             await engine.dispose()
     finally:

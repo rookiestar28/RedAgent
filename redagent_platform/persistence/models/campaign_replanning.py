@@ -60,6 +60,9 @@ Table(
     Column("producer_kind", String(32), nullable=False),
     Column("producer_id", String(150), nullable=False),
     Column("producer_version", String(150), nullable=False),
+    Column("source_record_id", String(150), nullable=False),
+    Column("source_execution_run_id", String(64)),
+    Column("source_node_id", String(100)),
     Column("observation_sha256", String(64), nullable=False),
     Column("provenance_sha256", String(64), nullable=False),
     Column("source_result_sha256", String(64), nullable=False),
@@ -79,6 +82,19 @@ Table(
         ),
         name="fk_trusted_campaign_observation_tenant_decision_campaign",
     ),
+    ForeignKeyConstraint(
+        ("tenant_id", "source_execution_run_id", "source_node_id"),
+        (
+            "campaign_execution_nodes.tenant_id",
+            "campaign_execution_nodes.execution_run_id",
+            "campaign_execution_nodes.node_id",
+        ),
+        name="fk_trusted_observation_tenant_execution_node",
+    ),
+    CheckConstraint(
+        "(source_execution_run_id IS NULL) = (source_node_id IS NULL)",
+        name="trusted_observation_execution_source_complete",
+    ),
     UniqueConstraint("tenant_id", "observation_sha256", name="uq_trusted_campaign_observation_digest"),
 )
 
@@ -87,10 +103,14 @@ Table(
     metadata,
     Column("id", String(64), primary_key=True),
     Column("campaign_id", String(64), nullable=False),
+    Column("engagement_id", String(64), nullable=False),
     Column("request_sha256", String(64), nullable=False),
     Column("proposal_sha256", String(64), nullable=False),
     Column("parent_revision_id", String(150), nullable=False),
     Column("parent_revision_sha256", String(64), nullable=False),
+    Column("parent_plan_sha256", String(64), nullable=False),
+    Column("parent_authority_sha256", String(64), nullable=False),
+    Column("parent_domain_sha256", String(64), nullable=False),
     Column("parent_admission_receipt_id", String(64), nullable=False),
     Column("parent_admission_receipt_sha256", String(64), nullable=False),
     Column("child_revision_id", String(150), nullable=False),
@@ -114,16 +134,22 @@ Table(
         name="fk_campaign_replan_proposal_tenant_campaign",
     ),
     ForeignKeyConstraint(
-        ("tenant_id", "parent_admission_receipt_id", "campaign_id"),
+        (
+            "tenant_id",
+            "parent_admission_receipt_id",
+            "campaign_id",
+            "parent_admission_receipt_sha256",
+        ),
         (
             "plan_admission_receipts.tenant_id",
             "plan_admission_receipts.id",
             "plan_admission_receipts.campaign_id",
+            "plan_admission_receipts.receipt_sha256",
         ),
         name="fk_campaign_replan_proposal_tenant_parent_admission_campaign",
     ),
     UniqueConstraint(
-        "tenant_id", "id", "campaign_id", name="uq_campaign_replan_proposal_identity"
+        "tenant_id", "id", "campaign_id", "proposal_sha256", name="uq_campaign_replan_proposal_identity"
     ),
     UniqueConstraint("tenant_id", "request_sha256", name="uq_campaign_replan_request"),
     UniqueConstraint("tenant_id", "proposal_sha256", name="uq_campaign_replan_proposal_digest"),
@@ -149,6 +175,7 @@ Table(
     metadata,
     Column("id", String(64), primary_key=True),
     Column("proposal_id", String(64), nullable=False),
+    Column("proposal_sha256", String(64), nullable=False),
     Column("campaign_id", String(64), nullable=False),
     Column("admission_receipt_id", String(64), nullable=False),
     Column("admission_receipt_sha256", String(64), nullable=False),
@@ -157,20 +184,22 @@ Table(
     Column("acceptance_payload", JSON, nullable=False),
     *_owned_columns(),
     ForeignKeyConstraint(
-        ("tenant_id", "proposal_id", "campaign_id"),
+        ("tenant_id", "proposal_id", "campaign_id", "proposal_sha256"),
         (
             "campaign_replan_proposals.tenant_id",
             "campaign_replan_proposals.id",
             "campaign_replan_proposals.campaign_id",
+            "campaign_replan_proposals.proposal_sha256",
         ),
         name="fk_campaign_replan_acceptance_tenant_proposal_campaign",
     ),
     ForeignKeyConstraint(
-        ("tenant_id", "admission_receipt_id", "campaign_id"),
+        ("tenant_id", "admission_receipt_id", "campaign_id", "admission_receipt_sha256"),
         (
             "plan_admission_receipts.tenant_id",
             "plan_admission_receipts.id",
             "plan_admission_receipts.campaign_id",
+            "plan_admission_receipts.receipt_sha256",
         ),
         name="fk_campaign_replan_acceptance_tenant_admission_campaign",
     ),

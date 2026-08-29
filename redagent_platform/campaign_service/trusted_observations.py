@@ -14,6 +14,11 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
     dag_workflow_request_sha256,
 )
 from redagent_platform.campaign_service.dag_execution_service import DagExecutionStartMaterialV1
+from redagent_platform.campaign_service.execution import (
+    EffectReceiptV1,
+    NodeObservedV1,
+    ReconciliationState,
+)
 from redagent_platform.campaign_service.contracts import (
     DetectionCorrelationDispositionV1,
     DetectionDisposition,
@@ -23,9 +28,12 @@ from redagent_platform.campaign_service.contracts import (
 )
 from redagent_platform.campaign_service.planning.contracts import (
     ScalarValueV1,
+    ScalarType,
+    PlanningDomainV1,
     WorldStateV1,
     canonical_planning_sha256,
 )
+from redagent_platform.campaign_service.planning.search_contracts import AttackPathDagRevisionV1
 
 
 PREDICTED_STATE_SCHEMA_VERSION = "redagent.predicted-state/v1"
@@ -157,6 +165,11 @@ class ObservationCandidateV1:
 class VerifiedObservationEvidenceV1:
     observation_sha256: str
     producer: ObservationProducerIdentityV1
+    source_record_id: str
+    source_execution_run_id: str | None
+    source_node_id: str | None
+    fact_id: str
+    value: ScalarValueV1
     source_result_sha256: str
     evidence_sha256: str
     verification_sha256: str
@@ -176,6 +189,15 @@ class VerifiedObservationEvidenceV1:
             _sha256(f"verified_observation_{name}", getattr(self, name))
         if not isinstance(self.producer, ObservationProducerIdentityV1):
             raise ValueError("verified_observation_producer_invalid")
+        _identifier("verified_observation_source_record", self.source_record_id)
+        if (self.source_execution_run_id is None) != (self.source_node_id is None):
+            raise ValueError("verified_observation_execution_source_incomplete")
+        if self.source_execution_run_id is not None:
+            _identifier("verified_observation_execution_run", self.source_execution_run_id)
+            _identifier("verified_observation_source_node", self.source_node_id)
+        _identifier("verified_observation_fact", self.fact_id)
+        if not isinstance(self.value, ScalarValueV1):
+            raise ValueError("verified_observation_value_invalid")
         _aware("verified_observation_time", self.verified_at)
 
 
@@ -187,7 +209,7 @@ class ObservationPromotionPolicyV1:
     engagement_id: str
     authority_sha256: str
     target_ids: tuple[str, ...]
-    allowed_producers: tuple[ObservationProducerIdentityV1, ...]
+    producer_registry_sha256: str
     lifecycle_epoch: int
     policy_revocation_epoch: int
     roe_revocation_epoch: int
@@ -201,25 +223,10 @@ class ObservationPromotionPolicyV1:
             _identifier(f"observation_policy_{name}", getattr(self, name))
         _sha256("observation_policy_authority", self.authority_sha256)
         _canonical_identifiers("observation_policy_targets", self.target_ids)
-        if (
-            not isinstance(self.allowed_producers, tuple)
-            or not self.allowed_producers
-            or any(not isinstance(item, ObservationProducerIdentityV1) for item in self.allowed_producers)
-            or tuple(sorted(set(self.allowed_producers), key=_producer_key)) != self.allowed_producers
-        ):
-            raise ValueError("observation_policy_producers_invalid")
-        # CRITICAL: belief-producing surfaces never become trusted merely by entering an allowlist.
-        if any(
-            item.kind
-            in {
-                ObservationProducerKind.MODEL_ASSERTION,
-                ObservationProducerKind.PLANNER_PREDICTION,
-                ObservationProducerKind.UI_ASSERTION,
-                ObservationProducerKind.UNVERIFIED_TELEMETRY,
-            }
-            for item in self.allowed_producers
-        ):
-            raise ValueError("observation_policy_untrusted_producer_forbidden")
+        _sha256("observation_policy_producer_registry", self.producer_registry_sha256)
+        # CRITICAL: the policy binds the server-owned registry; callers cannot extend trust.
+        if self.producer_registry_sha256 != TRUSTED_OBSERVATION_PRODUCER_REGISTRY_SHA256:
+            raise ValueError("observation_policy_producer_registry_invalid")
         for name in (
             "lifecycle_epoch",
             "policy_revocation_epoch",
@@ -234,6 +241,9 @@ class ObservationPromotionPolicyV1:
 class TrustedObservationV1:
     schema_version: str
     candidate: ObservationCandidateV1
+    source_record_id: str
+    source_execution_run_id: str | None
+    source_node_id: str | None
     provenance_sha256: str
     promoted_at: datetime
     _validation_token: InitVar[object] = None
@@ -246,6 +256,12 @@ class TrustedObservationV1:
             raise ValueError("trusted_observation_schema_unsupported")
         if not isinstance(self.candidate, ObservationCandidateV1):
             raise ValueError("trusted_observation_candidate_invalid")
+        _identifier("trusted_observation_source_record", self.source_record_id)
+        if (self.source_execution_run_id is None) != (self.source_node_id is None):
+            raise ValueError("trusted_observation_execution_source_incomplete")
+        if self.source_execution_run_id is not None:
+            _identifier("trusted_observation_execution_run", self.source_execution_run_id)
+            _identifier("trusted_observation_source_node", self.source_node_id)
         _sha256("trusted_observation_provenance", self.provenance_sha256)
         _aware("trusted_observation_promoted_at", self.promoted_at)
 
@@ -288,6 +304,11 @@ class ObservationPromotionDecisionV1:
             self.trusted_observation, TrustedObservationV1
         ):
             raise ValueError("observation_promotion_trust_binding_invalid")
+        if (
+            self.trusted_observation is not None
+            and self.trusted_observation.candidate.candidate_sha256 != self.candidate_sha256
+        ):
+            raise ValueError("observation_promotion_candidate_binding_invalid")
 
     @property
     def decision_sha256(self) -> str:
@@ -324,24 +345,39 @@ def verify_dag_node_observation_evidence(
     request: DagWorkflowInputV1,
     snapshot: DagExecutionSnapshotV1,
     execution_material: DagExecutionStartMaterialV1,
+    domain: PlanningDomainV1,
+    revision: AttackPathDagRevisionV1,
+    observed: NodeObservedV1,
+    effect_receipt: EffectReceiptV1,
     node_id: str,
-    result_sha256: str,
-    evidence_sha256: str,
     verified_at: datetime,
 ) -> VerifiedObservationEvidenceV1:
     if not isinstance(candidate, ObservationCandidateV1) or not isinstance(
         request, DagWorkflowInputV1
     ) or not isinstance(snapshot, DagExecutionSnapshotV1) or not isinstance(
         execution_material, DagExecutionStartMaterialV1
+    ) or not isinstance(domain, PlanningDomainV1) or not isinstance(
+        revision, AttackPathDagRevisionV1
+    ) or not isinstance(
+        observed, NodeObservedV1
+    ) or not isinstance(
+        effect_receipt, EffectReceiptV1
     ):
         raise ValueError("observation_dag_evidence_input_invalid")
     _identifier("observation_dag_node", node_id)
-    _sha256("observation_dag_result", result_sha256)
-    _sha256("observation_dag_evidence", evidence_sha256)
     _aware("observation_dag_verified_at", verified_at)
-    if candidate.producer.kind is not ObservationProducerKind.DAG_RUNNER_RESULT:
+    if candidate.producer != DAG_RESULT_PRODUCER_V1:
         raise ValueError("observation_dag_producer_invalid")
     matching_nodes = tuple(node for node in execution_material.nodes if node.node_id == node_id)
+    matching_operators = (
+        tuple(
+            operator
+            for operator in domain.operators
+            if operator.operator_id == matching_nodes[0].operator_id
+        )
+        if len(matching_nodes) == 1
+        else ()
+    )
     if (
         request.tenant_id != candidate.tenant_id
         or request != execution_material.workflow_input
@@ -354,16 +390,53 @@ def verify_dag_node_observation_evidence(
         or execution_material.policy_revocation_epoch != candidate.policy_revocation_epoch
         or execution_material.roe_revocation_epoch != candidate.roe_revocation_epoch
         or execution_material.kill_switch_epoch != candidate.kill_switch_epoch
+        or execution_material.domain_sha256 != domain.domain_sha256
+        or execution_material.plan_sha256 != revision.candidate_plan.plan_sha256
+        or revision.domain_sha256 != domain.domain_sha256
         or len(matching_nodes) != 1
         or matching_nodes[0].target_id != candidate.target_id
+        or len(matching_operators) != 1
+        or matching_operators[0].capability.capability_id != matching_nodes[0].capability_id
         or snapshot.execution_run_id != request.execution_run_id
         or snapshot.workflow_request_sha256 != dag_workflow_request_sha256(request)
         or snapshot.current_node_id != node_id
     ):
         raise ValueError("observation_dag_scope_binding_mismatch")
-    if snapshot.current_node_state is not DagNodeState.CONFIRMED:
-        raise ValueError("observation_dag_node_not_confirmed")
-    if result_sha256 != candidate.source_result_sha256 or evidence_sha256 != candidate.evidence_sha256:
+    current_node_state = snapshot.current_node_state
+    if current_node_state not in {DagNodeState.CONFIRMED, DagNodeState.NOT_APPLIED}:
+        raise ValueError("observation_dag_node_not_terminal")
+    assert current_node_state is not None
+    terminal_node_state = DagNodeState(current_node_state)
+    if (
+        observed.effect_state != terminal_node_state.value
+        or observed.effect_receipt_sha256 != effect_receipt.receipt_sha256
+        or not observed.evidence_complete
+        or not observed.reconciliation_complete
+        or observed.receipt_state is not effect_receipt.reconciliation_state
+        or effect_receipt.reconciliation_state
+        not in {ReconciliationState.CONFIRMED, ReconciliationState.NOT_APPLIED}
+    ):
+        raise ValueError("observation_dag_confirmed_receipt_required")
+    applied_assignments = {item.fact_id: item.value for item in matching_operators[0].effects}
+    if effect_receipt.reconciliation_state is ReconciliationState.CONFIRMED:
+        projected = applied_assignments
+    else:
+        initial = {
+            item.fact_id: item.value
+            for item in revision.candidate_plan.initial_state.values
+            if item.value is not None
+        }
+        projected = {
+            fact_id: initial[fact_id]
+            for fact_id in applied_assignments
+            if fact_id in initial
+        }
+    if candidate.fact_id not in projected or candidate.value != projected[candidate.fact_id]:
+        raise ValueError("observation_dag_fact_projection_mismatch")
+    if (
+        effect_receipt.receipt_sha256 != candidate.source_result_sha256
+        or effect_receipt.receipt_sha256 != candidate.evidence_sha256
+    ):
         raise ValueError("observation_dag_result_binding_mismatch")
     if not candidate.received_at <= verified_at < candidate.expires_at:
         raise ValueError("observation_dag_evidence_time_invalid")
@@ -375,16 +448,23 @@ def verify_dag_node_observation_evidence(
             execution_material.workflow_request_sha256,
             matching_nodes[0].node_sha256,
             node_id,
-            result_sha256,
-            evidence_sha256,
+            observed.observed_sha256,
+            effect_receipt.receipt_sha256,
+            candidate.fact_id,
+            candidate.value,
             verified_at,
         )
     )
     return VerifiedObservationEvidenceV1(
         observation_sha256=candidate.candidate_sha256,
         producer=candidate.producer,
-        source_result_sha256=result_sha256,
-        evidence_sha256=evidence_sha256,
+        source_record_id=effect_receipt.effect_id,
+        source_execution_run_id=execution_material.execution_run_id,
+        source_node_id=node_id,
+        fact_id=candidate.fact_id,
+        value=projected[candidate.fact_id],
+        source_result_sha256=effect_receipt.receipt_sha256,
+        evidence_sha256=effect_receipt.receipt_sha256,
         verification_sha256=verification_sha256,
         verified_at=verified_at,
         _validation_token=_VERIFIED_EVIDENCE_TOKEN,
@@ -397,6 +477,7 @@ def verify_detection_correlation_evidence(
     observation: DetectionObservationV1,
     correlation: DetectionCorrelationDispositionV1,
     execution_material: DagExecutionStartMaterialV1,
+    domain: PlanningDomainV1,
     verified_at: datetime,
 ) -> VerifiedObservationEvidenceV1:
     if (
@@ -404,10 +485,11 @@ def verify_detection_correlation_evidence(
         or not isinstance(observation, DetectionObservationV1)
         or not isinstance(correlation, DetectionCorrelationDispositionV1)
         or not isinstance(execution_material, DagExecutionStartMaterialV1)
+        or not isinstance(domain, PlanningDomainV1)
     ):
         raise ValueError("observation_detection_evidence_input_invalid")
     _aware("observation_detection_verified_at", verified_at)
-    if candidate.producer.kind is not ObservationProducerKind.DETECTION_CORRELATION:
+    if candidate.producer != DETECTION_CORRELATION_PRODUCER_V1:
         raise ValueError("observation_detection_producer_invalid")
     promotion = observation.promotion
     if (
@@ -423,6 +505,11 @@ def verify_detection_correlation_evidence(
         for node in execution_material.nodes
         if node.target_id == candidate.target_id and node.capability_id == observation.capability_id
     )
+    matching_operators = tuple(
+        operator
+        for operator in domain.operators
+        if any(node.operator_id == operator.operator_id for node in matching_nodes)
+    )
     if (
         candidate.tenant_id != execution_material.tenant_id
         or candidate.campaign_id != execution_material.campaign_id
@@ -432,7 +519,9 @@ def verify_detection_correlation_evidence(
         or candidate.policy_revocation_epoch != execution_material.policy_revocation_epoch
         or candidate.roe_revocation_epoch != execution_material.roe_revocation_epoch
         or candidate.kill_switch_epoch != execution_material.kill_switch_epoch
+        or execution_material.domain_sha256 != domain.domain_sha256
         or len(matching_nodes) != 1
+        or len(matching_operators) != 1
         or observation.correlation_key.split(":", 1)[0] != execution_material.execution_run_id
         or candidate.tenant_id != observation.tenant_id
         or candidate.engagement_id != observation.engagement_id
@@ -444,6 +533,15 @@ def verify_detection_correlation_evidence(
         or candidate.evidence_sha256 != observation.evidence_ref.sha256
     ):
         raise ValueError("observation_detection_correlation_binding_mismatch")
+    definitions = {item.fact_id: item for item in domain.facts}
+    fact = definitions.get(candidate.fact_id)
+    if (
+        candidate.fact_id not in matching_operators[0].observation_fact_ids
+        or fact is None
+        or fact.value_type is not ScalarType.BOOLEAN
+        or candidate.value != ScalarValueV1(ScalarType.BOOLEAN, True)
+    ):
+        raise ValueError("observation_detection_fact_projection_mismatch")
     if not correlation.evaluated_at <= verified_at < observation.expires_at:
         raise ValueError("observation_detection_correlation_time_invalid")
     verification_sha256 = canonical_planning_sha256(
@@ -459,6 +557,11 @@ def verify_detection_correlation_evidence(
     return VerifiedObservationEvidenceV1(
         observation_sha256=candidate.candidate_sha256,
         producer=candidate.producer,
+        source_record_id=observation.observation_id,
+        source_execution_run_id=None,
+        source_node_id=None,
+        fact_id=candidate.fact_id,
+        value=ScalarValueV1(ScalarType.BOOLEAN, True),
         source_result_sha256=candidate.source_result_sha256,
         evidence_sha256=candidate.evidence_sha256,
         verification_sha256=verification_sha256,
@@ -486,11 +589,13 @@ def promote_observation(
     if (
         evidence.observation_sha256 != candidate.candidate_sha256
         or evidence.producer != candidate.producer
+        or evidence.fact_id != candidate.fact_id
+        or evidence.value != candidate.value
         or evidence.source_result_sha256 != candidate.source_result_sha256
         or evidence.evidence_sha256 != candidate.evidence_sha256
     ):
         outcome, reason = ObservationPromotionOutcome.PROVENANCE_INVALID, "provenance_invalid"
-    elif candidate.producer not in policy.allowed_producers:
+    elif candidate.producer not in TRUSTED_OBSERVATION_PRODUCERS_V1:
         outcome, reason = ObservationPromotionOutcome.PRODUCER_DENIED, "producer_denied"
     elif (
         candidate.tenant_id != policy.tenant_id
@@ -519,6 +624,9 @@ def promote_observation(
         trusted = TrustedObservationV1(
             schema_version=TRUSTED_OBSERVATION_SCHEMA_VERSION,
             candidate=candidate,
+            source_record_id=evidence.source_record_id,
+            source_execution_run_id=evidence.source_execution_run_id,
+            source_node_id=evidence.source_node_id,
             provenance_sha256=evidence.verification_sha256,
             promoted_at=now,
             _validation_token=_TRUSTED_OBSERVATION_TOKEN,
@@ -598,3 +706,24 @@ def _bounded_int(name: str, value: object, minimum: int, maximum: int) -> None:
 def _aware(name: str, value: object) -> None:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{name}_timezone_required")
+
+
+DAG_RESULT_PRODUCER_V1 = ObservationProducerIdentityV1(
+    ObservationProducerKind.DAG_RUNNER_RESULT,
+    "campaign-dag-effect-receipt",
+    "redagent.r123-effect-receipt-v1",
+)
+DETECTION_CORRELATION_PRODUCER_V1 = ObservationProducerIdentityV1(
+    ObservationProducerKind.DETECTION_CORRELATION,
+    "detection-correlation",
+    "redagent.detection-correlation-v1",
+)
+TRUSTED_OBSERVATION_PRODUCERS_V1 = tuple(
+    sorted(
+        (DAG_RESULT_PRODUCER_V1, DETECTION_CORRELATION_PRODUCER_V1),
+        key=_producer_key,
+    )
+)
+TRUSTED_OBSERVATION_PRODUCER_REGISTRY_SHA256 = canonical_planning_sha256(
+    TRUSTED_OBSERVATION_PRODUCERS_V1
+)

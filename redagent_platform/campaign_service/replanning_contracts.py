@@ -113,8 +113,13 @@ class NodeSubstitutionV1:
 class BoundedReplanProposalV1:
     schema_version: str
     request_sha256: str
+    campaign_id: str
+    engagement_id: str
     parent_revision_id: str
     parent_revision_sha256: str
+    parent_plan_sha256: str
+    parent_authority_sha256: str
+    parent_domain_sha256: str
     parent_admission_receipt_id: str
     parent_admission_receipt_sha256: str
     child_revision: AttackPathDagRevisionV1
@@ -140,16 +145,21 @@ class BoundedReplanProposalV1:
         for name in (
             "request_sha256",
             "parent_revision_sha256",
+            "parent_plan_sha256",
+            "parent_authority_sha256",
+            "parent_domain_sha256",
             "parent_admission_receipt_sha256",
             "observation_history_sha256",
         ):
             _sha256(f"replan_proposal_{name}", getattr(self, name))
-        for name in ("parent_revision_id", "parent_admission_receipt_id"):
+        for name in ("campaign_id", "engagement_id", "parent_revision_id", "parent_admission_receipt_id"):
             _identifier(f"replan_proposal_{name}", getattr(self, name))
         if not isinstance(self.child_revision, AttackPathDagRevisionV1):
             raise ValueError("replan_proposal_child_invalid")
         if self.child_revision.parent_revision_id != self.parent_revision_id:
             raise ValueError("replan_proposal_parent_binding_mismatch")
+        if self.child_revision.engagement_id != self.engagement_id:
+            raise ValueError("replan_proposal_engagement_binding_mismatch")
         _canonical_digests("replan_proposal_observations", self.trusted_observation_sha256s)
         _canonical_ids("replan_proposal_invalidated", self.invalidated_parent_node_ids, allow_empty=True)
         _canonical_ids("replan_proposal_retained", self.retained_parent_node_ids, allow_empty=True)

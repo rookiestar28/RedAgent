@@ -156,6 +156,13 @@ Table(
     UniqueConstraint(
         "tenant_id", "id", "campaign_id", name="uq_plan_admission_receipt_tenant_campaign_identity"
     ),
+    UniqueConstraint(
+        "tenant_id",
+        "id",
+        "campaign_id",
+        "receipt_sha256",
+        name="uq_plan_admission_receipt_tenant_campaign_digest",
+    ),
     UniqueConstraint("tenant_id", "request_sha256", name="uq_plan_admission_receipt_request"),
     CheckConstraint("outcome IN ('admitted','denied')", name="plan_admission_outcome_closed"),
 )

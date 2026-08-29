@@ -22,15 +22,23 @@ from redagent_platform.campaign_service.planning.contracts import (
     ScalarType,
     WorldStateV1,
 )
+from redagent_platform.campaign_service.execution import (
+    EffectReceiptV1,
+    NodeObservedV1,
+    ReconciliationState,
+)
 from redagent_platform.campaign_service.contracts import canonical_sha256
 from redagent_platform.campaign_service.detection_feedback import (
     correlate_detection_observations,
     promote_detection_observation_by_correlation,
 )
 from redagent_platform.campaign_service.trusted_observations import (
+    DAG_RESULT_PRODUCER_V1,
+    DETECTION_CORRELATION_PRODUCER_V1,
     OBSERVATION_CANDIDATE_SCHEMA_VERSION,
     OBSERVATION_POLICY_SCHEMA_VERSION,
     PREDICTED_STATE_SCHEMA_VERSION,
+    TRUSTED_OBSERVATION_PRODUCER_REGISTRY_SHA256,
     ObservationCandidateV1,
     ObservationProducerIdentityV1,
     ObservationProducerKind,
@@ -51,6 +59,57 @@ from tests.unit.test_campaign_planning_contracts import scalar
 
 
 NOW = datetime(2026, 8, 29, 8, 0, tzinfo=timezone.utc)
+
+
+def _effect_receipt(
+    state: ReconciliationState = ReconciliationState.NOT_APPLIED,
+) -> EffectReceiptV1:
+    confirmed = state is ReconciliationState.CONFIRMED
+    return EffectReceiptV1(
+        schema_version="redagent.r123-effect-receipt/v1",
+        effect_id="effect-observation-a",
+        effect_intent_sha256="a" * 64,
+        envelope_sha256="b" * 64,
+        dispatch_attempt=1,
+        dispatch_generation=1,
+        runner_id="runner-a",
+        workload_identity="spiffe://redagent.test/runner/runner-a",
+        request_sha256="c" * 64,
+        started_at=NOW - timedelta(seconds=8),
+        completed_at=NOW - timedelta(seconds=6),
+        adapter_accepted=confirmed,
+        external_status="succeeded" if confirmed else "not_applied",
+        external_receipt_id="external-observation-a",
+        evidence_ids=("evidence-observation-a",),
+        cleanup_receipt_id="cleanup-observation-a",
+        output_complete=True,
+        external_contact_count=0,
+        reconciliation_state=state,
+        reconciliation_evidence_ids=("reconciliation-observation-a",),
+        redispatch_permitted=not confirmed,
+        failure_code=None,
+    )
+
+
+def _node_observed(receipt: EffectReceiptV1) -> NodeObservedV1:
+    return NodeObservedV1(
+        schema_version="redagent.r123-node-observed/v1",
+        effect_state=receipt.reconciliation_state.value,
+        attempt_count=1,
+        next_retry_at=None,
+        receipt_state=receipt.reconciliation_state,
+        effect_receipt_sha256=receipt.receipt_sha256,
+        evidence_complete=True,
+        report_safe_evidence_complete=True,
+        finding_or_coverage_complete=True,
+        retest_complete=True,
+        secret_revocation_complete=True,
+        containment_complete=True,
+        cleanup_complete=True,
+        reconciliation_complete=True,
+        residual_risk_complete=True,
+        infrastructure_available=True,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -97,15 +156,11 @@ def _candidate(**overrides: object) -> ObservationCandidateV1:
         "policy_revocation_epoch": 2,
         "roe_revocation_epoch": 3,
         "kill_switch_epoch": 4,
-        "fact_id": "finding-count",
-        "value": scalar(ScalarType.INTEGER, 1),
-        "producer": ObservationProducerIdentityV1(
-            kind=ObservationProducerKind.DAG_RUNNER_RESULT,
-            producer_id="owned-loopback-runner",
-            producer_version="runner-v1",
-        ),
-        "source_result_sha256": "2" * 64,
-        "evidence_sha256": "3" * 64,
+        "fact_id": "posture-collected",
+        "value": scalar(ScalarType.BOOLEAN, False),
+        "producer": DAG_RESULT_PRODUCER_V1,
+        "source_result_sha256": _effect_receipt().receipt_sha256,
+        "evidence_sha256": _effect_receipt().receipt_sha256,
         "observed_at": NOW - timedelta(seconds=5),
         "received_at": NOW - timedelta(seconds=4),
         "expires_at": NOW + timedelta(minutes=1),
@@ -139,14 +194,31 @@ def _snapshot(request: DagWorkflowInputV1 | None = None, **overrides: object) ->
 def _evidence(candidate: ObservationCandidateV1 | None = None) -> VerifiedObservationEvidenceV1:
     candidate = candidate or _candidate()
     material = _material_for(candidate)
+    source = dag_start_request()
+    state = (
+        ReconciliationState.CONFIRMED
+        if candidate.value == scalar(ScalarType.BOOLEAN, True)
+        else ReconciliationState.NOT_APPLIED
+    )
+    receipt = _effect_receipt(state)
     return verify_dag_node_observation_evidence(
         candidate=candidate,
         request=material.workflow_input,
-        snapshot=_snapshot(material.workflow_input, current_node_id=material.nodes[0].node_id),
+        snapshot=_snapshot(
+            material.workflow_input,
+            current_node_id=material.nodes[0].node_id,
+            current_node_state=(
+                DagNodeState.CONFIRMED
+                if state is ReconciliationState.CONFIRMED
+                else DagNodeState.NOT_APPLIED
+            ),
+        ),
         execution_material=material,
+        domain=source.domain,
+        revision=source.revision,
+        observed=_node_observed(receipt),
+        effect_receipt=receipt,
         node_id=material.nodes[0].node_id,
-        result_sha256=candidate.source_result_sha256,
-        evidence_sha256=candidate.evidence_sha256,
         verified_at=max(NOW - timedelta(seconds=1), candidate.received_at),
     )
 
@@ -159,13 +231,7 @@ def _policy(**overrides: object) -> ObservationPromotionPolicyV1:
         "engagement_id": "engagement-a",
         "authority_sha256": "1" * 64,
         "target_ids": ("target-a",),
-        "allowed_producers": (
-            ObservationProducerIdentityV1(
-                kind=ObservationProducerKind.DAG_RUNNER_RESULT,
-                producer_id="owned-loopback-runner",
-                producer_version="runner-v1",
-            ),
-        ),
+        "producer_registry_sha256": TRUSTED_OBSERVATION_PRODUCER_REGISTRY_SHA256,
         "lifecycle_epoch": 1,
         "policy_revocation_epoch": 2,
         "roe_revocation_epoch": 3,
@@ -208,6 +274,11 @@ def test_predicted_state_and_verified_observation_evidence_are_non_interchangeab
             ),
             source_result_sha256="b" * 64,
             evidence_sha256="c" * 64,
+            source_record_id="source-a",
+            source_execution_run_id="run-a",
+            source_node_id="node-a",
+            fact_id="posture-collected",
+            value=scalar(ScalarType.BOOLEAN, False),
             verification_sha256="d" * 64,
             verified_at=NOW,
         )
@@ -217,49 +288,53 @@ def test_dag_evidence_requires_exact_workflow_node_result_and_confirmed_fact() -
     candidate = _candidate()
     evidence = _evidence(candidate)
     assert evidence.source_result_sha256 == candidate.source_result_sha256
-    with pytest.raises(ValueError, match="observation_dag_node_not_confirmed"):
+    source = dag_start_request()
+    receipt = _effect_receipt()
+    common = {
+        "domain": source.domain,
+        "revision": source.revision,
+        "observed": _node_observed(receipt),
+        "effect_receipt": receipt,
+    }
+    with pytest.raises(ValueError, match="observation_dag_node_not_terminal"):
         verify_dag_node_observation_evidence(
             candidate=candidate,
             request=_request(),
             snapshot=_snapshot(current_node_state=DagNodeState.DISPATCHING),
             execution_material=_material_for(candidate),
             node_id=_material().nodes[0].node_id,
-            result_sha256=candidate.source_result_sha256,
-            evidence_sha256=candidate.evidence_sha256,
             verified_at=NOW,
+            **common,
         )
     with pytest.raises(ValueError, match="observation_dag_result_binding_mismatch"):
         verify_dag_node_observation_evidence(
-            candidate=candidate,
+            candidate=replace(candidate, source_result_sha256="f" * 64),
             request=_request(),
-            snapshot=_snapshot(),
+            snapshot=_snapshot(current_node_state=DagNodeState.NOT_APPLIED),
             execution_material=_material_for(candidate),
             node_id=_material().nodes[0].node_id,
-            result_sha256="f" * 64,
-            evidence_sha256=candidate.evidence_sha256,
             verified_at=NOW,
+            **common,
         )
     with pytest.raises(ValueError, match="observation_dag_evidence_time_invalid"):
         verify_dag_node_observation_evidence(
             candidate=candidate,
             request=_request(),
-            snapshot=_snapshot(),
+            snapshot=_snapshot(current_node_state=DagNodeState.NOT_APPLIED),
             execution_material=_material_for(candidate),
             node_id=_material().nodes[0].node_id,
-            result_sha256=candidate.source_result_sha256,
-            evidence_sha256=candidate.evidence_sha256,
             verified_at=candidate.received_at - timedelta(microseconds=1),
+            **common,
         )
     with pytest.raises(ValueError, match="observation_dag_scope_binding_mismatch"):
         verify_dag_node_observation_evidence(
             candidate=replace(candidate, campaign_id="campaign-b"),
             request=_request(),
-            snapshot=_snapshot(),
+            snapshot=_snapshot(current_node_state=DagNodeState.NOT_APPLIED),
             execution_material=_material(),
             node_id=_material().nodes[0].node_id,
-            result_sha256=candidate.source_result_sha256,
-            evidence_sha256=candidate.evidence_sha256,
             verified_at=NOW,
+            **common,
         )
 
 
@@ -271,16 +346,6 @@ def test_dag_evidence_requires_exact_workflow_node_result_and_confirmed_fact() -
         (_candidate(observed_at=NOW - timedelta(minutes=2)), _policy(), NOW, ObservationPromotionOutcome.STALE),
         (_candidate(observed_at=NOW + timedelta(seconds=1), received_at=NOW + timedelta(seconds=2)), _policy(), NOW, ObservationPromotionOutcome.FUTURE),
         (_candidate(expires_at=NOW), _policy(), NOW, ObservationPromotionOutcome.EXPIRED),
-        (
-            _candidate(
-                producer=ObservationProducerIdentityV1(
-                    ObservationProducerKind.DAG_RUNNER_RESULT, "untrusted-runner", "runner-v1"
-                )
-            ),
-            _policy(),
-            NOW,
-            ObservationPromotionOutcome.PRODUCER_DENIED,
-        ),
     ),
 )
 def test_promotion_failures_are_explicit_and_never_return_trusted_truth(
@@ -300,14 +365,16 @@ def test_history_is_deterministic_deduplicated_and_conflict_fail_closed() -> Non
     same = _trusted(_candidate(observation_id="observation-b"))
     conflicting_candidate = _candidate(
         observation_id="observation-c",
-        value=scalar(ScalarType.INTEGER, 2),
+        value=scalar(ScalarType.BOOLEAN, True),
+        source_result_sha256=_effect_receipt(ReconciliationState.CONFIRMED).receipt_sha256,
+        evidence_sha256=_effect_receipt(ReconciliationState.CONFIRMED).receipt_sha256,
     )
     conflicting = _trusted(conflicting_candidate)
     one = evaluate_observation_history((first, same, conflicting))
     two = evaluate_observation_history((conflicting, first, same, first))
     assert one.history_sha256 == two.history_sha256
     assert one.trusted_observations == ()
-    assert one.conflicted_fact_keys == ("tenant-a:campaign-a:target-a:finding-count",)
+    assert one.conflicted_fact_keys == ("tenant-a:campaign-a:target-a:posture-collected",)
     with pytest.raises(FrozenInstanceError):
         first.candidate.fact_id = "different"  # type: ignore[misc]
 
@@ -322,7 +389,7 @@ def test_exact_nonconflicting_history_collapses_duplicate_digest_only() -> None:
 def test_explicit_negative_fact_is_preserved_as_trusted_value_not_treated_as_missing() -> None:
     negative = _trusted(
         _candidate(
-            fact_id="effect-observed",
+            fact_id="posture-collected",
             value=scalar(ScalarType.BOOLEAN, False),
         )
     )
@@ -356,11 +423,7 @@ def test_only_exact_r138_deterministic_correlation_receipt_can_mint_detection_pr
         correlation=correlation,
         receipt_ref=_ref("correlation-receipt", "correlation-a", correlation.correlation_sha256),
     )
-    producer = ObservationProducerIdentityV1(
-        ObservationProducerKind.DETECTION_CORRELATION,
-        "detection-correlation",
-        "correlation-v1",
-    )
+    producer = DETECTION_CORRELATION_PRODUCER_V1
     candidate = _candidate(
         producer=producer,
         authority_sha256=execution_material.authority_sha256,
@@ -368,6 +431,8 @@ def test_only_exact_r138_deterministic_correlation_receipt_can_mint_detection_pr
         policy_revocation_epoch=execution_material.policy_revocation_epoch,
         roe_revocation_epoch=execution_material.roe_revocation_epoch,
         kill_switch_epoch=execution_material.kill_switch_epoch,
+        fact_id="posture-collected",
+        value=scalar(ScalarType.BOOLEAN, True),
         source_result_sha256=canonical_sha256(promoted),
         evidence_sha256=promoted.evidence_ref.sha256,
         observed_at=promoted.observed_at,
@@ -379,6 +444,7 @@ def test_only_exact_r138_deterministic_correlation_receipt_can_mint_detection_pr
         observation=promoted,
         correlation=correlation,
         execution_material=execution_material,
+        domain=dag_start_request().domain,
         verified_at=DETECTION_NOW,
     )
     decision = promote_observation(
@@ -390,7 +456,6 @@ def test_only_exact_r138_deterministic_correlation_receipt_can_mint_detection_pr
             policy_revocation_epoch=execution_material.policy_revocation_epoch,
             roe_revocation_epoch=execution_material.roe_revocation_epoch,
             kill_switch_epoch=execution_material.kill_switch_epoch,
-            allowed_producers=(producer,),
         ),
         now=DETECTION_NOW,
     )
@@ -401,5 +466,30 @@ def test_only_exact_r138_deterministic_correlation_receipt_can_mint_detection_pr
             observation=promoted,
             correlation=correlation,
             execution_material=execution_material,
+            domain=dag_start_request().domain,
             verified_at=DETECTION_NOW,
         )
+
+
+def test_verified_evidence_rejects_caller_forged_fact_value_and_producer_identity() -> None:
+    candidate = _candidate()
+    with pytest.raises(ValueError, match="observation_dag_fact_projection_mismatch"):
+        _evidence(replace(candidate, value=scalar(ScalarType.INTEGER, 999)))
+    with pytest.raises(ValueError, match="observation_dag_producer_invalid"):
+        _evidence(
+            replace(
+                candidate,
+                producer=ObservationProducerIdentityV1(
+                    ObservationProducerKind.DAG_RUNNER_RESULT,
+                    "caller-selected-runner",
+                    "runner-v1",
+                ),
+            )
+        )
+
+
+def test_trusted_decision_cannot_bind_a_different_candidate_digest() -> None:
+    candidate = _candidate()
+    decision = promote_observation(candidate, _evidence(candidate), _policy(), now=NOW)
+    with pytest.raises(ValueError, match="observation_promotion_candidate_binding_invalid"):
+        replace(decision, candidate_sha256="f" * 64)

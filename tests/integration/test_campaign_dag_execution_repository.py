@@ -65,7 +65,11 @@ from redagent_platform.campaign_service.dag_relay_store import (
     PostgresDagWorkflowRelayRepository,
 )
 from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
-from redagent_platform.campaign_service.planning.contracts import CapabilityIdentityV1
+from redagent_platform.campaign_service.planning.contracts import (
+    CapabilityIdentityV1,
+    FactAssignmentV1,
+    ScalarType,
+)
 from redagent_platform.campaign_service.planning.search import plan_attack_path
 from redagent_platform.campaign_service.planning.validation import validate_candidate_plan
 from redagent_platform.campaign_service.registry import closed_execution_registry
@@ -90,6 +94,7 @@ from tests.unit.test_campaign_planning_contracts import (
     domain,
     limits,
     operator,
+    scalar,
     world,
 )
 
@@ -945,7 +950,9 @@ def _authority_snapshot(
     )
 
 
-def _planning_inputs(*, tenant: str, engagement: str):
+def _planning_inputs(
+    *, tenant: str, engagement: str, include_finding_observation: bool = False
+):
     binding = closed_execution_registry()["zap-controlled-runtime@2"]
     capability = CapabilityIdentityV1(
         capability_id=binding.capability_id,
@@ -960,7 +967,17 @@ def _planning_inputs(*, tenant: str, engagement: str):
         bundle_revision=binding.bundle_revision,
         bundle_sha256=binding.bundle_sha256,
     )
-    current_domain = domain(operators=(replace(operator(), capability=capability),))
+    current_operator = replace(operator(), capability=capability)
+    if include_finding_observation:
+        current_operator = replace(
+            current_operator,
+            effects=(
+                FactAssignmentV1("finding-count", scalar(ScalarType.INTEGER, 1)),
+                *current_operator.effects,
+            ),
+            observation_fact_ids=("finding-count", "posture-collected"),
+        )
+    current_domain = domain(operators=(current_operator,))
     current_authority = authority(
         tenant_id=tenant,
         engagement_id=engagement,
@@ -997,6 +1014,10 @@ async def _admit(
     validator_version: str,
     validator_sha256: str,
     authority_sha256: str,
+    lifecycle_epoch: int = 1,
+    policy_revocation_epoch: int = 2,
+    roe_revocation_epoch: int = 3,
+    kill_switch_epoch: int = 4,
 ):
     authorized = CampaignBudgetVectorV1(
         10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000, 10_000
@@ -1023,10 +1044,10 @@ async def _admit(
             "campaign_certificate_sha256": certificate_sha256,
             "campaign_subset_proof_sha256": "e" * 64,
             "campaign_residual_budget_sha256": authorized.budget_sha256,
-            "campaign_lifecycle_epoch": 1,
-            "campaign_policy_revocation_epoch": 2,
-            "campaign_roe_revocation_epoch": 3,
-            "campaign_kill_switch_epoch": 4,
+            "campaign_lifecycle_epoch": lifecycle_epoch,
+            "campaign_policy_revocation_epoch": policy_revocation_epoch,
+            "campaign_roe_revocation_epoch": roe_revocation_epoch,
+            "campaign_kill_switch_epoch": kill_switch_epoch,
         },
     )
     decision = PolicyDecision(
@@ -1060,10 +1081,10 @@ async def _admit(
         policy_decision=decision,
         idempotency_key=f"admit-{suffix}",
         request_sha256=_digest(f"request-{suffix}"),
-        lifecycle_epoch=1,
-        policy_revocation_epoch=2,
-        roe_revocation_epoch=3,
-        kill_switch_epoch=4,
+        lifecycle_epoch=lifecycle_epoch,
+        policy_revocation_epoch=policy_revocation_epoch,
+        roe_revocation_epoch=roe_revocation_epoch,
+        kill_switch_epoch=kill_switch_epoch,
         issued_at=NOW + timedelta(seconds=30),
         lease_expires_at=NOW + timedelta(seconds=55),
     )
