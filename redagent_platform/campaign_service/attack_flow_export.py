@@ -6,13 +6,15 @@ from dataclasses import dataclass
 from datetime import datetime
 import hashlib
 import json
+from pathlib import Path
 import uuid
 
 from redagent_platform.campaign_service.planner_evidence import (
     CampaignEvidenceVerificationOutcome,
-    CampaignEvidenceVerificationResultV1,
+    CampaignEvidenceTrustAnchorV1,
     LineageArtifactKind,
     campaign_context_sha256,
+    verify_campaign_evidence_bundle,
 )
 from redagent_platform.identity.authorization import authorize_permission
 from redagent_platform.evidence_chain import EvidenceAccessPolicy
@@ -56,16 +58,22 @@ class AttackFlowExportRequestV1:
 
 
 def export_verified_campaign_attack_flow(
-    verified: CampaignEvidenceVerificationResultV1,
+    bundle_path: Path,
     *,
+    trust_anchor: CampaignEvidenceTrustAnchorV1,
     request: AttackFlowExportRequestV1,
 ) -> dict[str, object]:
-    """Project verified digests only; there is deliberately no inverse/import operation."""
+    """Re-verify retained bytes, then project digests; no inverse/import operation exists."""
 
-    if not isinstance(verified, CampaignEvidenceVerificationResultV1) or not isinstance(
-        request, AttackFlowExportRequestV1
+    if (
+        not isinstance(bundle_path, Path)
+        or not isinstance(trust_anchor, CampaignEvidenceTrustAnchorV1)
+        or not isinstance(request, AttackFlowExportRequestV1)
     ):
         raise ValueError("attack_flow_export_input_invalid")
+    # CRITICAL: a result dataclass is forgeable in-process; export must re-verify retained bytes
+    # against the caller's external trust anchor before treating any lineage as verified.
+    verified = verify_campaign_evidence_bundle(bundle_path, trust_anchor=trust_anchor)
     if verified.outcome is not CampaignEvidenceVerificationOutcome.VERIFIED:
         raise PermissionError("attack_flow_verified_complete_bundle_required")
     if (

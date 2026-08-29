@@ -17,9 +17,11 @@ from redagent_platform.campaign_service.planner_evidence import (
     LineageArtifactKind,
     LineageArtifactState,
     MAX_CAMPAIGN_EVIDENCE_FILE_BYTES,
+    MAX_CAMPAIGN_EVIDENCE_ARTIFACTS,
     REQUIRED_LINEAGE_ARTIFACT_KINDS,
     build_campaign_evidence_bundle,
     campaign_context_sha256,
+    lineage_source_schema_version,
     verify_campaign_evidence_bundle,
     write_campaign_evidence_bundle,
 )
@@ -33,16 +35,39 @@ def _digest(label: str) -> str:
     return hashlib.sha256(label.encode("ascii")).hexdigest()
 
 
-def _inputs() -> tuple[CampaignLineageArtifactInputV1, ...]:
-    return tuple(
-        CampaignLineageArtifactInputV1(
-            kind=kind,
-            source_schema_version=f"redagent.{kind.value}/v1",
-            state=LineageArtifactState.COMPLETE,
-            payload={"source_sha256": _digest(kind.value), "complete": True},
-        )
-        for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS
-    )
+def _inputs(
+    *,
+    excluded: frozenset[LineageArtifactKind] = frozenset(),
+    states: dict[LineageArtifactKind, LineageArtifactState] | None = None,
+    counts: dict[LineageArtifactKind, int] | None = None,
+) -> tuple[CampaignLineageArtifactInputV1, ...]:
+    records = []
+    previous: str | None = None
+    for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS:
+        if kind in excluded:
+            continue
+        count = (counts or {}).get(kind, 1)
+        for record_index in range(count):
+            source_sha256 = _digest(kind.value if count == 1 else f"{kind.value}-{record_index}")
+            state = (states or {}).get(kind, LineageArtifactState.COMPLETE)
+            records.append(
+                CampaignLineageArtifactInputV1(
+                    kind=kind,
+                    source_schema_version=lineage_source_schema_version(kind),
+                    source_record_sha256=source_sha256,
+                    source_parent_sha256s=() if previous is None else (previous,),
+                    record_index=record_index,
+                    record_count=count,
+                    state=state,
+                    state_reason=(
+                        None
+                        if state in {LineageArtifactState.COMPLETE, LineageArtifactState.NOT_APPLICABLE}
+                        else f"{kind.value.replace('-', '_')}_{state.value.replace('-', '_')}"
+                    ),
+                )
+            )
+            previous = source_sha256
+    return tuple(records)
 
 
 def _bundle(tmp_path):
@@ -51,8 +76,6 @@ def _bundle(tmp_path):
         campaign_id="campaign-alpha",
         signed_authority_sha256=SHA,
         artifacts=_inputs(),
-        terminal_disposition=CampaignTerminalDisposition.QUALIFIED,
-        loss_reasons=(),
     )
     path = tmp_path / "bundle"
     write_campaign_evidence_bundle(bundle, path)
@@ -71,6 +94,63 @@ def _rewrite_manifest(path, payload, anchor):
     return replace(anchor, expected_manifest_sha256=hashlib.sha256(encoded).hexdigest())
 
 
+def _coherently_rewrite_artifacts(
+    path,
+    anchor,
+    mutate,
+    *,
+    sequence_overrides=None,
+    mutate_manifest=None,
+):
+    manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+    artifacts = [
+        json.loads((path / entry["name"]).read_text(encoding="utf-8"))
+        for entry in manifest["artifacts"]
+    ]
+    mutate(artifacts)
+    if mutate_manifest is not None:
+        mutate_manifest(manifest)
+    for artifact_path in path.glob("[0-9][0-9][0-9][0-9]-*.json"):
+        artifact_path.unlink()
+
+    entries = []
+    previous = None
+    for index, artifact in enumerate(artifacts):
+        artifact["sequence"] = (sequence_overrides or {}).get(index, index)
+        artifact["parent_sha256s"] = [] if previous is None else [previous]
+        if artifact["kind"] == LineageArtifactKind.TERMINAL_DISPOSITION.value:
+            artifact["payload"]["final_chain_sha256"] = previous
+            artifact["payload"]["observed_kind_count"] = len(
+                {item["kind"] for item in artifacts[:-1]}
+            )
+        if "payload_sha256" in artifact:
+            normalized = artifact["payload"] if isinstance(artifact["payload"], dict) else {}
+            artifact["payload_sha256"] = hashlib.sha256(canonical_planning_bytes(normalized)).hexdigest()
+        body = dict(artifact)
+        body.pop("artifact_sha256", None)
+        artifact_sha256 = hashlib.sha256(canonical_planning_bytes(body)).hexdigest()
+        artifact["artifact_sha256"] = artifact_sha256
+        encoded = canonical_planning_bytes(artifact)
+        name = f"{index:04d}-{artifact['kind']}.json"
+        (path / name).write_bytes(encoded)
+        entries.append(
+            {
+                "name": name,
+                "sequence": (sequence_overrides or {}).get(index, index),
+                "kind": artifact["kind"],
+                "size_bytes": len(encoded),
+                "file_sha256": hashlib.sha256(encoded).hexdigest(),
+                "artifact_sha256": artifact_sha256,
+            }
+        )
+        previous = artifact_sha256
+
+    manifest["artifacts"] = entries
+    manifest["artifact_count"] = len(entries)
+    manifest["terminal_artifact_sha256"] = entries[-1]["artifact_sha256"]
+    return _rewrite_manifest(path, manifest, anchor)
+
+
 def test_complete_bundle_round_trips_with_exact_pinned_context(tmp_path) -> None:
     bundle, path, anchor = _bundle(tmp_path)
 
@@ -87,6 +167,40 @@ def test_complete_bundle_round_trips_with_exact_pinned_context(tmp_path) -> None
     retained_bytes = b"".join(child.read_bytes() for child in path.iterdir())
     assert b"tenant-alpha" not in retained_bytes
     assert b"campaign-alpha" not in retained_bytes
+
+
+def test_multiple_source_records_have_contiguous_cardinality_and_optional_na_is_truthful(tmp_path) -> None:
+    bundle = build_campaign_evidence_bundle(
+        tenant_id="tenant-alpha",
+        campaign_id="campaign-alpha",
+        signed_authority_sha256=SHA,
+        artifacts=_inputs(
+            counts={LineageArtifactKind.EVIDENCE: 2},
+            states={
+                LineageArtifactKind.CREDENTIAL_LEASE: LineageArtifactState.NOT_APPLICABLE,
+                LineageArtifactKind.TRUSTED_OBSERVATION: LineageArtifactState.NOT_APPLICABLE,
+                LineageArtifactKind.REPLAN: LineageArtifactState.NOT_APPLICABLE,
+                LineageArtifactKind.CONTAINMENT: LineageArtifactState.NOT_APPLICABLE,
+            },
+        ),
+    )
+    path = tmp_path / "multiple"
+    write_campaign_evidence_bundle(bundle, path)
+    result = verify_campaign_evidence_bundle(
+        path,
+        trust_anchor=CampaignEvidenceTrustAnchorV1(
+            expected_manifest_sha256=bundle.manifest_sha256,
+            expected_signed_authority_sha256=SHA,
+            expected_tenant_sha256=campaign_context_sha256("tenant-alpha"),
+            expected_campaign_sha256=campaign_context_sha256("campaign-alpha"),
+        ),
+    )
+    evidence = [item for item in result.artifacts if item.kind is LineageArtifactKind.EVIDENCE]
+    assert result.outcome is CampaignEvidenceVerificationOutcome.VERIFIED
+    assert [(item.payload["record_index"], item.payload["record_count"]) for item in evidence] == [
+        (0, 2),
+        (1, 2),
+    ]
 
 
 @pytest.mark.parametrize("attack", ["tamper", "missing", "reorder", "duplicate"])
@@ -126,16 +240,23 @@ def test_cross_context_and_coherent_replacement_fail_against_external_pin(tmp_pa
     with pytest.raises(CampaignEvidenceVerificationError, match="campaign_binding"):
         verify_campaign_evidence_bundle(path, trust_anchor=cross_campaign)
 
+    replacement_records = []
+    replacement_parent = None
+    for item in _inputs():
+        replacement_sha256 = _digest(f"replacement-{item.kind.value}")
+        replacement_records.append(
+            replace(
+                item,
+                source_record_sha256=replacement_sha256,
+                source_parent_sha256s=() if replacement_parent is None else (replacement_parent,),
+            )
+        )
+        replacement_parent = replacement_sha256
     replacement = build_campaign_evidence_bundle(
         tenant_id="tenant-alpha",
         campaign_id="campaign-alpha",
         signed_authority_sha256=SHA,
-        artifacts=tuple(
-            replace(item, payload={"source_sha256": _digest(f"replacement-{item.kind.value}"), "complete": True})
-            for item in _inputs()
-        ),
-        terminal_disposition=CampaignTerminalDisposition.QUALIFIED,
-        loss_reasons=(),
+        artifacts=tuple(replacement_records),
     )
     replacement_path = tmp_path / "replacement"
     write_campaign_evidence_bundle(replacement, replacement_path)
@@ -145,14 +266,12 @@ def test_cross_context_and_coherent_replacement_fail_against_external_pin(tmp_pa
 
 
 def test_truthful_incomplete_bundle_is_deterministic_non_pass(tmp_path) -> None:
-    inputs = tuple(item for item in _inputs() if item.kind is not LineageArtifactKind.CLEANUP)
+    inputs = _inputs(excluded=frozenset({LineageArtifactKind.CLEANUP}))
     bundle = build_campaign_evidence_bundle(
         tenant_id="tenant-alpha",
         campaign_id="campaign-alpha",
         signed_authority_sha256=SHA,
         artifacts=inputs,
-        terminal_disposition=CampaignTerminalDisposition.INCOMPLETE,
-        loss_reasons=("cleanup_evidence_missing",),
     )
     path = tmp_path / "incomplete"
     write_campaign_evidence_bundle(bundle, path)
@@ -167,24 +286,93 @@ def test_truthful_incomplete_bundle_is_deterministic_non_pass(tmp_path) -> None:
     )
 
     assert result.outcome is CampaignEvidenceVerificationOutcome.INCOMPLETE
-    assert result.loss_reasons == ("cleanup_evidence_missing",)
+    assert result.loss_reasons == ("cleanup_missing",)
 
 
-def test_secret_bearing_or_raw_identifier_payload_is_rejected() -> None:
-    with pytest.raises(ValueError, match="sensitive|identifier"):
+def test_source_record_contract_rejects_arbitrary_payload_and_unknown_schema() -> None:
+    with pytest.raises(TypeError):
         CampaignLineageArtifactInputV1(
             kind=LineageArtifactKind.EVIDENCE,
-            source_schema_version="redagent.evidence/v1",
+            source_schema_version=lineage_source_schema_version(LineageArtifactKind.EVIDENCE),
+            source_record_sha256=SHA,
+            source_parent_sha256s=("b" * 64,),
+            record_index=0,
+            record_count=1,
             state=LineageArtifactState.COMPLETE,
-            payload={"target_id": "raw-target", "authorization": "Bearer secret"},
+            payload={"value": 123},  # type: ignore[call-arg]
         )
-    with pytest.raises(ValueError, match="identifier_value"):
+    with pytest.raises(ValueError, match="source_schema"):
         CampaignLineageArtifactInputV1(
             kind=LineageArtifactKind.EVIDENCE,
-            source_schema_version="redagent.evidence/v1",
+            source_schema_version="redagent.unapproved/v1",
+            source_record_sha256=SHA,
+            source_parent_sha256s=("b" * 64,),
+            record_index=0,
+            record_count=1,
             state=LineageArtifactState.COMPLETE,
-            payload={"label": "raw-target"},
         )
+
+
+def test_semantic_cardinality_parent_and_required_state_are_fail_closed() -> None:
+    base = list(_inputs())
+    evidence_index = next(index for index, item in enumerate(base) if item.kind is LineageArtifactKind.EVIDENCE)
+    duplicate = replace(
+        base[evidence_index],
+        source_record_sha256=_digest("second-evidence"),
+        record_index=0,
+        record_count=1,
+    )
+    base.insert(evidence_index + 1, duplicate)
+    with pytest.raises(ValueError, match="cardinality|record_index"):
+        build_campaign_evidence_bundle(
+            tenant_id="tenant-alpha",
+            campaign_id="campaign-alpha",
+            signed_authority_sha256=SHA,
+            artifacts=tuple(base),
+        )
+
+    orphaned = list(_inputs())
+    orphaned[4] = replace(orphaned[4], source_parent_sha256s=("f" * 64,))
+    with pytest.raises(ValueError, match="parent"):
+        build_campaign_evidence_bundle(
+            tenant_id="tenant-alpha",
+            campaign_id="campaign-alpha",
+            signed_authority_sha256=SHA,
+            artifacts=tuple(orphaned),
+        )
+
+    with pytest.raises(ValueError, match="not_applicable"):
+        _inputs(states={LineageArtifactKind.AUTHORIZATION: LineageArtifactState.NOT_APPLICABLE})
+
+
+@pytest.mark.parametrize(
+    ("kind", "state", "expected_outcome"),
+    [
+        (LineageArtifactKind.CLEANUP, LineageArtifactState.MISSING, CampaignEvidenceVerificationOutcome.INCOMPLETE),
+        (LineageArtifactKind.EVIDENCE, LineageArtifactState.AMBIGUOUS, CampaignEvidenceVerificationOutcome.AMBIGUOUS),
+        (LineageArtifactKind.RUNNER_RESULT, LineageArtifactState.LOST, CampaignEvidenceVerificationOutcome.LOST),
+    ],
+)
+def test_terminal_loss_is_derived_from_matching_source_state(tmp_path, kind, state, expected_outcome) -> None:
+    bundle = build_campaign_evidence_bundle(
+        tenant_id="tenant-alpha",
+        campaign_id="campaign-alpha",
+        signed_authority_sha256=SHA,
+        artifacts=_inputs(states={kind: state}),
+    )
+    path = tmp_path / state.value
+    write_campaign_evidence_bundle(bundle, path)
+    result = verify_campaign_evidence_bundle(
+        path,
+        trust_anchor=CampaignEvidenceTrustAnchorV1(
+            expected_manifest_sha256=bundle.manifest_sha256,
+            expected_signed_authority_sha256=SHA,
+            expected_tenant_sha256=campaign_context_sha256("tenant-alpha"),
+            expected_campaign_sha256=campaign_context_sha256("campaign-alpha"),
+        ),
+    )
+    assert result.outcome is expected_outcome
+    assert result.loss_reasons == (f"{kind.value.replace('-', '_')}_{state.value.replace('-', '_')}",)
 
 
 @pytest.mark.parametrize("attack", ["schema", "size", "duplicate-name", "path", "malformed"])
@@ -211,6 +399,81 @@ def test_manifest_and_parser_attacks_fail_closed(tmp_path, attack: str) -> None:
 
     with pytest.raises(CampaignEvidenceVerificationError):
         verify_campaign_evidence_bundle(path, trust_anchor=anchor)
+
+
+@pytest.mark.parametrize("attack", ["non-object-payload", "boolean-sequence", "coherent-reorder"])
+def test_coherently_repinned_malformed_or_reordered_bundle_fails_closed(tmp_path, attack: str) -> None:
+    _, path, anchor = _bundle(tmp_path)
+    sequence_overrides = {1: True} if attack == "boolean-sequence" else None
+
+    def mutate(artifacts):
+        if attack == "non-object-payload":
+            artifacts[1]["payload"] = []
+        elif attack == "coherent-reorder":
+            artifacts[2], artifacts[3] = artifacts[3], artifacts[2]
+
+    anchor = _coherently_rewrite_artifacts(
+        path,
+        anchor,
+        mutate,
+        sequence_overrides=sequence_overrides,
+    )
+    with pytest.raises(CampaignEvidenceVerificationError):
+        verify_campaign_evidence_bundle(path, trust_anchor=anchor)
+
+
+@pytest.mark.parametrize("attack", ["cardinality", "duplicate-source", "terminal-lie"])
+def test_coherently_repinned_semantic_lineage_lies_fail_closed(tmp_path, attack: str) -> None:
+    _, path, anchor = _bundle(tmp_path)
+
+    def mutate(artifacts):
+        if attack == "cardinality":
+            artifacts[4]["payload"]["record_count"] = 2
+        elif attack == "duplicate-source":
+            artifacts[4]["payload"]["source_record_sha256"] = artifacts[3]["payload"][
+                "source_record_sha256"
+            ]
+        else:
+            terminal = artifacts[-1]
+            terminal["state"] = LineageArtifactState.AMBIGUOUS.value
+            terminal["payload"]["disposition"] = CampaignTerminalDisposition.AMBIGUOUS.value
+            terminal["payload"]["loss_reasons"] = ["fabricated_ambiguity"]
+
+    def mutate_manifest(manifest):
+        if attack == "terminal-lie":
+            manifest["terminal_disposition"] = CampaignTerminalDisposition.AMBIGUOUS.value
+            manifest["loss_reasons"] = ["fabricated_ambiguity"]
+
+    anchor = _coherently_rewrite_artifacts(
+        path,
+        anchor,
+        mutate,
+        mutate_manifest=mutate_manifest,
+    )
+    with pytest.raises(CampaignEvidenceVerificationError):
+        verify_campaign_evidence_bundle(path, trust_anchor=anchor)
+
+
+def test_json_depth_and_directory_inventory_are_bounded(tmp_path) -> None:
+    _, deep_path, deep_anchor = _bundle(tmp_path)
+
+    def deepen(artifacts):
+        nested: object = 1
+        for _ in range(40):
+            nested = [nested]
+        artifacts[1]["payload"]["nested"] = nested
+
+    deep_anchor = _coherently_rewrite_artifacts(deep_path, deep_anchor, deepen)
+    with pytest.raises(CampaignEvidenceVerificationError, match="depth"):
+        verify_campaign_evidence_bundle(deep_path, trust_anchor=deep_anchor)
+
+    inventory_root = tmp_path / "inventory"
+    inventory_root.mkdir()
+    _, inventory_path, inventory_anchor = _bundle(inventory_root)
+    for index in range(MAX_CAMPAIGN_EVIDENCE_ARTIFACTS + 2):
+        (inventory_path / f"extra-{index:03d}.json").write_text("{}", encoding="ascii")
+    with pytest.raises(CampaignEvidenceVerificationError, match="inventory_too_large"):
+        verify_campaign_evidence_bundle(inventory_path, trust_anchor=inventory_anchor)
 
 
 def test_oversized_and_linklike_artifacts_fail_before_parsing(tmp_path) -> None:

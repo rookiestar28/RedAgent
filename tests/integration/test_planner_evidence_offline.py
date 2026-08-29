@@ -7,11 +7,11 @@ from redagent_platform.campaign_service.planner_evidence import (
     CampaignEvidenceTrustAnchorV1,
     CampaignEvidenceVerificationOutcome,
     CampaignLineageArtifactInputV1,
-    CampaignTerminalDisposition,
     LineageArtifactState,
     REQUIRED_LINEAGE_ARTIFACT_KINDS,
     build_campaign_evidence_bundle,
     campaign_context_sha256,
+    lineage_source_schema_version,
     verify_campaign_evidence_bundle,
     write_campaign_evidence_bundle,
 )
@@ -26,24 +26,27 @@ def test_retained_bundle_verifies_after_runtime_fixture_and_cache_cleanup(tmp_pa
         (path / "ephemeral.txt").write_text("ephemeral", encoding="utf-8")
 
     signed = "a" * 64
+    records = []
+    previous = None
+    for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS:
+        source_sha256 = hashlib.sha256(kind.value.encode("ascii")).hexdigest()
+        records.append(
+            CampaignLineageArtifactInputV1(
+                kind=kind,
+                source_schema_version=lineage_source_schema_version(kind),
+                source_record_sha256=source_sha256,
+                source_parent_sha256s=() if previous is None else (previous,),
+                record_index=0,
+                record_count=1,
+                state=LineageArtifactState.COMPLETE,
+            )
+        )
+        previous = source_sha256
     bundle = build_campaign_evidence_bundle(
         tenant_id="tenant-alpha",
         campaign_id="campaign-alpha",
         signed_authority_sha256=signed,
-        artifacts=tuple(
-            CampaignLineageArtifactInputV1(
-                kind=kind,
-                source_schema_version=f"redagent.{kind.value}/v1",
-                state=LineageArtifactState.COMPLETE,
-                payload={
-                    "source_sha256": hashlib.sha256(kind.value.encode("ascii")).hexdigest(),
-                    "complete": True,
-                },
-            )
-            for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS
-        ),
-        terminal_disposition=CampaignTerminalDisposition.QUALIFIED,
-        loss_reasons=(),
+        artifacts=tuple(records),
     )
     retained = tmp_path / "retained"
     write_campaign_evidence_bundle(bundle, retained)

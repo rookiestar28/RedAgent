@@ -12,12 +12,15 @@ from redagent_platform.campaign_service.attack_flow_export import (
 )
 from redagent_platform.campaign_service.planner_evidence import (
     CampaignEvidenceTrustAnchorV1,
+    CampaignEvidenceVerificationOutcome,
+    CampaignEvidenceVerificationResultV1,
     CampaignLineageArtifactInputV1,
     CampaignTerminalDisposition,
     LineageArtifactState,
     REQUIRED_LINEAGE_ARTIFACT_KINDS,
     build_campaign_evidence_bundle,
     campaign_context_sha256,
+    lineage_source_schema_version,
     verify_campaign_evidence_bundle,
     write_campaign_evidence_bundle,
 )
@@ -30,38 +33,42 @@ def _digest(label: str) -> str:
 
 def _verified(tmp_path, *, access_policy: EvidenceAccessPolicy = EvidenceAccessPolicy.REVIEWERS_ONLY):
     signed = "a" * 64
+    records = []
+    previous = None
+    for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS:
+        source_sha256 = _digest(kind.value)
+        records.append(
+            CampaignLineageArtifactInputV1(
+                kind=kind,
+                source_schema_version=lineage_source_schema_version(kind),
+                source_record_sha256=source_sha256,
+                source_parent_sha256s=() if previous is None else (previous,),
+                record_index=0,
+                record_count=1,
+                state=LineageArtifactState.COMPLETE,
+                access_policy=access_policy,
+            )
+        )
+        previous = source_sha256
     bundle = build_campaign_evidence_bundle(
         tenant_id="tenant-alpha",
         campaign_id="campaign-alpha",
         signed_authority_sha256=signed,
-        artifacts=tuple(
-            CampaignLineageArtifactInputV1(
-                kind=kind,
-                source_schema_version=f"redagent.{kind.value}/v1",
-                state=LineageArtifactState.COMPLETE,
-                payload={"source_sha256": _digest(kind.value), "complete": True},
-                access_policy=access_policy,
-            )
-            for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS
-        ),
-        terminal_disposition=CampaignTerminalDisposition.QUALIFIED,
-        loss_reasons=(),
+        artifacts=tuple(records),
     )
     path = tmp_path / "bundle"
     write_campaign_evidence_bundle(bundle, path)
-    return verify_campaign_evidence_bundle(
-        path,
-        trust_anchor=CampaignEvidenceTrustAnchorV1(
-            expected_manifest_sha256=bundle.manifest_sha256,
-            expected_signed_authority_sha256=signed,
-            expected_tenant_sha256=campaign_context_sha256("tenant-alpha"),
-            expected_campaign_sha256=campaign_context_sha256("campaign-alpha"),
-        ),
+    anchor = CampaignEvidenceTrustAnchorV1(
+        expected_manifest_sha256=bundle.manifest_sha256,
+        expected_signed_authority_sha256=signed,
+        expected_tenant_sha256=campaign_context_sha256("tenant-alpha"),
+        expected_campaign_sha256=campaign_context_sha256("campaign-alpha"),
     )
+    return path, anchor, verify_campaign_evidence_bundle(path, trust_anchor=anchor)
 
 
 def test_attack_flow_export_is_permission_gated_deterministic_and_sanitized(tmp_path) -> None:
-    verified = _verified(tmp_path)
+    path, anchor, verified = _verified(tmp_path)
     request = AttackFlowExportRequestV1(
         tenant_id="tenant-alpha",
         campaign_id="campaign-alpha",
@@ -69,8 +76,8 @@ def test_attack_flow_export_is_permission_gated_deterministic_and_sanitized(tmp_
         exported_at=datetime(2026, 8, 29, tzinfo=timezone.utc),
     )
 
-    first = export_verified_campaign_attack_flow(verified, request=request)
-    second = export_verified_campaign_attack_flow(verified, request=request)
+    first = export_verified_campaign_attack_flow(path, trust_anchor=anchor, request=request)
+    second = export_verified_campaign_attack_flow(path, trust_anchor=anchor, request=request)
 
     assert first == second
     assert first["type"] == "bundle"
@@ -86,11 +93,12 @@ def test_attack_flow_export_is_permission_gated_deterministic_and_sanitized(tmp_
 
 
 def test_operator_and_cross_tenant_export_are_denied(tmp_path) -> None:
-    verified = _verified(tmp_path)
+    path, anchor, _ = _verified(tmp_path)
     now = datetime(2026, 8, 29, tzinfo=timezone.utc)
     with pytest.raises(PermissionError, match="permission"):
         export_verified_campaign_attack_flow(
-            verified,
+            path,
+            trust_anchor=anchor,
             request=AttackFlowExportRequestV1(
                 tenant_id="tenant-alpha",
                 campaign_id="campaign-alpha",
@@ -100,7 +108,8 @@ def test_operator_and_cross_tenant_export_are_denied(tmp_path) -> None:
         )
     with pytest.raises(PermissionError, match="binding"):
         export_verified_campaign_attack_flow(
-            verified,
+            path,
+            trust_anchor=anchor,
             request=AttackFlowExportRequestV1(
                 tenant_id="tenant-other",
                 campaign_id="campaign-alpha",
@@ -118,12 +127,43 @@ def test_export_module_has_no_import_or_execution_surface() -> None:
     assert not {name for name in public_names if "execute" in name.casefold() or "dispatch" in name.casefold()}
 
 
+def test_forged_verified_result_is_not_an_export_input(tmp_path) -> None:
+    _, _, verified = _verified(tmp_path)
+    forged = CampaignEvidenceVerificationResultV1(
+        outcome=CampaignEvidenceVerificationOutcome.VERIFIED,
+        manifest_sha256=verified.manifest_sha256,
+        signed_authority_sha256=verified.signed_authority_sha256,
+        tenant_sha256=verified.tenant_sha256,
+        campaign_sha256=verified.campaign_sha256,
+        terminal_disposition=CampaignTerminalDisposition.QUALIFIED,
+        loss_reasons=(),
+        artifacts=(),
+    )
+    with pytest.raises(ValueError, match="input"):
+        export_verified_campaign_attack_flow(
+            forged,  # type: ignore[arg-type]
+            trust_anchor=CampaignEvidenceTrustAnchorV1(
+                expected_manifest_sha256=forged.manifest_sha256,
+                expected_signed_authority_sha256=forged.signed_authority_sha256,
+                expected_tenant_sha256=forged.tenant_sha256,
+                expected_campaign_sha256=forged.campaign_sha256,
+            ),
+            request=AttackFlowExportRequestV1(
+                tenant_id="tenant-alpha",
+                campaign_id="campaign-alpha",
+                roles=("reviewer",),
+                exported_at=datetime(2026, 8, 29, tzinfo=timezone.utc),
+            ),
+        )
+
+
 def test_security_lead_only_bundle_requires_tenant_admin_role(tmp_path) -> None:
-    verified = _verified(tmp_path, access_policy=EvidenceAccessPolicy.SECURITY_LEADS_ONLY)
+    path, anchor, _ = _verified(tmp_path, access_policy=EvidenceAccessPolicy.SECURITY_LEADS_ONLY)
     now = datetime(2026, 8, 29, tzinfo=timezone.utc)
     with pytest.raises(PermissionError, match="security_lead"):
         export_verified_campaign_attack_flow(
-            verified,
+            path,
+            trust_anchor=anchor,
             request=AttackFlowExportRequestV1(
                 tenant_id="tenant-alpha",
                 campaign_id="campaign-alpha",
@@ -132,7 +172,8 @@ def test_security_lead_only_bundle_requires_tenant_admin_role(tmp_path) -> None:
             ),
         )
     export = export_verified_campaign_attack_flow(
-        verified,
+        path,
+        trust_anchor=anchor,
         request=AttackFlowExportRequestV1(
             tenant_id="tenant-alpha",
             campaign_id="campaign-alpha",

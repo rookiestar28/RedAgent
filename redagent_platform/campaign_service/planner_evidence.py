@@ -15,19 +15,22 @@ import os
 from pathlib import Path
 import re
 import stat
-from typing import Mapping
+from typing import Mapping, cast
 
 from redagent_platform.campaign_service.planning.contracts import canonical_planning_bytes
 from redagent_platform.evidence_chain import EvidenceAccessPolicy, RedactionStatus, RetentionClass
 from redagent_platform.redaction import RedactionArtifactClass, assert_no_sensitive_output
 
 
-CAMPAIGN_EVIDENCE_ARTIFACT_SCHEMA_VERSION = "redagent.campaign-evidence-artifact/v1"
-CAMPAIGN_EVIDENCE_MANIFEST_SCHEMA_VERSION = "redagent.campaign-evidence-manifest/v1"
-CAMPAIGN_EVIDENCE_TERMINAL_SCHEMA_VERSION = "redagent.campaign-terminal-disposition/v1"
+CAMPAIGN_EVIDENCE_ARTIFACT_SCHEMA_VERSION = "redagent.campaign-evidence-artifact/v2"
+CAMPAIGN_EVIDENCE_MANIFEST_SCHEMA_VERSION = "redagent.campaign-evidence-manifest/v2"
+CAMPAIGN_EVIDENCE_TERMINAL_SCHEMA_VERSION = "redagent.campaign-terminal-disposition/v2"
 MAX_CAMPAIGN_EVIDENCE_ARTIFACTS = 64
 MAX_CAMPAIGN_EVIDENCE_FILE_BYTES = 256 * 1024
 MAX_CAMPAIGN_EVIDENCE_TOTAL_BYTES = 8 * 1024 * 1024
+MAX_CAMPAIGN_EVIDENCE_JSON_DEPTH = 24
+MAX_CAMPAIGN_EVIDENCE_JSON_NODES = 4096
+MAX_CAMPAIGN_EVIDENCE_JSON_STRING_BYTES = 4096
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SCHEMA = re.compile(r"^[a-z0-9][a-z0-9._/-]{0,127}$")
@@ -82,6 +85,14 @@ REQUIRED_LINEAGE_ARTIFACT_KINDS = tuple(
 _KIND_ORDER: dict[LineageArtifactKind, int] = {
     kind: index for index, kind in enumerate(REQUIRED_LINEAGE_ARTIFACT_KINDS)
 }
+_NOT_APPLICABLE_KINDS = frozenset(
+    {
+        LineageArtifactKind.CREDENTIAL_LEASE,
+        LineageArtifactKind.TRUSTED_OBSERVATION,
+        LineageArtifactKind.REPLAN,
+        LineageArtifactKind.CONTAINMENT,
+    }
+)
 
 
 class LineageArtifactState(str, Enum):
@@ -114,8 +125,12 @@ class CampaignEvidenceVerificationError(ValueError):
 class CampaignLineageArtifactInputV1:
     kind: LineageArtifactKind
     source_schema_version: str
+    source_record_sha256: str
+    source_parent_sha256s: tuple[str, ...]
+    record_index: int
+    record_count: int
     state: LineageArtifactState
-    payload: Mapping[str, object]
+    state_reason: str | None = None
     access_policy: EvidenceAccessPolicy = EvidenceAccessPolicy.REVIEWERS_ONLY
     retention_class: RetentionClass = RetentionClass.STANDARD
     redaction_status: RedactionStatus = RedactionStatus.REDACTED
@@ -123,9 +138,31 @@ class CampaignLineageArtifactInputV1:
     def __post_init__(self) -> None:
         if not isinstance(self.kind, LineageArtifactKind) or self.kind is LineageArtifactKind.TERMINAL_DISPOSITION:
             raise ValueError("campaign_evidence_artifact_kind_invalid")
-        _schema("source_schema_version", self.source_schema_version)
+        if self.source_schema_version != lineage_source_schema_version(self.kind):
+            raise ValueError("campaign_evidence_source_schema_invalid")
+        _sha256("source_record_sha256", self.source_record_sha256)
+        if (
+            not isinstance(self.source_parent_sha256s, tuple)
+            or len(self.source_parent_sha256s) > MAX_CAMPAIGN_EVIDENCE_ARTIFACTS
+            or len(set(self.source_parent_sha256s)) != len(self.source_parent_sha256s)
+            or tuple(sorted(self.source_parent_sha256s)) != self.source_parent_sha256s
+        ):
+            raise ValueError("campaign_evidence_source_parents_invalid")
+        for parent in self.source_parent_sha256s:
+            _sha256("source_parent_sha256", parent)
+        _bounded_int("record_index", self.record_index, 0, MAX_CAMPAIGN_EVIDENCE_ARTIFACTS - 1)
+        _bounded_int("record_count", self.record_count, 1, MAX_CAMPAIGN_EVIDENCE_ARTIFACTS)
+        if self.record_index >= self.record_count:
+            raise ValueError("campaign_evidence_record_index_invalid")
         if not isinstance(self.state, LineageArtifactState):
             raise ValueError("campaign_evidence_artifact_state_invalid")
+        if self.state is LineageArtifactState.NOT_APPLICABLE and self.kind not in _NOT_APPLICABLE_KINDS:
+            raise ValueError("campaign_evidence_not_applicable_kind_invalid")
+        if self.state in {LineageArtifactState.COMPLETE, LineageArtifactState.NOT_APPLICABLE}:
+            if self.state_reason is not None:
+                raise ValueError("campaign_evidence_state_reason_unexpected")
+        elif not isinstance(self.state_reason, str) or not _REASON.fullmatch(self.state_reason):
+            raise ValueError("campaign_evidence_state_reason_required")
         if self.access_policy not in {
             EvidenceAccessPolicy.REVIEWERS_ONLY,
             EvidenceAccessPolicy.SECURITY_LEADS_ONLY,
@@ -135,8 +172,12 @@ class CampaignLineageArtifactInputV1:
             raise ValueError("campaign_evidence_artifact_retention_class_invalid")
         if self.redaction_status not in {RedactionStatus.REDACTED, RedactionStatus.NOT_APPLICABLE}:
             raise ValueError("campaign_evidence_artifact_redaction_status_invalid")
-        normalized = _safe_payload(self.payload)
-        object.__setattr__(self, "payload", normalized)
+
+
+def lineage_source_schema_version(kind: LineageArtifactKind) -> str:
+    if not isinstance(kind, LineageArtifactKind) or kind is LineageArtifactKind.TERMINAL_DISPOSITION:
+        raise ValueError("campaign_evidence_source_kind_invalid")
+    return f"redagent.campaign-lineage-source-{kind.value}/v1"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -198,10 +239,112 @@ class CampaignEvidenceVerificationResultV1:
     artifacts: tuple[VerifiedCampaignLineageArtifactV1, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _SourceRecordView:
+    kind: LineageArtifactKind
+    source_schema_version: str
+    source_record_sha256: str
+    source_parent_sha256s: tuple[str, ...]
+    record_index: int
+    record_count: int
+    state: LineageArtifactState
+    state_reason: str | None
+
+
 def campaign_context_sha256(value: str) -> str:
     if not isinstance(value, str) or not value or len(value) > 256:
         raise ValueError("campaign_evidence_context_invalid")
     return hashlib.sha256(canonical_planning_bytes({"context": value})).hexdigest()
+
+
+def _validate_source_records(
+    records: tuple[CampaignLineageArtifactInputV1, ...],
+    *,
+    error_type: type[ValueError],
+) -> tuple[CampaignTerminalDisposition, tuple[str, ...]]:
+    views = tuple(
+        _SourceRecordView(
+            item.kind,
+            item.source_schema_version,
+            item.source_record_sha256,
+            item.source_parent_sha256s,
+            item.record_index,
+            item.record_count,
+            item.state,
+            item.state_reason,
+        )
+        for item in records
+    )
+    return _validate_source_record_views(views, error_type=error_type)
+
+
+def _validate_source_record_views(
+    records: tuple[_SourceRecordView, ...],
+    *,
+    error_type: type[ValueError],
+) -> tuple[CampaignTerminalDisposition, tuple[str, ...]]:
+    seen: set[str] = set()
+    previous_order = -1
+    grouped: dict[LineageArtifactKind, list[_SourceRecordView]] = {}
+    for item in records:
+        order = _KIND_ORDER[item.kind]
+        if order < previous_order:
+            raise error_type("campaign_evidence_kind_order_invalid")
+        previous_order = order
+        if item.source_schema_version != lineage_source_schema_version(item.kind):
+            raise error_type("campaign_evidence_source_schema_invalid")
+        if item.source_record_sha256 in seen:
+            raise error_type("campaign_evidence_source_record_duplicate")
+        if any(parent not in seen for parent in item.source_parent_sha256s):
+            raise error_type("campaign_evidence_source_parent_invalid")
+        if seen and not item.source_parent_sha256s:
+            raise error_type("campaign_evidence_source_parent_required")
+        if not seen and item.source_parent_sha256s:
+            raise error_type("campaign_evidence_source_parent_invalid")
+        seen.add(item.source_record_sha256)
+        grouped.setdefault(item.kind, []).append(item)
+
+    for kind, group in grouped.items():
+        expected_count = len(group)
+        if any(item.record_count != expected_count for item in group) or [
+            item.record_index for item in group
+        ] != list(range(expected_count)):
+            raise error_type("campaign_evidence_record_cardinality_invalid")
+        if any(
+            item.state is LineageArtifactState.NOT_APPLICABLE and kind not in _NOT_APPLICABLE_KINDS
+            for item in group
+        ):
+            raise error_type("campaign_evidence_not_applicable_kind_invalid")
+
+    missing = tuple(kind for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS if kind not in grouped)
+    reasons = tuple(
+        sorted(
+            [f"{kind.value.replace('-', '_')}_missing" for kind in missing]
+            + [
+                str(item.state_reason)
+                for item in records
+                if item.state in {
+                    LineageArtifactState.MISSING,
+                    LineageArtifactState.AMBIGUOUS,
+                    LineageArtifactState.LOST,
+                }
+            ]
+        )
+    )
+    states = {item.state for item in records}
+    if LineageArtifactState.LOST in states:
+        disposition = CampaignTerminalDisposition.LOST
+    elif LineageArtifactState.AMBIGUOUS in states:
+        disposition = CampaignTerminalDisposition.AMBIGUOUS
+    elif missing or LineageArtifactState.MISSING in states:
+        disposition = CampaignTerminalDisposition.INCOMPLETE
+    else:
+        disposition = CampaignTerminalDisposition.QUALIFIED
+    if disposition is CampaignTerminalDisposition.QUALIFIED and reasons:
+        raise error_type("campaign_evidence_qualified_lineage_incomplete")
+    if disposition is not CampaignTerminalDisposition.QUALIFIED and not reasons:
+        raise error_type("campaign_evidence_loss_reason_missing")
+    return disposition, reasons
 
 
 def build_campaign_evidence_bundle(
@@ -210,17 +353,12 @@ def build_campaign_evidence_bundle(
     campaign_id: str,
     signed_authority_sha256: str,
     artifacts: tuple[CampaignLineageArtifactInputV1, ...],
-    terminal_disposition: CampaignTerminalDisposition,
-    loss_reasons: tuple[str, ...],
 ) -> CampaignEvidenceBundleV1:
     """Build immutable canonical bytes; callers persist only the returned closed inventory."""
 
     tenant_sha256 = campaign_context_sha256(tenant_id)
     campaign_sha256 = campaign_context_sha256(campaign_id)
     _sha256("signed_authority_sha256", signed_authority_sha256)
-    if not isinstance(terminal_disposition, CampaignTerminalDisposition):
-        raise ValueError("campaign_terminal_disposition_invalid")
-    reasons = _loss_reasons(loss_reasons)
     if (
         not isinstance(artifacts, tuple)
         or not artifacts
@@ -229,34 +367,21 @@ def build_campaign_evidence_bundle(
     ):
         raise ValueError("campaign_evidence_artifacts_invalid")
 
-    ordered = tuple(
-        sorted(
-            artifacts,
-            key=lambda item: (
-                _KIND_ORDER[item.kind],
-                item.source_schema_version,
-                hashlib.sha256(canonical_planning_bytes(item.payload)).hexdigest(),
-            ),
-        )
-    )
+    ordered = tuple(sorted(artifacts, key=lambda item: (_KIND_ORDER[item.kind], item.record_index)))
+    terminal_disposition, reasons = _validate_source_records(ordered, error_type=ValueError)
     kinds = {item.kind for item in ordered}
-    missing = tuple(kind for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS if kind not in kinds)
-    noncomplete = tuple(
-        item for item in ordered if item.state not in {LineageArtifactState.COMPLETE, LineageArtifactState.NOT_APPLICABLE}
-    )
-    if terminal_disposition is CampaignTerminalDisposition.QUALIFIED:
-        if missing or noncomplete or reasons:
-            raise ValueError("campaign_evidence_qualified_lineage_incomplete")
-    elif not reasons:
-        raise ValueError("campaign_evidence_nonqualified_loss_reason_required")
 
     files: list[tuple[str, bytes]] = []
     entries: list[dict[str, object]] = []
     previous_sha256: str | None = None
     for sequence, item in enumerate(ordered):
-        payload = dict(item.payload)
-        if item.kind is LineageArtifactKind.AUTHORIZATION:
-            payload = {**payload, "signed_authority_sha256": signed_authority_sha256}
+        payload = {
+            "source_record_sha256": item.source_record_sha256,
+            "source_parent_sha256s": list(item.source_parent_sha256s),
+            "record_index": item.record_index,
+            "record_count": item.record_count,
+            "state_reason": item.state_reason,
+        }
         encoded, artifact_sha256, payload_sha256 = _artifact_bytes(
             sequence=sequence,
             kind=item.kind,
@@ -412,10 +537,26 @@ def verify_campaign_evidence_bundle(
         name = entry.get("name")
         if not isinstance(name, str) or not _FILE_NAME.fullmatch(name):
             raise CampaignEvidenceVerificationError("campaign_evidence_manifest_name_invalid")
+        if (
+            type(entry.get("sequence")) is not int
+            or type(entry.get("size_bytes")) is not int
+            or not 0 <= entry["sequence"] < MAX_CAMPAIGN_EVIDENCE_ARTIFACTS
+            or entry["size_bytes"] < 0
+        ):
+            raise CampaignEvidenceVerificationError("campaign_evidence_manifest_entry_number_invalid")
+        if entry["size_bytes"] > MAX_CAMPAIGN_EVIDENCE_FILE_BYTES:
+            raise CampaignEvidenceVerificationError("campaign_evidence_file_too_large")
         names.append(name)
     if len(set(names)) != len(names):
         raise CampaignEvidenceVerificationError("campaign_evidence_manifest_duplicate_name")
-    actual_names = {child.name for child in bundle_path.iterdir()}
+    actual_names: set[str] = set()
+    try:
+        for child in bundle_path.iterdir():
+            actual_names.add(child.name)
+            if len(actual_names) > MAX_CAMPAIGN_EVIDENCE_ARTIFACTS + 1:
+                raise CampaignEvidenceVerificationError("campaign_evidence_bundle_inventory_too_large")
+    except OSError as exc:
+        raise CampaignEvidenceVerificationError("campaign_evidence_bundle_inventory_read_failed") from exc
     if actual_names != {"manifest.json", *names}:
         raise CampaignEvidenceVerificationError("campaign_evidence_bundle_inventory_mismatch")
 
@@ -447,8 +588,10 @@ def verify_campaign_evidence_bundle(
 
     terminal = _terminal_disposition(manifest.get("terminal_disposition"))
     reasons = _verified_loss_reasons(manifest.get("loss_reasons"))
+    derived_terminal, derived_reasons = _verify_lineage_completeness(verified)
+    if terminal is not derived_terminal or reasons != derived_reasons:
+        raise CampaignEvidenceVerificationError("campaign_evidence_terminal_truth_mismatch")
     _verify_terminal(verified, manifest, terminal, reasons)
-    _verify_lineage_completeness(verified, terminal, reasons)
     outcome = {
         CampaignTerminalDisposition.QUALIFIED: CampaignEvidenceVerificationOutcome.VERIFIED,
         CampaignTerminalDisposition.INCOMPLETE: CampaignEvidenceVerificationOutcome.INCOMPLETE,
@@ -481,7 +624,7 @@ def _artifact_bytes(
     parent_sha256s: tuple[str, ...],
     payload: Mapping[str, object],
 ) -> tuple[bytes, str, str]:
-    safe_payload = _safe_payload(payload)
+    safe_payload = _safe_payload(payload, kind=kind, state=state)
     payload_sha256 = hashlib.sha256(canonical_planning_bytes(safe_payload)).hexdigest()
     body = {
         "schema_version": CAMPAIGN_EVIDENCE_ARTIFACT_SCHEMA_VERSION,
@@ -566,6 +709,7 @@ def _verify_artifact(
         raise CampaignEvidenceVerificationError("campaign_evidence_artifact_disclosure_boundary_invalid")
     if (
         payload["schema_version"] != CAMPAIGN_EVIDENCE_ARTIFACT_SCHEMA_VERSION
+        or type(payload["sequence"]) is not int
         or payload["sequence"] != expected_sequence
         or payload["kind"] != expected_kind
         or expected_name != f"{expected_sequence:04d}-{kind.value}.json"
@@ -578,9 +722,14 @@ def _verify_artifact(
     if parents != expected_parents:
         raise CampaignEvidenceVerificationError("campaign_evidence_artifact_parent_invalid")
     source_schema = payload.get("source_schema_version")
-    if not isinstance(source_schema, str) or not _SCHEMA.fullmatch(source_schema):
+    expected_source_schema = (
+        CAMPAIGN_EVIDENCE_TERMINAL_SCHEMA_VERSION
+        if kind is LineageArtifactKind.TERMINAL_DISPOSITION
+        else lineage_source_schema_version(kind)
+    )
+    if source_schema != expected_source_schema:
         raise CampaignEvidenceVerificationError("campaign_evidence_source_schema_invalid")
-    safe_payload = _safe_payload_for_verification(payload.get("payload"))
+    safe_payload = _safe_payload_for_verification(payload.get("payload"), kind=kind, state=state)
     payload_sha256 = hashlib.sha256(canonical_planning_bytes(safe_payload)).hexdigest()
     if payload.get("payload_sha256") != payload_sha256:
         raise CampaignEvidenceVerificationError("campaign_evidence_payload_digest_mismatch")
@@ -644,29 +793,52 @@ def _verify_terminal(
     }
     if terminal_artifact.payload != expected_payload:
         raise CampaignEvidenceVerificationError("campaign_evidence_terminal_payload_mismatch")
+    expected_state = {
+        CampaignTerminalDisposition.QUALIFIED: LineageArtifactState.COMPLETE,
+        CampaignTerminalDisposition.INCOMPLETE: LineageArtifactState.MISSING,
+        CampaignTerminalDisposition.AMBIGUOUS: LineageArtifactState.AMBIGUOUS,
+        CampaignTerminalDisposition.LOST: LineageArtifactState.LOST,
+    }[terminal]
+    if (
+        terminal_artifact.state is not expected_state
+        or terminal_artifact.access_policy is not EvidenceAccessPolicy.REVIEWERS_ONLY
+        or terminal_artifact.retention_class is not RetentionClass.STANDARD
+        or terminal_artifact.redaction_status is not RedactionStatus.REDACTED
+    ):
+        raise CampaignEvidenceVerificationError("campaign_evidence_terminal_contract_invalid")
 
 
 def _verify_lineage_completeness(
     artifacts: list[VerifiedCampaignLineageArtifactV1],
-    terminal: CampaignTerminalDisposition,
-    reasons: tuple[str, ...],
-) -> None:
+) -> tuple[CampaignTerminalDisposition, tuple[str, ...]]:
     body = artifacts[:-1]
-    kinds = {item.kind for item in body}
-    missing = {kind for kind in REQUIRED_LINEAGE_ARTIFACT_KINDS if kind not in kinds}
-    noncomplete = {
-        item.kind
-        for item in body
-        if item.state not in {LineageArtifactState.COMPLETE, LineageArtifactState.NOT_APPLICABLE}
-    }
-    if terminal is CampaignTerminalDisposition.QUALIFIED:
-        if missing or noncomplete or reasons:
-            raise CampaignEvidenceVerificationError("campaign_evidence_false_qualified_terminal")
-    elif not reasons:
-        raise CampaignEvidenceVerificationError("campaign_evidence_loss_reason_missing")
+    views = []
+    for item in body:
+        payload = item.payload
+        views.append(
+            _SourceRecordView(
+                item.kind,
+                item.source_schema_version,
+                cast(str, payload["source_record_sha256"]),
+                tuple(cast(list[str], payload["source_parent_sha256s"])),
+                cast(int, payload["record_index"]),
+                cast(int, payload["record_count"]),
+                item.state,
+                None if payload["state_reason"] is None else cast(str, payload["state_reason"]),
+            )
+        )
+    return _validate_source_record_views(
+        tuple(views),
+        error_type=CampaignEvidenceVerificationError,
+    )
 
 
-def _safe_payload(value: Mapping[str, object]) -> dict[str, object]:
+def _safe_payload(
+    value: Mapping[str, object],
+    *,
+    kind: LineageArtifactKind,
+    state: LineageArtifactState,
+) -> dict[str, object]:
     if not isinstance(value, Mapping):
         raise ValueError("campaign_evidence_payload_invalid")
     try:
@@ -675,8 +847,60 @@ def _safe_payload(value: Mapping[str, object]) -> dict[str, object]:
         raise ValueError("campaign_evidence_payload_invalid") from exc
     if not isinstance(normalized, dict):
         raise ValueError("campaign_evidence_payload_invalid")
-    _assert_safe_payload_keys(normalized)
-    _assert_safe_payload_values(normalized)
+    if kind is LineageArtifactKind.TERMINAL_DISPOSITION:
+        if set(normalized) != {
+            "disposition",
+            "loss_reasons",
+            "required_kind_count",
+            "observed_kind_count",
+            "final_chain_sha256",
+        }:
+            raise ValueError("campaign_evidence_terminal_payload_shape_invalid")
+        _terminal_disposition(normalized["disposition"])
+        _verified_loss_reasons(normalized["loss_reasons"])
+        if normalized["required_kind_count"] != len(REQUIRED_LINEAGE_ARTIFACT_KINDS):
+            raise ValueError("campaign_evidence_terminal_required_count_invalid")
+        _bounded_int(
+            "terminal_observed_kind_count",
+            normalized["observed_kind_count"],
+            0,
+            len(REQUIRED_LINEAGE_ARTIFACT_KINDS),
+        )
+        if normalized["final_chain_sha256"] is not None:
+            _sha256("terminal_final_chain_sha256", normalized["final_chain_sha256"])
+    else:
+        if set(normalized) != {
+            "source_record_sha256",
+            "source_parent_sha256s",
+            "record_index",
+            "record_count",
+            "state_reason",
+        }:
+            raise ValueError("campaign_evidence_source_payload_shape_invalid")
+        _sha256("source_record_sha256", normalized["source_record_sha256"])
+        parents = normalized["source_parent_sha256s"]
+        if (
+            not isinstance(parents, list)
+            or len(parents) > MAX_CAMPAIGN_EVIDENCE_ARTIFACTS
+            or len(set(parents)) != len(parents)
+            or sorted(parents) != parents
+        ):
+            raise ValueError("campaign_evidence_source_parents_invalid")
+        for parent in parents:
+            _sha256("source_parent_sha256", parent)
+        _bounded_int("record_index", normalized["record_index"], 0, MAX_CAMPAIGN_EVIDENCE_ARTIFACTS - 1)
+        _bounded_int("record_count", normalized["record_count"], 1, MAX_CAMPAIGN_EVIDENCE_ARTIFACTS)
+        if normalized["record_index"] >= normalized["record_count"]:
+            raise ValueError("campaign_evidence_record_index_invalid")
+        reason = normalized["state_reason"]
+        if state in {LineageArtifactState.COMPLETE, LineageArtifactState.NOT_APPLICABLE}:
+            if reason is not None:
+                raise ValueError("campaign_evidence_state_reason_unexpected")
+        elif not isinstance(reason, str) or not _REASON.fullmatch(reason):
+            raise ValueError("campaign_evidence_state_reason_required")
+        if state is LineageArtifactState.NOT_APPLICABLE and kind not in _NOT_APPLICABLE_KINDS:
+            raise ValueError("campaign_evidence_not_applicable_kind_invalid")
+    _assert_json_bounds(normalized)
     encoded = canonical_planning_bytes(normalized)
     if len(encoded) > MAX_CAMPAIGN_EVIDENCE_FILE_BYTES // 2:
         raise ValueError("campaign_evidence_payload_too_large")
@@ -687,48 +911,18 @@ def _safe_payload(value: Mapping[str, object]) -> dict[str, object]:
     return normalized
 
 
-def _safe_payload_for_verification(value: object) -> dict[str, object]:
+def _safe_payload_for_verification(
+    value: object,
+    *,
+    kind: LineageArtifactKind,
+    state: LineageArtifactState,
+) -> dict[str, object]:
+    if not isinstance(value, Mapping):
+        raise CampaignEvidenceVerificationError("campaign_evidence_payload_invalid")
     try:
-        return _safe_payload(value if isinstance(value, Mapping) else {})
+        return _safe_payload(value, kind=kind, state=state)
     except ValueError as exc:
         raise CampaignEvidenceVerificationError(str(exc)) from exc
-
-
-def _assert_safe_payload_keys(value: object) -> None:
-    if isinstance(value, dict):
-        for key, nested in value.items():
-            lowered = str(key).casefold()
-            if (
-                lowered in _RAW_IDENTIFIER_KEYS
-                or lowered.endswith("_id")
-                or lowered.endswith("_ids")
-                or any(part in lowered for part in _SENSITIVE_KEY_PARTS)
-            ):
-                raise ValueError("campaign_evidence_raw_identifier_or_sensitive_key_forbidden")
-            _assert_safe_payload_keys(nested)
-    elif isinstance(value, list):
-        for nested in value:
-            _assert_safe_payload_keys(nested)
-
-
-def _assert_safe_payload_values(value: object, *, field_name: str | None = None) -> None:
-    if isinstance(value, dict):
-        for key, nested in value.items():
-            _assert_safe_payload_values(nested, field_name=str(key).casefold())
-    elif isinstance(value, list):
-        for nested in value:
-            _assert_safe_payload_values(nested, field_name=field_name)
-    elif isinstance(value, str):
-        digest = _SHA256.fullmatch(value) is not None
-        classified = (
-            field_name == "disposition"
-            or field_name == "loss_reasons"
-            or (field_name is not None and field_name.endswith(("_state", "_reason", "_version")))
-        )
-        if not digest and (not classified or not _REASON.fullmatch(value)):
-            raise ValueError("campaign_evidence_raw_identifier_value_forbidden")
-    elif value is not None and type(value) not in {bool, int}:
-        raise ValueError("campaign_evidence_payload_type_forbidden")
 
 
 def _loss_reasons(value: tuple[str, ...]) -> tuple[str, ...]:
@@ -806,11 +1000,49 @@ def _is_linklike(value: os.stat_result) -> bool:
 def _json_object(value: bytes, error: str) -> dict[str, object]:
     try:
         parsed = json.loads(value)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        _assert_json_bounds(parsed)
+        canonical = canonical_planning_bytes(parsed)
+    except ValueError as exc:
+        if str(exc).startswith("campaign_evidence_json_"):
+            raise CampaignEvidenceVerificationError(str(exc)) from exc
         raise CampaignEvidenceVerificationError(error) from exc
-    if not isinstance(parsed, dict) or canonical_planning_bytes(parsed) != value:
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, TypeError) as exc:
+        raise CampaignEvidenceVerificationError(error) from exc
+    if not isinstance(parsed, dict) or canonical != value:
         raise CampaignEvidenceVerificationError(error)
     return parsed
+
+
+def _assert_json_bounds(value: object) -> None:
+    nodes = 0
+
+    def visit(item: object, depth: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        if nodes > MAX_CAMPAIGN_EVIDENCE_JSON_NODES:
+            raise ValueError("campaign_evidence_json_nodes_exceeded")
+        if depth > MAX_CAMPAIGN_EVIDENCE_JSON_DEPTH:
+            raise ValueError("campaign_evidence_json_depth_exceeded")
+        if isinstance(item, dict):
+            for key, nested in item.items():
+                if not isinstance(key, str) or len(key.encode("utf-8")) > MAX_CAMPAIGN_EVIDENCE_JSON_STRING_BYTES:
+                    raise ValueError("campaign_evidence_json_key_invalid")
+                visit(nested, depth + 1)
+        elif isinstance(item, list):
+            for nested in item:
+                visit(nested, depth + 1)
+        elif isinstance(item, str):
+            if len(item.encode("utf-8")) > MAX_CAMPAIGN_EVIDENCE_JSON_STRING_BYTES:
+                raise ValueError("campaign_evidence_json_string_too_large")
+        elif type(item) is int:
+            if not -(2**63) <= item <= 2**63 - 1:
+                raise ValueError("campaign_evidence_json_integer_out_of_range")
+        elif item is not None and type(item) not in {bool, float}:
+            raise ValueError("campaign_evidence_json_type_invalid")
+        if isinstance(item, float):
+            raise ValueError("campaign_evidence_json_float_forbidden")
+
+    visit(value, 0)
 
 
 def _sha256(name: str, value: object) -> None:
@@ -820,4 +1052,9 @@ def _sha256(name: str, value: object) -> None:
 
 def _schema(name: str, value: object) -> None:
     if not isinstance(value, str) or not _SCHEMA.fullmatch(value):
+        raise ValueError(f"campaign_evidence_{name}_invalid")
+
+
+def _bounded_int(name: str, value: object, minimum: int, maximum: int) -> None:
+    if type(value) is not int or not minimum <= value <= maximum:
         raise ValueError(f"campaign_evidence_{name}_invalid")
