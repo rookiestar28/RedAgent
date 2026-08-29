@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
 from redagent_platform.validation.autonomous_planner_qualification import (  # noqa: E402
     MAX_BUNDLE_BYTES,
     MAX_PROJECTION_BYTES,
+    MATRIX_SCHEMA_V4,
     QualificationError,
     QualificationMatrix,
     StageSpec,
@@ -43,8 +44,10 @@ from redagent_platform.validation.autonomous_planner_qualification import (  # n
 )
 
 
-MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v3.json"
-OUTPUT_ROOT = ROOT / ".tmp/autonomous-planner-qualification-attempt-03"
+MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v4.json"
+# IMPORTANT: keep this formal writer root short; deep atomic filenames fail under legacy Windows
+# MAX_PATH when the qualification namespace consumes the path budget before product tests run.
+OUTPUT_ROOT = ROOT / ".tmp/apq-04"
 RUNTIME_ROOT = OUTPUT_ROOT / "runtime"
 STAGE_LOG_ROOT = OUTPUT_ROOT / "stages"
 PROJECTION_PATH = OUTPUT_ROOT / "execution-projection.json"
@@ -61,6 +64,7 @@ MAX_RUNTIME_COORDINATE_BYTES = 128 * 1024
 RUNTIME_COORDINATE_SCHEMA = "redagent.autonomous-planner-runtime-coordinate-snapshot/v1"
 LOCAL_COMPOSE_PROJECT = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 QUALIFICATION_INVOCATION_ID = re.compile(r"^invocation-planner-[0-9a-f]{12}$")
+DOCKER_RESOURCE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$")
 
 PYTHON_STARTUP_VARIABLES = frozenset(
     {
@@ -184,6 +188,31 @@ def _runner_commands(runner_id: str, projection_commit: str, projection_parent: 
     raise QualificationError("unknown qualification runner id")
 
 
+def _stage_commands(
+    stage: StageSpec,
+    matrix: QualificationMatrix,
+    projection,
+) -> tuple[tuple[str, ...], ...]:
+    commands = _runner_commands(
+        stage.runner_id,
+        projection.candidate_commit,
+        projection.candidate_parent_commit,
+    )
+    if matrix.schema_version != MATRIX_SCHEMA_V4 or stage.runner_id != "windows-full-gate":
+        return commands
+    # CRITICAL: the Full Gate can leave default persisted coordinates. V4 must reset that exact
+    # synthetic runtime only after both gate commands pass, or provision can combine 55432 state
+    # with the frozen 55472 environment. Keep V1-V3 command behavior unchanged.
+    return (
+        *commands,
+        *_runner_commands(
+            "owned-runtime-cleanup",
+            projection.candidate_commit,
+            projection.candidate_parent_commit,
+        ),
+    )
+
+
 def _assert_fixed_path(path: Path, expected: Path, *, must_exist: bool, directory: bool = False) -> None:
     if path.absolute() != expected.absolute():
         raise QualificationError("qualification path is not the fixed repository path")
@@ -299,16 +328,16 @@ def _observe_preflight(matrix: QualificationMatrix, projection) -> dict[str, obj
 
 def _load_inputs():
     _assert_fixed_path(
-        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v3.json", must_exist=True
+        MATRIX_PATH, ROOT / "config/validation/autonomous-planner-qualification-v4.json", must_exist=True
     )
     _assert_fixed_path(
         PROJECTION_PATH,
-        ROOT / ".tmp/autonomous-planner-qualification-attempt-03/execution-projection.json",
+        ROOT / ".tmp/apq-04/execution-projection.json",
         must_exist=True,
     )
     _assert_fixed_path(
         PINS_PATH,
-        ROOT / ".tmp/autonomous-planner-qualification-attempt-03/verification-pins.json",
+        ROOT / ".tmp/apq-04/verification-pins.json",
         must_exist=True,
     )
     matrix = load_matrix(MATRIX_PATH)
@@ -329,6 +358,7 @@ def _load_inputs():
 
 def preflight_command() -> int:
     matrix, projection, _pins = _load_inputs()
+    _assert_formal_start_ready(matrix)
     preflight = _observe_preflight(matrix, projection)
     _atomic_write(PREFLIGHT_PATH, _json_bytes(preflight))
     print(json.dumps(preflight, sort_keys=True))
@@ -569,6 +599,98 @@ def _workspace_compose_project(prefix: str) -> str:
     return f"{prefix}-{digest}"
 
 
+def _assert_formal_start_ready(matrix: QualificationMatrix) -> None:
+    if matrix.schema_version != MATRIX_SCHEMA_V4:
+        return
+
+    state_root = ROOT / Path(matrix.formal_environment["REDAGENT_STATE_DIR"])
+    _assert_fixed_path(state_root, ROOT / ".local/redagent", must_exist=False, directory=True)
+    if state_root.exists():
+        raise QualificationError("formal start owned state is present")
+
+    port_names = (
+        "REDAGENT_POSTGRES_PORT",
+        "REDAGENT_KEYCLOAK_PORT",
+        "REDAGENT_TEMPORAL_PORT",
+        "REDAGENT_RUSTFS_PORT",
+        "REDAGENT_OPA_HOST_PORT",
+    )
+    try:
+        ports = tuple(int(matrix.formal_environment[name], 10) for name in port_names) + (58200,)
+    except (KeyError, ValueError) as exc:
+        raise QualificationError("formal start declared port inventory invalid") from exc
+    if len(set(ports)) != 6 or any(not 1024 <= port <= 65535 for port in ports):
+        raise QualificationError("formal start declared port inventory invalid")
+    if any(not _port_closed(port) for port in ports):
+        raise QualificationError("formal start declared port is open")
+
+    docker = _tool("docker")
+    inventories: list[tuple[str, ...]] = []
+    for arguments in (
+        ("ps", "-a", "--format", "{{.Names}}"),
+        ("network", "ls", "--format", "{{.Name}}"),
+        ("volume", "ls", "--format", "{{.Name}}"),
+    ):
+        completed = subprocess.run(
+            (docker, *arguments),
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        lines = tuple(completed.stdout.splitlines())
+        if (
+            completed.returncode != 0
+            or len(completed.stdout) > 1024 * 1024
+            or len(lines) > 4096
+            or any(name != name.strip() or DOCKER_RESOURCE_NAME.fullmatch(name) is None for name in lines)
+        ):
+            raise QualificationError("formal start Docker inventory invalid")
+        inventories.append(lines)
+
+    markers = (
+        matrix.formal_environment["REDAGENT_COMPOSE_PROJECT_NAME"],
+        _workspace_compose_project("redagent-opa"),
+        _workspace_compose_project("redagent-openbao"),
+        "redagent-r123-zap",
+    )
+    # CRITICAL: this is a startup-only denial check. Reusing it after a formal stage would classify
+    # expected provisioned state as drift and abort a valid lifecycle before its fixed cleanup stage.
+    if any(
+        name.lower() == marker.lower()
+        or name.lower().startswith(marker.lower() + "-")
+        or name.lower().startswith(marker.lower() + "_")
+        for names in inventories
+        for name in names
+        for marker in markers
+    ):
+        raise QualificationError("formal start owned Docker resource is present")
+
+
+def _complete_v4_full_gate_transition(matrix: QualificationMatrix, stdout_path: Path) -> None:
+    if matrix.schema_version != MATRIX_SCHEMA_V4:
+        raise QualificationError("formal Full Gate transition schema invalid")
+    removed_receipts = _remove_owned_zap_qualification_state()
+    _remove_item_runtime_paths(matrix)
+    _assert_formal_start_ready(matrix)
+    with stdout_path.open("ab") as stdout:
+        stdout.write(
+            (
+                json.dumps(
+                    {
+                        "formal_full_gate_transition_ready": True,
+                        "removed_qualification_receipts": removed_receipts,
+                    },
+                    sort_keys=True,
+                )
+                + "\n"
+            ).encode("utf-8")
+        )
+        stdout.flush()
+        os.fsync(stdout.fileno())
+
+
 def _runtime_environment_coordinates() -> tuple[str, dict[str, int]]:
     path = ROOT / ".local/redagent/runtime/local-stack.env"
     try:
@@ -704,9 +826,7 @@ def _capture_runtime_coordinate_snapshot() -> Mapping[str, object]:
         "opa": {"project_name": opa_project, "port": opa_port},
         "openbao": {"project_name": openbao_project, "port": 58200},
         "ports": ports,
-        "resource_markers": sorted(
-            {local_project, opa_project, openbao_project, "redagent-r123-zap"}
-        ),
+        "resource_markers": sorted({local_project, opa_project, openbao_project, "redagent-r123-zap"}),
     }
     snapshot = {**body, "snapshot_sha256": hashlib.sha256(canonical_bytes(body)).hexdigest()}
     _parse_runtime_coordinate_snapshot(snapshot)
@@ -779,7 +899,7 @@ def _residual_report(matrix: QualificationMatrix, projection) -> dict[str, objec
 
 def _execute_stage(stage: StageSpec, matrix: QualificationMatrix, projection) -> dict[str, object]:
     stdout_path, stderr_path = _stage_log_paths(stage)
-    commands = _runner_commands(stage.runner_id, projection.candidate_commit, projection.candidate_parent_commit)
+    commands = _stage_commands(stage, matrix, projection)
     launch_aborted = False
     completed_count = 0
     if stage.result_kind == "residual":
@@ -800,6 +920,13 @@ def _execute_stage(stage: StageSpec, matrix: QualificationMatrix, projection) ->
         _atomic_write(stderr_path, b"")
     else:
         completed_count, launch_aborted = _run_processes(commands, stage, matrix)
+        if (
+            matrix.schema_version == MATRIX_SCHEMA_V4
+            and stage.runner_id == "windows-full-gate"
+            and not launch_aborted
+            and completed_count == len(commands)
+        ):
+            _complete_v4_full_gate_transition(matrix, stdout_path)
         if stage.result_kind == "cleanup" and not launch_aborted and completed_count == len(commands):
             removed_receipts = _remove_owned_zap_qualification_state()
             with stdout_path.open("ab") as stdout:
@@ -913,6 +1040,7 @@ def run_command() -> int:
     )
     if any(path.exists() for path in formal_outputs):
         raise QualificationError("formal attempt output already exists; retries are forbidden")
+    _assert_formal_start_ready(matrix)
     observed_preflight = _observe_preflight(matrix, projection)
     retained_preflight = load_json_file(PREFLIGHT_PATH, label="retained preflight", maximum_bytes=MAX_PROJECTION_BYTES)
     if retained_preflight != observed_preflight:

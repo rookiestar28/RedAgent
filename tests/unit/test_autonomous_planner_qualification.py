@@ -38,19 +38,31 @@ ROOT = Path(__file__).resolve().parents[2]
 MATRIX_PATH = ROOT / "config/validation/autonomous-planner-qualification-v1.json"
 MATRIX_V2_PATH = ROOT / "config/validation/autonomous-planner-qualification-v2.json"
 MATRIX_V3_PATH = ROOT / "config/validation/autonomous-planner-qualification-v3.json"
+MATRIX_V4_PATH = ROOT / "config/validation/autonomous-planner-qualification-v4.json"
+MATRIX_SCHEMA_V4 = "redagent.autonomous-planner-qualification-matrix/v4"
+PROJECTION_SCHEMA_V4 = "redagent.autonomous-planner-qualification-projection/v4"
 ZERO_SHA = "0" * 64
 
 
 def _projection_payload(matrix) -> dict[str, object]:
     is_v2 = matrix.schema_version == MATRIX_SCHEMA_V2
     is_v3 = matrix.schema_version == MATRIX_SCHEMA_V3
-    has_runtime_binding = is_v2 or is_v3
+    is_v4 = matrix.schema_version == MATRIX_SCHEMA_V4
+    has_runtime_binding = is_v2 or is_v3 or is_v4
     body: dict[str, object] = {
         "schema_version": (
-            PROJECTION_SCHEMA_V3 if is_v3 else PROJECTION_SCHEMA_V2 if is_v2 else PROJECTION_SCHEMA
+            PROJECTION_SCHEMA_V4
+            if is_v4
+            else PROJECTION_SCHEMA_V3
+            if is_v3
+            else PROJECTION_SCHEMA_V2
+            if is_v2
+            else PROJECTION_SCHEMA
         ),
         "attempt_id": (
-            "r165-20260829-attempt-03"
+            "autonomous-planner-20260830-attempt-04"
+            if is_v4
+            else "r165-20260829-attempt-03"
             if is_v3
             else "r164-formal-attempt-2"
             if is_v2
@@ -320,8 +332,39 @@ def test_v3_matrix_adds_owned_provisioning_and_uses_only_product_semantic_author
     assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
 
 
+def test_v4_matrix_uses_only_the_short_windows_safe_runtime_and_preserves_v3_lifecycle() -> None:
+    matrix = load_matrix(MATRIX_V4_PATH)
+
+    assert matrix.schema_version == MATRIX_SCHEMA_V4
+    expected_parent = "4a9887119258fbc10d6cca28ced7014e1a7089f1"  # pragma: allowlist secret
+    assert matrix.candidate_parent_commit == expected_parent
+    assert len(matrix.stages) == 9
+    assert [stage.stage_id for stage in matrix.stages][3:7] == [
+        "windows-full-gate",
+        "owned-runtime-provision",
+        "runtime-coordinate-snapshot",
+        "owned-runtime-cleanup",
+    ]
+    assert dict(matrix.runner_environment["pytest-authority-to-terminal"]) == {
+        "REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1"
+    }
+    assert dict(matrix.formal_runtime_paths) == {
+        "home": ".tmp/apq-04/runtime/h",
+        "pre_commit_home": ".tmp/apq-04/runtime/p",
+        "temp": ".tmp/apq-04/runtime/t",
+    }
+    assert all(path.startswith(".tmp/apq-04/runtime/") for path in matrix.cleanup_paths)
+    assert "config/validation/autonomous-planner-qualification-v4.json" in matrix.source_paths
+    assert matrix.stages[0].expected_pass_count == 281
+    assert all(stage.allowed_skip_count == 0 for stage in matrix.stages)
+
+    _matrix, _projection_value, events, bundle = _accepted_ceremony_for(MATRIX_V4_PATH)
+    assert len(events) == len(matrix.stages) + 3
+    assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
+
+
 def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> None:
-    for path in (MATRIX_PATH, MATRIX_V2_PATH, MATRIX_V3_PATH):
+    for path in (MATRIX_PATH, MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH):
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["max_concurrency"] = 2
         body = {key: value for key, value in payload.items() if key != "matrix_sha256"}
@@ -365,7 +408,7 @@ def test_projection_denies_target_runner_identity_and_candidate_lineage_drift() 
             parse_projection(mutated, matrix)
 
 
-@pytest.mark.parametrize("matrix_path", [MATRIX_V2_PATH, MATRIX_V3_PATH])
+@pytest.mark.parametrize("matrix_path", [MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH])
 def test_runtime_bound_projection_denies_runner_runtime_and_snapshot_input_drift(
     matrix_path: Path,
 ) -> None:
@@ -567,8 +610,8 @@ def test_event_chain_rejects_missing_reordered_or_tampered_lifecycle() -> None:
 def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v3.json"
-    assert cli.OUTPUT_ROOT.name == "autonomous-planner-qualification-attempt-03"
+    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v4.json"
+    assert cli.OUTPUT_ROOT.relative_to(cli.ROOT).as_posix() == ".tmp/apq-04"
     assert cli.build_parser().parse_args(["preflight"]).command == "preflight"
     assert cli.build_parser().parse_args(["run"]).command == "run"
     assert cli.build_parser().parse_args(["verify"]).command == "verify"
@@ -577,8 +620,7 @@ def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> N
     commands = cli._runner_commands("pytest-authority-to-terminal", "1" * 40, "2" * 40)
     assert commands[0][1:3] == ("-m", "pytest")
     assert (
-        "--deselect=tests/unit/test_planner_evidence.py::test_file_symlink_artifact_fails_before_parsing"
-        in commands[0]
+        "--deselect=tests/unit/test_planner_evidence.py::test_file_symlink_artifact_fails_before_parsing" in commands[0]
     )
     assert all("http://" not in argument and "https://" not in argument for command in commands for argument in command)
     with pytest.raises(QualificationError, match="unknown qualification runner"):
@@ -599,10 +641,224 @@ def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> N
     assert [command[2] for command in provision] == ["start", "provision", "provision"]
 
 
+def test_v4_full_gate_stage_appends_fixed_transition_resets_without_changing_v3(monkeypatch) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    v4 = load_matrix(MATRIX_V4_PATH)
+    v4_projection = _projection(v4)
+    v4_stage = next(stage for stage in v4.stages if stage.runner_id == "windows-full-gate")
+    commands = cli._stage_commands(v4_stage, v4, v4_projection)
+
+    assert len(commands) == 5
+    assert Path(commands[0][3]).name == "run_full_tests_windows.ps1"
+    assert Path(commands[1][1]).name == "run_validation_gate.py"
+    assert [Path(command[1]).name for command in commands[2:]] == [
+        "openbao_conformance.py",
+        "opa_conformance.py",
+        "redagent_local_stack.py",
+    ]
+    assert [command[2] for command in commands[2:]] == ["reset", "reset", "reset"]
+
+    v3 = load_matrix(MATRIX_V3_PATH)
+    v3_projection = _projection(v3)
+    v3_stage = next(stage for stage in v3.stages if stage.runner_id == "windows-full-gate")
+    assert len(cli._stage_commands(v3_stage, v3, v3_projection)) == 2
+
+
+def test_v4_full_gate_transition_failure_aborts_before_stage_result(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V4_PATH)
+    projection = _projection(matrix)
+    stage = next(stage for stage in matrix.stages if stage.runner_id == "windows-full-gate")
+    monkeypatch.setattr(cli, "STAGE_LOG_ROOT", tmp_path / "stages")
+    monkeypatch.setattr(cli, "_stage_commands", lambda *_args: (("fixed", "command"),))
+
+    def successful_commands(_commands, observed_stage, _matrix):
+        stdout_path, stderr_path = cli._stage_log_paths(observed_stage)
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_text("fixed commands passed\n", encoding="utf-8")
+        stderr_path.write_bytes(b"")
+        return 1, False
+
+    monkeypatch.setattr(cli, "_run_processes", successful_commands)
+    transition_calls: list[str] = []
+
+    def fail_transition(_matrix, _stdout_path):
+        transition_calls.append("transition")
+        raise QualificationError("formal Full Gate transition readiness failed")
+
+    monkeypatch.setattr(cli, "_complete_v4_full_gate_transition", fail_transition)
+
+    with pytest.raises(QualificationError, match="transition readiness failed"):
+        cli._execute_stage(stage, matrix, projection)
+    assert transition_calls == ["transition"]
+
+
+def test_v4_start_readiness_rejects_persisted_owned_state(tmp_path: Path, monkeypatch) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V4_PATH)
+    (tmp_path / ".local/redagent").mkdir(parents=True)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+
+    with pytest.raises(QualificationError, match="formal start owned state is present"):
+        cli._assert_formal_start_ready(matrix)
+
+
+def test_v4_start_readiness_rejects_any_declared_listener(tmp_path: Path, monkeypatch) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V4_PATH)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "_port_closed", lambda port: port != 55472)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda command, **_kwargs: cli.subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
+    )
+
+    with pytest.raises(QualificationError, match="formal start declared port is open"):
+        cli._assert_formal_start_ready(matrix)
+
+
+@pytest.mark.parametrize("inventory", ["container", "network", "volume"])
+def test_v4_start_readiness_rejects_exact_owned_docker_markers(
+    inventory: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V4_PATH)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "_port_closed", lambda _port: True)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    marker = f"{cli._workspace_compose_project('redagent-opa')}-opa-1"
+
+    def docker(command, **_kwargs):
+        observed_inventory = (
+            "container"
+            if command[1:3] == ("ps", "-a")
+            else "network"
+            if command[1:3] == ("network", "ls")
+            else "volume"
+        )
+        selected = inventory == observed_inventory
+        return cli.subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=f"{marker}\n" if selected else "",
+            stderr="",
+        )
+
+    monkeypatch.setattr(cli.subprocess, "run", docker)
+    with pytest.raises(QualificationError, match="formal start owned Docker resource is present"):
+        cli._assert_formal_start_ready(matrix)
+
+
+@pytest.mark.parametrize("failure", ["exit", "malformed"])
+def test_v4_start_readiness_fails_closed_on_untrusted_docker_inventory(
+    failure: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V4_PATH)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "_port_closed", lambda _port: True)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+
+    def docker(command, **_kwargs):
+        if failure == "exit":
+            return cli.subprocess.CompletedProcess(command, 1, stdout="", stderr="unavailable")
+        return cli.subprocess.CompletedProcess(command, 0, stdout="invalid docker name\n", stderr="")
+
+    monkeypatch.setattr(cli.subprocess, "run", docker)
+    with pytest.raises(QualificationError, match="formal start Docker inventory invalid"):
+        cli._assert_formal_start_ready(matrix)
+
+
+def test_v4_start_readiness_ignores_other_workspace_resources_and_checks_six_ports(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V4_PATH)
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    probed: list[int] = []
+
+    def closed(port: int) -> bool:
+        probed.append(port)
+        return True
+
+    monkeypatch.setattr(cli, "_port_closed", closed)
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda command, **_kwargs: cli.subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="redagent-opa-ffffffffffffffff-opa-1\nunrelated_default\n",
+            stderr="",
+        ),
+    )
+
+    cli._assert_formal_start_ready(matrix)
+    assert sorted(probed) == [55472, 57273, 58090, 58191, 58200, 59010]
+
+
+@pytest.mark.parametrize("command_name", ["preflight", "run"])
+def test_v4_preflight_and_initial_run_check_readiness_before_observation(
+    command_name: str,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V4_PATH)
+    projection = _projection(matrix)
+    output_root = tmp_path / ".tmp/apq-04"
+    replacements = {
+        "OUTPUT_ROOT": output_root,
+        "RUNTIME_ROOT": output_root / "runtime",
+        "STAGE_LOG_ROOT": output_root / "stages",
+        "PREFLIGHT_PATH": output_root / "preflight.json",
+        "STAGE_RESULTS_PATH": output_root / "stage-results.json",
+        "EVENTS_PATH": output_root / "events.jsonl",
+        "BUNDLE_PATH": output_root / "qualification-bundle.json",
+        "FORCED_G2_RETAINED": output_root / "forced-g2-verification.json",
+        "RUNTIME_COORDINATE_SNAPSHOT": output_root / "runtime-coordinate-snapshot.json",
+    }
+    for name, value in replacements.items():
+        monkeypatch.setattr(cli, name, value)
+    monkeypatch.setattr(cli, "_load_inputs", lambda: (matrix, projection, {}))
+    calls: list[str] = []
+    monkeypatch.setattr(cli, "_assert_formal_start_ready", lambda _matrix: calls.append("ready"))
+
+    def stop_after_observation(*_args):
+        calls.append("observe")
+        raise QualificationError("stop before formal start")
+
+    monkeypatch.setattr(cli, "_observe_preflight", stop_after_observation)
+
+    with pytest.raises(QualificationError, match="stop before formal start"):
+        getattr(cli, f"{command_name}_command")()
+    assert calls == ["ready", "observe"]
+
+
 def test_count_parser_is_capture_safe_for_every_output_kind() -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    matrix = load_matrix(MATRIX_V3_PATH)
+    matrix = load_matrix(MATRIX_V4_PATH)
     stages = {stage.result_kind: stage for stage in matrix.stages}
 
     assert cli._parse_counts(stages["pytest"], "301 passed", None) == (301, 0)
@@ -685,13 +941,15 @@ def test_formal_children_receive_only_the_source_pinned_redagent_environment(
     assert "REDAGENT_R159_LIVE_QUALIFICATION" not in second_environment
 
 
-def test_v3_formal_children_receive_product_semantic_authority_only_on_authority_runner(
+@pytest.mark.parametrize("matrix_path", [MATRIX_V3_PATH, MATRIX_V4_PATH])
+def test_product_semantic_formal_children_bind_authority_only_on_the_authority_runner(
+    matrix_path: Path,
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    matrix = load_matrix(MATRIX_V3_PATH)
+    matrix = load_matrix(matrix_path)
     monkeypatch.setattr(cli, "ROOT", tmp_path)
     monkeypatch.setenv("REDAGENT_R159_LIVE_QUALIFICATION", "must-not-survive")
     monkeypatch.setenv("REDAGENT_UNDECLARED", "must-not-survive")

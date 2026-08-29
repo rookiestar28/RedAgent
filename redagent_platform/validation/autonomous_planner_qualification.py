@@ -14,11 +14,13 @@ from typing import Any, Mapping, Sequence
 MATRIX_SCHEMA_V1 = "redagent.autonomous-planner-qualification-matrix/v1"
 MATRIX_SCHEMA_V2 = "redagent.autonomous-planner-qualification-matrix/v2"
 MATRIX_SCHEMA_V3 = "redagent.autonomous-planner-qualification-matrix/v3"
+MATRIX_SCHEMA_V4 = "redagent.autonomous-planner-qualification-matrix/v4"
 MATRIX_SCHEMA = MATRIX_SCHEMA_V1
 SCORER_SCHEMA = "redagent.autonomous-planner-qualification-scorer/v1"
 PROJECTION_SCHEMA_V1 = "redagent.autonomous-planner-qualification-projection/v1"
 PROJECTION_SCHEMA_V2 = "redagent.autonomous-planner-qualification-projection/v2"
 PROJECTION_SCHEMA_V3 = "redagent.autonomous-planner-qualification-projection/v3"
+PROJECTION_SCHEMA_V4 = "redagent.autonomous-planner-qualification-projection/v4"
 PROJECTION_SCHEMA = PROJECTION_SCHEMA_V1
 PREFLIGHT_SCHEMA = "redagent.autonomous-planner-qualification-preflight/v1"
 STAGE_RESULT_SCHEMA = "redagent.autonomous-planner-qualification-stage-result/v1"
@@ -39,6 +41,7 @@ MAX_JSON_DEPTH = 16
 EXPECTED_MATRIX_SHA256_V1 = "1ab6ef282abeda1dac450c2556a50369ab05211420d128e009a91c1ca6a2b524"
 EXPECTED_MATRIX_SHA256_V2 = "236ca3a0c1422440c7e04a96186870dfa21735a21ccc6736de7d5784a7fa29b5"
 EXPECTED_MATRIX_SHA256_V3 = "84d477f1864025b0857d6e7b623f32ca9c3ee61c5df39aeb3272983fbdfb6e5f"
+EXPECTED_MATRIX_SHA256_V4 = "b2996b2d06ef0e041e08f0dd97e419aea7281a4294af8c425cfdd3d3319d777e"
 
 
 def _pinned_git_oid(*chunks: str) -> str:
@@ -127,6 +130,7 @@ EXPECTED_STAGE_BINDINGS_V3 = (
     ("post-cleanup-offline-lineage", "pytest-offline-lineage"),
     ("residual-safety", "internal-residual-safety"),
 )
+EXPECTED_STAGE_BINDINGS_V4 = EXPECTED_STAGE_BINDINGS_V3
 EXPECTED_STAGE_BINDINGS = EXPECTED_STAGE_BINDINGS_V1
 EXPECTED_FORMAL_RUNTIME_PATHS_V2 = {
     "home": ".tmp/autonomous-planner-qualification-attempt-02/runtime/home",
@@ -138,10 +142,14 @@ EXPECTED_FORMAL_RUNTIME_PATHS_V3 = {
     "pre_commit_home": ".tmp/autonomous-planner-qualification-attempt-03/runtime/cache/pre-commit",
     "temp": ".tmp/autonomous-planner-qualification-attempt-03/runtime/temp",
 }
-EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3 = {
-    "REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1"
+EXPECTED_FORMAL_RUNTIME_PATHS_V4 = {
+    "home": ".tmp/apq-04/runtime/h",
+    "pre_commit_home": ".tmp/apq-04/runtime/p",
+    "temp": ".tmp/apq-04/runtime/t",
 }
-RUNTIME_BOUND_MATRIX_SCHEMAS = frozenset({MATRIX_SCHEMA_V2, MATRIX_SCHEMA_V3})
+EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3 = {"REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1"}
+EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V4 = EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3
+RUNTIME_BOUND_MATRIX_SCHEMAS = frozenset({MATRIX_SCHEMA_V2, MATRIX_SCHEMA_V3, MATRIX_SCHEMA_V4})
 
 _TOKEN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -514,6 +522,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         MATRIX_SCHEMA_V1: EXPECTED_MATRIX_SHA256_V1,
         MATRIX_SCHEMA_V2: EXPECTED_MATRIX_SHA256_V2,
         MATRIX_SCHEMA_V3: EXPECTED_MATRIX_SHA256_V3,
+        MATRIX_SCHEMA_V4: EXPECTED_MATRIX_SHA256_V4,
     }[schema_version]
     if computed_digest != expected_digest:
         raise QualificationError("trusted matrix digest mismatch")
@@ -605,6 +614,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         expected_runtime_paths = {
             MATRIX_SCHEMA_V2: EXPECTED_FORMAL_RUNTIME_PATHS_V2,
             MATRIX_SCHEMA_V3: EXPECTED_FORMAL_RUNTIME_PATHS_V3,
+            MATRIX_SCHEMA_V4: EXPECTED_FORMAL_RUNTIME_PATHS_V4,
         }[schema_version]
         if formal_runtime_paths != expected_runtime_paths:
             raise QualificationError("formal runtime path binding invalid")
@@ -622,6 +632,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         MATRIX_SCHEMA_V1: EXPECTED_STAGE_BINDINGS_V1,
         MATRIX_SCHEMA_V2: EXPECTED_STAGE_BINDINGS_V2,
         MATRIX_SCHEMA_V3: EXPECTED_STAGE_BINDINGS_V3,
+        MATRIX_SCHEMA_V4: EXPECTED_STAGE_BINDINGS_V4,
     }[schema_version]
     if stage_bindings != expected_stage_bindings:
         raise QualificationError("stage order or runner binding invalid")
@@ -630,9 +641,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         if tuple(runner_environment) != runner_ids:
             raise QualificationError("runner environment inventory invalid")
         authority_environment = runner_environment["pytest-authority-to-terminal"]
-        if len(authority_environment) != 1 or tuple(authority_environment.values()) != (
-            "owned-loopback-zap-v1",
-        ):
+        if len(authority_environment) != 1 or tuple(authority_environment.values()) != ("owned-loopback-zap-v1",):
             raise QualificationError("authority runner environment invalid")
         authority_name = next(iter(authority_environment))
         if not authority_name.startswith("REDAGENT_") or not authority_name.endswith("_LIVE_QUALIFICATION"):
@@ -643,10 +652,14 @@ def parse_matrix(payload: object) -> QualificationMatrix:
             if runner_id != "pytest-authority-to-terminal"
         ):
             raise QualificationError("runner environment exceeded authority stage")
-        # IMPORTANT: V2 remains authenticated by its immutable trusted matrix digest; only the
-        # fresh V3 authority surface is product-semantic and may be used by the current ceremony.
-        if schema_version == MATRIX_SCHEMA_V3 and authority_environment != EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3:
-            raise QualificationError("V3 authority runner environment invalid")
+        # IMPORTANT: V2 remains authenticated by its immutable trusted matrix digest; current V3/V4
+        # authority surfaces are product-semantic and must never regress to a private item code.
+        expected_authority_environment = {
+            MATRIX_SCHEMA_V3: EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V3,
+            MATRIX_SCHEMA_V4: EXPECTED_AUTHORITY_RUNNER_ENVIRONMENT_V4,
+        }.get(schema_version)
+        if expected_authority_environment is not None and authority_environment != expected_authority_environment:
+            raise QualificationError("product authority runner environment invalid")
 
     retained_artifacts = _path_tuple(item["retained_artifacts"], label="retained artifact")
     expected_retained_artifacts = tuple(
@@ -668,6 +681,7 @@ def parse_matrix(payload: object) -> QualificationMatrix:
         MATRIX_SCHEMA_V1: ".tmp/autonomous-planner-qualification/runtime/",
         MATRIX_SCHEMA_V2: ".tmp/autonomous-planner-qualification-attempt-02/runtime/",
         MATRIX_SCHEMA_V3: ".tmp/autonomous-planner-qualification-attempt-03/runtime/",
+        MATRIX_SCHEMA_V4: ".tmp/apq-04/runtime/",
     }[schema_version]
     if any(not path.startswith(cleanup_root) for path in cleanup_paths):
         raise QualificationError("cleanup path escaped the item-owned runtime root")
@@ -708,6 +722,7 @@ def parse_projection(payload: object, matrix: QualificationMatrix) -> ExecutionP
         MATRIX_SCHEMA_V1: PROJECTION_SCHEMA_V1,
         MATRIX_SCHEMA_V2: PROJECTION_SCHEMA_V2,
         MATRIX_SCHEMA_V3: PROJECTION_SCHEMA_V3,
+        MATRIX_SCHEMA_V4: PROJECTION_SCHEMA_V4,
     }[matrix.schema_version]
     common_fields = {
         "schema_version",
@@ -862,9 +877,7 @@ def _formal_execution_binding(
 ) -> dict[str, object]:
     binding: dict[str, object] = {"formal_environment": dict(projection.formal_environment)}
     if matrix.schema_version in RUNTIME_BOUND_MATRIX_SCHEMAS:
-        binding["runner_environment"] = {
-            key: dict(value) for key, value in projection.runner_environment.items()
-        }
+        binding["runner_environment"] = {key: dict(value) for key, value in projection.runner_environment.items()}
         binding["formal_runtime_paths"] = dict(projection.formal_runtime_paths)
     return binding
 

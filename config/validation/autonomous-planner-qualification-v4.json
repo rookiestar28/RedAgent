@@ -1,0 +1,245 @@
+{
+  "schema_version": "redagent.autonomous-planner-qualification-matrix/v4",
+  "matrix_sha256": "b2996b2d06ef0e041e08f0dd97e419aea7281a4294af8c425cfdd3d3319d777e",
+  "accepted_predecessors": [
+    {
+      "contract": "campaign-authority-envelope-v2",
+      "source_revision": "cea19a04ffc0ddea7cef026657b3373a2bfc7bc4"
+    },
+    {
+      "contract": "independent-plan-validator-v1",
+      "source_revision": "8cd82bee5b6550517c38b1bfca907f4359f781fb"
+    },
+    {
+      "contract": "deterministic-dag-planner-v1",
+      "source_revision": "200df0dea5d9f522a80ab67fefbc127e11bd4dd7"
+    },
+    {
+      "contract": "plan-admission-budget-v1",
+      "source_revision": "63b1456fd448471a55fc5cb6d6f414a0dd620fe9"
+    },
+    {
+      "contract": "durable-dag-execution-v1",
+      "source_revision": "bf99bb242be2d5b369605c36a4c1e783dc806d07"
+    },
+    {
+      "contract": "trusted-bounded-replanning-v1",
+      "source_revision": "86644cac5d26902e92eb5a7dce2e10278fe81341"
+    },
+    {
+      "contract": "planner-evidence-lineage-v1",
+      "source_revision": "a7e204c25ec7117ab95b5d18802f95fd59640942"
+    },
+    {
+      "contract": "campaign-operations-v1",
+      "source_revision": "29ee076b113d25e27af7ee3eba49ce7eeec5c7cc"
+    }
+  ],
+  "source_base": "4a9887119258fbc10d6cca28ced7014e1a7089f1",
+  "allowed_target_hosts": ["127.0.0.1", "::1", "localhost"],
+  "max_concurrency": 1,
+  "scorer": {
+    "schema_version": "redagent.autonomous-planner-qualification-scorer/v1",
+    "required_score_basis_points": 10000,
+    "conditional_allowlist": []
+  },
+  "network_policy": {
+    "assessment_targets": "loopback_only",
+    "unapproved_assessment_contacts_max": 0,
+    "validation_dependency_runner_ids": ["windows-full-gate"]
+  },
+  "formal_environment": {
+    "REDAGENT_ACTIVE_TARGET_ACCESS": "false",
+    "REDAGENT_BIND_HOST": "127.0.0.1",
+    "REDAGENT_COMPOSE_PROJECT_NAME": "redagent-planner-qualification",
+    "REDAGENT_EXTERNAL_DELIVERY": "false",
+    "REDAGENT_KEYCLOAK_PORT": "58090",
+    "REDAGENT_OPA_HOST_PORT": "58191",
+    "REDAGENT_POSTGRES_PORT": "55472",
+    "REDAGENT_PRIVILEGED_RUNNERS": "false",
+    "REDAGENT_PROFILE": "local",
+    "REDAGENT_REAL_SCANNERS": "false",
+    "REDAGENT_RUSTFS_PORT": "59010",
+    "REDAGENT_STARTUP_TIMEOUT_SECONDS": "180",
+    "REDAGENT_STATE_DIR": ".local/redagent",
+    "REDAGENT_STOP_TIMEOUT_SECONDS": "30",
+    "REDAGENT_TEMPORAL_PORT": "57273"
+  },
+  "runner_environment": {
+    "internal-residual-safety": {},
+    "internal-runtime-coordinate-snapshot": {},
+    "owned-runtime-cleanup": {},
+    "owned-runtime-provision": {},
+    "playwright-operations-e2e": {},
+    "pytest-authority-to-terminal": {
+      "REDAGENT_AUTONOMOUS_PLANNER_LIVE_QUALIFICATION": "owned-loopback-zap-v1"
+    },
+    "pytest-offline-lineage": {},
+    "vitest-operations-component": {},
+    "windows-full-gate": {}
+  },
+  "formal_runtime_paths": {
+    "home": ".tmp/apq-04/runtime/h",
+    "pre_commit_home": ".tmp/apq-04/runtime/p",
+    "temp": ".tmp/apq-04/runtime/t"
+  },
+  "required_source_paths": [
+    "config/validation/autonomous-planner-qualification-v1.json",
+    "config/validation/autonomous-planner-qualification-v2.json",
+    "config/validation/autonomous-planner-qualification-v3.json",
+    "config/validation/autonomous-planner-qualification-v4.json",
+    "config/validation/r118-stage-registry.json",
+    "frontend/src/features/campaigns/CampaignCoreFeature.test.tsx",
+    "frontend/src/features/campaigns/CampaignCoreFeature.tsx",
+    "package-lock.json",
+    "redagent_platform/campaign_service/admission.py",
+    "redagent_platform/campaign_service/api.py",
+    "redagent_platform/campaign_service/attack_flow_export.py",
+    "redagent_platform/campaign_service/authority_envelope.py",
+    "redagent_platform/campaign_service/dag_effect_authority.py",
+    "redagent_platform/campaign_service/dag_execution_service.py",
+    "redagent_platform/campaign_service/planner_evidence.py",
+    "redagent_platform/campaign_service/planning/contracts.py",
+    "redagent_platform/campaign_service/planning/search.py",
+    "redagent_platform/campaign_service/planning/validation.py",
+    "redagent_platform/campaign_service/replanning.py",
+    "redagent_platform/campaign_service/trusted_observations.py",
+    "redagent_platform/local_stack.py",
+    "redagent_platform/local_stack_config.py",
+    "redagent_platform/orchestration/dag_execution_workflow.py",
+    "redagent_platform/validation/autonomous_planner_qualification.py",
+    "requirements-dev.txt",
+    "scripts/autonomous_planner_qualification.py",
+    "scripts/opa_conformance.py",
+    "scripts/openbao_conformance.py",
+    "scripts/redagent_local_stack.py",
+    "tests/e2e/compat_124-campaign-core.spec.js",
+    "tests/integration/test_campaign_dag_owned_loopback.py",
+    "tests/integration/test_planner_evidence_offline.py",
+    "tests/unit/test_autonomous_planner_qualification.py",
+    "tests/unit/test_campaign_attack_path_planner.py",
+    "tests/unit/test_campaign_authority_envelope.py",
+    "tests/unit/test_campaign_dag_effect_authority.py",
+    "tests/unit/test_campaign_operations_projection.py",
+    "tests/unit/test_campaign_plan_admission.py",
+    "tests/unit/test_campaign_planning_validator_separation.py",
+    "tests/unit/test_campaign_replanning.py",
+    "tests/unit/test_planner_evidence.py",
+    "tests/unit/test_trusted_observations.py"
+  ],
+  "stages": [
+    {
+      "stage_id": "authority-to-terminal-python",
+      "runner_id": "pytest-authority-to-terminal",
+      "timeout_seconds": 2400,
+      "result_kind": "pytest",
+      "expected_pass_count": 281,
+      "allowed_skip_count": 0,
+      "expected_artifacts": []
+    },
+    {
+      "stage_id": "operations-component",
+      "runner_id": "vitest-operations-component",
+      "timeout_seconds": 600,
+      "result_kind": "vitest",
+      "expected_pass_count": 11,
+      "allowed_skip_count": 0,
+      "expected_artifacts": []
+    },
+    {
+      "stage_id": "operations-e2e",
+      "runner_id": "playwright-operations-e2e",
+      "timeout_seconds": 1200,
+      "result_kind": "playwright",
+      "expected_pass_count": 8,
+      "allowed_skip_count": 0,
+      "expected_artifacts": []
+    },
+    {
+      "stage_id": "windows-full-gate",
+      "runner_id": "windows-full-gate",
+      "timeout_seconds": 7200,
+      "result_kind": "forced-g2",
+      "expected_pass_count": 22,
+      "allowed_skip_count": 0,
+      "expected_artifacts": ["forced-g2-verification.json"]
+    },
+    {
+      "stage_id": "owned-runtime-provision",
+      "runner_id": "owned-runtime-provision",
+      "timeout_seconds": 900,
+      "result_kind": "provision",
+      "expected_pass_count": 3,
+      "allowed_skip_count": 0,
+      "expected_artifacts": []
+    },
+    {
+      "stage_id": "runtime-coordinate-snapshot",
+      "runner_id": "internal-runtime-coordinate-snapshot",
+      "timeout_seconds": 120,
+      "result_kind": "runtime-snapshot",
+      "expected_pass_count": 1,
+      "allowed_skip_count": 0,
+      "expected_artifacts": ["runtime-coordinate-snapshot.json"]
+    },
+    {
+      "stage_id": "owned-runtime-cleanup",
+      "runner_id": "owned-runtime-cleanup",
+      "timeout_seconds": 900,
+      "result_kind": "cleanup",
+      "expected_pass_count": 4,
+      "allowed_skip_count": 0,
+      "expected_artifacts": []
+    },
+    {
+      "stage_id": "post-cleanup-offline-lineage",
+      "runner_id": "pytest-offline-lineage",
+      "timeout_seconds": 600,
+      "result_kind": "pytest",
+      "expected_pass_count": 1,
+      "allowed_skip_count": 0,
+      "expected_artifacts": []
+    },
+    {
+      "stage_id": "residual-safety",
+      "runner_id": "internal-residual-safety",
+      "timeout_seconds": 120,
+      "result_kind": "residual",
+      "expected_pass_count": 9,
+      "allowed_skip_count": 0,
+      "expected_artifacts": []
+    }
+  ],
+  "retained_artifacts": [
+    "events.jsonl",
+    "forced-g2-verification.json",
+    "preflight.json",
+    "runtime-coordinate-snapshot.json",
+    "stage-results.json",
+    "stages/authority-to-terminal-python.stderr.log",
+    "stages/authority-to-terminal-python.stdout.log",
+    "stages/operations-component.stderr.log",
+    "stages/operations-component.stdout.log",
+    "stages/operations-e2e.stderr.log",
+    "stages/operations-e2e.stdout.log",
+    "stages/owned-runtime-cleanup.stderr.log",
+    "stages/owned-runtime-cleanup.stdout.log",
+    "stages/owned-runtime-provision.stderr.log",
+    "stages/owned-runtime-provision.stdout.log",
+    "stages/post-cleanup-offline-lineage.stderr.log",
+    "stages/post-cleanup-offline-lineage.stdout.log",
+    "stages/residual-safety.stderr.log",
+    "stages/residual-safety.stdout.log",
+    "stages/runtime-coordinate-snapshot.stderr.log",
+    "stages/runtime-coordinate-snapshot.stdout.log",
+    "stages/windows-full-gate.stderr.log",
+    "stages/windows-full-gate.stdout.log"
+  ],
+  "cleanup_paths": [
+    ".tmp/apq-04/runtime/fixtures",
+    ".tmp/apq-04/runtime/h",
+    ".tmp/apq-04/runtime/lab",
+    ".tmp/apq-04/runtime/p",
+    ".tmp/apq-04/runtime/t"
+  ]
+}
