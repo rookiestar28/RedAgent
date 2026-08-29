@@ -45,12 +45,15 @@ MATRIX_V3_PATH = ROOT / "config/validation/autonomous-planner-qualification-v3.j
 MATRIX_V4_PATH = ROOT / "config/validation/autonomous-planner-qualification-v4.json"
 MATRIX_V5_PATH = ROOT / "config/validation/autonomous-planner-qualification-v5.json"
 MATRIX_V6_PATH = ROOT / "config/validation/autonomous-planner-qualification-v6.json"
+MATRIX_V7_PATH = ROOT / "config/validation/autonomous-planner-qualification-v7.json"
 MATRIX_SCHEMA_V4 = "redagent.autonomous-planner-qualification-matrix/v4"
 MATRIX_SCHEMA_V5 = "redagent.autonomous-planner-qualification-matrix/v5"
 MATRIX_SCHEMA_V6 = "redagent.autonomous-planner-qualification-matrix/v6"
+MATRIX_SCHEMA_V7 = "redagent.autonomous-planner-qualification-matrix/v7"
 PROJECTION_SCHEMA_V4 = "redagent.autonomous-planner-qualification-projection/v4"
 PROJECTION_SCHEMA_V5 = "redagent.autonomous-planner-qualification-projection/v5"
 PROJECTION_SCHEMA_V6 = "redagent.autonomous-planner-qualification-projection/v6"
+PROJECTION_SCHEMA_V7 = "redagent.autonomous-planner-qualification-projection/v7"
 ZERO_SHA = "0" * 64
 V5_DEFAULT_VOLUMES = (
     ("redagent-local-postgres-data", "redagent_postgres_data"),
@@ -66,10 +69,13 @@ def _projection_payload(matrix) -> dict[str, object]:
     is_v4 = matrix.schema_version == MATRIX_SCHEMA_V4
     is_v5 = matrix.schema_version == MATRIX_SCHEMA_V5
     is_v6 = matrix.schema_version == MATRIX_SCHEMA_V6
-    has_runtime_binding = is_v2 or is_v3 or is_v4 or is_v5 or is_v6
+    is_v7 = matrix.schema_version == MATRIX_SCHEMA_V7
+    has_runtime_binding = is_v2 or is_v3 or is_v4 or is_v5 or is_v6 or is_v7
     body: dict[str, object] = {
         "schema_version": (
-            PROJECTION_SCHEMA_V6
+            PROJECTION_SCHEMA_V7
+            if is_v7
+            else PROJECTION_SCHEMA_V6
             if is_v6
             else PROJECTION_SCHEMA_V5
             if is_v5
@@ -82,7 +88,9 @@ def _projection_payload(matrix) -> dict[str, object]:
             else PROJECTION_SCHEMA
         ),
         "attempt_id": (
-            "autonomous-planner-20260830-attempt-06"
+            "autonomous-planner-20260830-attempt-07"
+            if is_v7
+            else "autonomous-planner-20260830-attempt-06"
             if is_v6
             else "autonomous-planner-20260830-attempt-05"
             if is_v5
@@ -496,6 +504,33 @@ def test_v6_matrix_is_fresh_and_preserves_v5_and_the_closed_nine_stage_authority
     assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
 
 
+def test_v7_matrix_is_fresh_and_preserves_v6_and_the_closed_nine_stage_authority() -> None:
+    matrix = load_matrix(MATRIX_V7_PATH)
+
+    assert matrix.schema_version == MATRIX_SCHEMA_V7
+    assert matrix.candidate_parent_commit == "3e2b4cc2ed64567d14e9cb357dfe41afd7fbba17"  # pragma: allowlist secret
+    assert len(matrix.stages) == 9
+    assert dict(matrix.formal_runtime_paths) == {
+        "home": ".tmp/apq-07/runtime/h",
+        "pre_commit_home": ".tmp/apq-07/runtime/p",
+        "temp": ".tmp/apq-07/runtime/t",
+    }
+    assert all(path.startswith(".tmp/apq-07/runtime/") for path in matrix.cleanup_paths)
+    assert "config/validation/autonomous-planner-qualification-v6.json" in matrix.source_paths
+    assert "config/validation/autonomous-planner-qualification-v7.json" in matrix.source_paths
+    assert len(matrix.source_paths) == 45
+    assert matrix.validation_dependency_runner_ids == (
+        "playwright-operations-e2e",
+        "windows-full-gate",
+    )
+    assert matrix.stages[0].expected_pass_count == 326
+    assert all(stage.allowed_skip_count == 0 for stage in matrix.stages)
+
+    _matrix, _projection_value, events, bundle = _accepted_ceremony_for(MATRIX_V7_PATH)
+    assert len(events) == len(matrix.stages) + 3
+    assert bundle["result"]["disposition"] == AUTONOMOUS_PLANNER_QUALIFIED
+
+
 def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> None:
     for path in (
         MATRIX_PATH,
@@ -504,6 +539,7 @@ def test_coherently_rehashed_matrix_drift_still_fails_the_trusted_digest() -> No
         MATRIX_V4_PATH,
         MATRIX_V5_PATH,
         MATRIX_V6_PATH,
+        MATRIX_V7_PATH,
     ):
         payload = json.loads(path.read_text(encoding="utf-8"))
         payload["max_concurrency"] = 2
@@ -550,7 +586,7 @@ def test_projection_denies_target_runner_identity_and_candidate_lineage_drift() 
 
 @pytest.mark.parametrize(
     "matrix_path",
-    [MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH, MATRIX_V6_PATH],
+    [MATRIX_V2_PATH, MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH, MATRIX_V6_PATH, MATRIX_V7_PATH],
 )
 def test_runtime_bound_projection_denies_runner_runtime_and_snapshot_input_drift(
     matrix_path: Path,
@@ -753,8 +789,8 @@ def test_event_chain_rejects_missing_reordered_or_tampered_lifecycle() -> None:
 def test_cli_surface_has_only_fixed_commands_and_no_operator_target_input() -> None:
     from scripts import autonomous_planner_qualification as cli
 
-    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v6.json"
-    assert cli.OUTPUT_ROOT.relative_to(cli.ROOT).as_posix() == ".tmp/apq-06"
+    assert cli.MATRIX_PATH.name == "autonomous-planner-qualification-v7.json"
+    assert cli.OUTPUT_ROOT.relative_to(cli.ROOT).as_posix() == ".tmp/apq-07"
     assert cli.build_parser().parse_args(["preflight"]).command == "preflight"
     assert cli.build_parser().parse_args(["run"]).command == "run"
     assert cli.build_parser().parse_args(["verify"]).command == "verify"
@@ -791,12 +827,12 @@ def test_cli_real_input_loader_binds_the_exact_current_matrix(
     from scripts import autonomous_planner_qualification as cli
 
     workspace = tmp_path / "workspace"
-    matrix_path = workspace / "config/validation/autonomous-planner-qualification-v6.json"
+    matrix_path = workspace / "config/validation/autonomous-planner-qualification-v7.json"
     matrix_path.parent.mkdir(parents=True)
-    shutil.copyfile(MATRIX_V6_PATH, matrix_path)
+    shutil.copyfile(MATRIX_V7_PATH, matrix_path)
     matrix = load_matrix(matrix_path)
     projection = _projection_payload(matrix)
-    output_root = workspace / ".tmp/apq-06"
+    output_root = workspace / ".tmp/apq-07"
     output_root.mkdir(parents=True)
     projection_path = output_root / "execution-projection.json"
     projection_path.write_text(json.dumps(projection), encoding="utf-8")
@@ -821,7 +857,7 @@ def test_cli_real_input_loader_binds_the_exact_current_matrix(
 
     loaded_matrix, loaded_projection, loaded_pins = cli._load_inputs()
 
-    assert loaded_matrix.schema_version == MATRIX_SCHEMA_V6
+    assert loaded_matrix.schema_version == MATRIX_SCHEMA_V7
     assert loaded_projection.projection_sha256 == projection["projection_sha256"]
     assert loaded_pins["pins_sha256"] == canonical_sha256(pins_body)
 
@@ -851,8 +887,8 @@ def test_v4_full_gate_stage_appends_fixed_transition_resets_without_changing_v3(
     assert len(cli._stage_commands(v3_stage, v3, v3_projection)) == 2
 
 
-@pytest.mark.parametrize("matrix_path", [MATRIX_V5_PATH, MATRIX_V6_PATH])
-def test_v5_v6_full_gate_stage_preserves_the_v4_fixed_transition_commands(
+@pytest.mark.parametrize("matrix_path", [MATRIX_V5_PATH, MATRIX_V6_PATH, MATRIX_V7_PATH])
+def test_v5_v7_full_gate_stage_preserves_the_v4_fixed_transition_commands(
     matrix_path: Path,
     monkeypatch,
 ) -> None:
@@ -873,6 +909,148 @@ def test_v5_v6_full_gate_stage_preserves_the_v4_fixed_transition_commands(
         "redagent_local_stack.py",
     ]
     assert [command[2] for command in commands[2:]] == ["reset", "reset", "reset"]
+
+
+def test_v7_operations_stage_bootstraps_chromium_before_the_fixed_e2e_command(monkeypatch) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    monkeypatch.setattr(cli, "_tool", lambda name: name)
+    v7 = load_matrix(MATRIX_V7_PATH)
+    projection = _projection(v7)
+    stage = next(stage for stage in v7.stages if stage.runner_id == "playwright-operations-e2e")
+
+    commands = cli._stage_commands(stage, v7, projection)
+
+    assert commands[0] == ("npx", "playwright", "install", "chromium")
+    assert commands[1][0:3] == ("npx", "playwright", "test")
+    assert len(commands) == 2
+
+
+def test_v7_provision_stage_counts_successful_fixed_commands_not_nested_output(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    v7 = load_matrix(MATRIX_V7_PATH)
+    projection = _projection(v7)
+    stage = next(stage for stage in v7.stages if stage.runner_id == "owned-runtime-provision")
+    _bind_cli_artifact_paths(cli, monkeypatch, tmp_path / "apq-07-test")
+    monkeypatch.setattr(cli, "_stage_commands", lambda *_args: (("one",), ("two",), ("three",)))
+
+    def successful_commands(_commands, observed_stage, _matrix):
+        stdout_path, stderr_path = cli._stage_log_paths(observed_stage)
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_text('{"ok": true}\n' * 5, encoding="utf-8")
+        stderr_path.write_bytes(b"")
+        return 3, False
+
+    monkeypatch.setattr(cli, "_run_processes", successful_commands)
+
+    result = cli._execute_stage(stage, v7, projection)
+
+    assert result["status"] == "passed"
+    assert result["passed_count"] == 3
+    assert result["exit_code"] == 0
+
+
+@pytest.mark.parametrize(
+    ("completed_count", "launch_aborted", "expected_status", "expected_exit"),
+    [
+        (2, False, "failed", 1),
+        (1, True, "aborted", None),
+    ],
+)
+def test_v7_provision_incomplete_or_aborted_fixed_command_set_fails_closed(
+    completed_count: int,
+    launch_aborted: bool,
+    expected_status: str,
+    expected_exit: int | None,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V7_PATH)
+    projection = _projection(matrix)
+    stage = next(stage for stage in matrix.stages if stage.runner_id == "owned-runtime-provision")
+    _bind_cli_artifact_paths(cli, monkeypatch, tmp_path / "apq-07-test")
+    monkeypatch.setattr(cli, "_stage_commands", lambda *_args: (("one",), ("two",), ("three",)))
+
+    def incomplete_commands(_commands, observed_stage, _matrix):
+        stdout_path, stderr_path = cli._stage_log_paths(observed_stage)
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_text('{"ok": true}\n' * 5, encoding="utf-8")
+        stderr_path.write_bytes(b"")
+        return completed_count, launch_aborted
+
+    monkeypatch.setattr(cli, "_run_processes", incomplete_commands)
+
+    result = cli._execute_stage(stage, matrix, projection)
+
+    assert result["status"] == expected_status
+    assert result["passed_count"] == completed_count
+    assert result["exit_code"] == expected_exit
+
+
+def test_v6_provision_preserves_the_historical_nested_output_count_contract(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V6_PATH)
+    projection = _projection(matrix)
+    stage = next(stage for stage in matrix.stages if stage.runner_id == "owned-runtime-provision")
+    _bind_cli_artifact_paths(cli, monkeypatch, tmp_path / "apq-06-test")
+    monkeypatch.setattr(cli, "_stage_commands", lambda *_args: (("one",), ("two",), ("three",)))
+
+    def successful_commands(_commands, observed_stage, _matrix):
+        stdout_path, stderr_path = cli._stage_log_paths(observed_stage)
+        stdout_path.parent.mkdir(parents=True, exist_ok=True)
+        stdout_path.write_text('{"ok": true}\n' * 5, encoding="utf-8")
+        stderr_path.write_bytes(b"")
+        return 3, False
+
+    monkeypatch.setattr(cli, "_run_processes", successful_commands)
+
+    result = cli._execute_stage(stage, matrix, projection)
+
+    assert result["status"] == "failed"
+    assert result["passed_count"] == 5
+    assert result["exit_code"] == 1
+
+
+def test_v7_browser_install_and_e2e_share_the_same_isolated_child_environment(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from scripts import autonomous_planner_qualification as cli
+
+    matrix = load_matrix(MATRIX_V7_PATH)
+    stage = next(stage for stage in matrix.stages if stage.runner_id == "playwright-operations-e2e")
+    monkeypatch.setattr(cli, "ROOT", tmp_path)
+    monkeypatch.setattr(cli, "STAGE_LOG_ROOT", tmp_path / "stages")
+    environments: list[dict[str, str]] = []
+
+    def successful_run(command, **kwargs):
+        environments.append(dict(kwargs["env"]))
+        return cli.subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(cli.subprocess, "run", successful_run)
+
+    completed_count, launch_aborted = cli._run_processes(
+        (("fixed", "install"), ("fixed", "test")),
+        stage,
+        matrix,
+    )
+
+    assert completed_count == 2
+    assert launch_aborted is False
+    assert len(environments) == 2
+    assert environments[0] == environments[1]
+    runtime_home = tmp_path / ".tmp/apq-07/runtime/h"
+    assert Path(environments[0]["LOCALAPPDATA"]).is_relative_to(runtime_home)
 
 
 def test_v4_full_gate_transition_failure_aborts_before_stage_result(
@@ -1421,7 +1599,7 @@ def test_formal_children_receive_only_the_source_pinned_redagent_environment(
 
 @pytest.mark.parametrize(
     "matrix_path",
-    [MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH, MATRIX_V6_PATH],
+    [MATRIX_V3_PATH, MATRIX_V4_PATH, MATRIX_V5_PATH, MATRIX_V6_PATH, MATRIX_V7_PATH],
 )
 def test_product_semantic_formal_children_bind_authority_only_on_the_authority_runner(
     matrix_path: Path,
