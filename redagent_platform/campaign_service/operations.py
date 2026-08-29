@@ -12,6 +12,12 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql.elements import ColumnElement
 
+from redagent_platform.campaign_service.admission_contracts import (
+    AdmissionOutcome,
+    CampaignBudgetVectorV1,
+    PlanAdmissionReceiptV1,
+)
+from redagent_platform.campaign_service.planning.contracts import canonical_planning_sha256
 from redagent_platform.campaign_service.status import CampaignStatusNotFound
 from redagent_platform.persistence.models import metadata
 
@@ -483,39 +489,60 @@ def _authority(
         _ADMISSION_OUTCOMES,
         "operations_admission_outcome_invalid",
     )
-    try:
-        signed_authority_sha256 = _digest_required(payload.get("signed_authority_sha256"))
-        authority_sha256 = _digest_required(payload.get("authority_sha256"))
-        lifecycle_epoch = _integer(payload.get("lifecycle_epoch"), "operations_authority_binding_invalid")
-        policy_revocation_epoch = _integer(
-            payload.get("policy_revocation_epoch"),
-            "operations_authority_binding_invalid",
-        )
-        roe_revocation_epoch = _integer(
-            payload.get("roe_revocation_epoch"),
-            "operations_authority_binding_invalid",
-        )
-        kill_switch_epoch = _integer(
-            payload.get("kill_switch_epoch"),
-            "operations_authority_binding_invalid",
-        )
-        expires_at = _as_datetime(payload.get("expires_at"), "operations_authority_binding_invalid")
-        admission_receipt_sha256 = _digest_required(source.admission.get("receipt_sha256"))
-    except CampaignOperationsProjectionInvalid as exc:
-        raise CampaignOperationsProjectionInvalid("operations_authority_binding_invalid") from exc
+    selected_receipt = _typed_admission_receipt(payload)
+    signed_authority_sha256 = selected_receipt.signed_authority_sha256
+    authority_sha256 = selected_receipt.authority_sha256
+    lifecycle_epoch = selected_receipt.lifecycle_epoch
+    policy_revocation_epoch = selected_receipt.policy_revocation_epoch
+    roe_revocation_epoch = selected_receipt.roe_revocation_epoch
+    kill_switch_epoch = selected_receipt.kill_switch_epoch
+    expires_at = selected_receipt.expires_at
+    admission_receipt_sha256 = _digest_required(source.admission.get("receipt_sha256"))
+    if (
+        source.admission.get("id") != selected_receipt.receipt_id
+        or outcome != selected_receipt.outcome.value
+        or source.admission.get("reason_code") != selected_receipt.reason_code
+        or admission_receipt_sha256 != selected_receipt.receipt_sha256
+    ):
+        raise CampaignOperationsProjectionInvalid("operations_authority_binding_mismatch")
     if execution:
         # CRITICAL: never render an admitted approval from a partial or cross-revision binding;
         # doing so makes unrelated persisted rows look like one current authority grant.
         if outcome != "admitted":
             raise CampaignOperationsProjectionInvalid("operations_authority_binding_mismatch")
+        input_payload = _mapping(execution.get("input_payload"), "operations_authority_binding_mismatch")
+        nested_payload = _mapping(
+            input_payload.get("admission_receipt"),
+            "operations_authority_binding_mismatch",
+        )
+        nested_receipt = _typed_admission_receipt(nested_payload)
+        # CRITICAL: the immutable workflow input is an authority copy, not a display hint. Any
+        # divergence can make a different receipt or expiry appear admitted after execution starts.
+        if (
+            nested_receipt != selected_receipt
+            or nested_receipt.receipt_sha256 != admission_receipt_sha256
+            or canonical_planning_sha256(input_payload) != execution.get("input_sha256")
+        ):
+            raise CampaignOperationsProjectionInvalid("operations_authority_binding_mismatch")
+        reserved_budget = selected_receipt.reserved_budget
+        if reserved_budget is None or selected_receipt.reservation_id is None:
+            raise CampaignOperationsProjectionInvalid("operations_authority_binding_mismatch")
         expected = {
+            "tenant_id": selected_receipt.tenant_id,
+            "campaign_id": selected_receipt.campaign_id,
+            "admission_receipt_id": selected_receipt.receipt_id,
+            "reservation_id": selected_receipt.reservation_id,
             "signed_authority_sha256": signed_authority_sha256,
             "authority_sha256": authority_sha256,
+            "domain_sha256": selected_receipt.domain_sha256,
+            "plan_sha256": selected_receipt.plan_sha256,
+            "certificate_sha256": selected_receipt.certificate_sha256,
             "lifecycle_epoch": lifecycle_epoch,
             "policy_revocation_epoch": policy_revocation_epoch,
             "roe_revocation_epoch": roe_revocation_epoch,
             "kill_switch_epoch": kill_switch_epoch,
             "admission_receipt_sha256": admission_receipt_sha256,
+            "reserved_budget_sha256": reserved_budget.budget_sha256,
         }
         for name, value in expected.items():
             actual = execution.get(name)
@@ -531,6 +558,25 @@ def _authority(
         "kill_switch_epoch": kill_switch_epoch,
         "expires_at": expires_at.astimezone(timezone.utc).isoformat(),
     }
+
+
+def _typed_admission_receipt(payload: Mapping[str, Any]) -> PlanAdmissionReceiptV1:
+    values = dict(payload)
+    try:
+        values["outcome"] = AdmissionOutcome(values.get("outcome"))
+        values["issued_at"] = _as_datetime(values.get("issued_at"), "operations_authority_binding_invalid")
+        values["expires_at"] = _as_datetime(
+            values.get("expires_at"),
+            "operations_authority_binding_invalid",
+        )
+        reserved = values.get("reserved_budget")
+        if reserved is not None:
+            values["reserved_budget"] = CampaignBudgetVectorV1(
+                **dict(_mapping(reserved, "operations_authority_binding_invalid"))
+            )
+        return PlanAdmissionReceiptV1(**values)
+    except (KeyError, TypeError, ValueError, CampaignOperationsProjectionInvalid) as exc:
+        raise CampaignOperationsProjectionInvalid("operations_authority_binding_invalid") from exc
 
 
 def _validation(certificate: Mapping[str, Any]) -> dict[str, Any]:

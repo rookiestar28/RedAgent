@@ -11,6 +11,7 @@ from redagent_platform.campaign_service.operations import (
     CampaignOperationsSource,
     project_campaign_operations,
 )
+from redagent_platform.campaign_service.planning.contracts import canonical_planning_sha256
 
 
 NOW = datetime(2026, 8, 29, 12, 0, tzinfo=timezone.utc)
@@ -166,6 +167,28 @@ def test_operations_projection_requires_complete_coherent_admitted_authority_bin
         project_campaign_operations(replace(source, execution=receipt_mismatch), now=NOW)
 
 
+@pytest.mark.parametrize("field", ("authority_sha256", "expires_at"))
+def test_operations_projection_rejects_divergent_nested_admission_receipt(field: str) -> None:
+    source = _source()
+    input_payload = dict(source.execution["input_payload"])
+    nested_receipt = dict(input_payload["admission_receipt"])
+    nested_receipt[field] = "9" * 64 if field == "authority_sha256" else (NOW + timedelta(hours=2)).isoformat()
+    input_payload["admission_receipt"] = nested_receipt
+
+    with pytest.raises(CampaignOperationsProjectionInvalid, match="operations_authority_binding_mismatch"):
+        project_campaign_operations(
+            replace(
+                source,
+                execution={
+                    **source.execution,
+                    "input_sha256": canonical_planning_sha256(input_payload),
+                    "input_payload": input_payload,
+                },
+            ),
+            now=NOW,
+        )
+
+
 def test_operations_projection_rejects_deep_or_non_json_stored_material() -> None:
     source = _source()
     deep: dict[str, object] = {}
@@ -246,22 +269,77 @@ def _source() -> CampaignOperationsSource:
         ],
         "child_revision": {"revision_id": "revision-child"},
     }
+    receipt_payload = {
+        "schema_version": "redagent.plan-admission-receipt/v1",
+        "receipt_id": "admission-a",
+        "tenant_id": "tenant-a",
+        "campaign_id": "campaign-a",
+        "engagement_id": "engagement-a",
+        "signed_authority_sha256": "a" * 64,
+        "authority_sha256": "b" * 64,
+        "domain_sha256": "3" * 64,
+        "plan_sha256": "4" * 64,
+        "certificate_sha256": "d" * 64,
+        "validator_version": "validator-v1",
+        "validator_sha256": "5" * 64,
+        "subset_proof_sha256": "6" * 64,
+        "policy_decision_id": "policy-decision-a",
+        "policy_input_sha256": "7" * 64,
+        "policy_bundle_revision": "policy-bundle-v1",
+        "policy_bundle_sha256": "8" * 64,
+        "pre_residual_budget_sha256": "9" * 64,
+        "post_residual_budget_sha256": "0" * 64,
+        "reserved_budget": {
+            **reservation,
+            "schema_version": "redagent.campaign-budget-vector/v1",
+        },
+        "reservation_id": "reservation-a",
+        "idempotency_key": "idempotency-a",
+        "request_sha256": "1" * 64,
+        "lifecycle_epoch": 4,
+        "policy_revocation_epoch": 2,
+        "roe_revocation_epoch": 1,
+        "kill_switch_epoch": 0,
+        "issued_at": (NOW - timedelta(minutes=1)).isoformat().replace("+00:00", "Z"),
+        "expires_at": (NOW + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
+        "outcome": "admitted",
+        "denial_stage": None,
+        "reason_code": "admitted",
+        "audit_id": "audit-a",
+        "outbox_id": "outbox-a",
+    }
+    receipt_sha256 = canonical_planning_sha256(receipt_payload)
+    input_payload = {
+        "admission_receipt": dict(receipt_payload),
+        "revision": {
+            "revision_id": "revision-initial",
+            "parent_revision_id": None,
+            "candidate_plan": {
+                "nodes": [
+                    {
+                        "node_id": "node-internal",
+                        "operator_id": "http-posture",
+                        "target_id": "target-internal",
+                        "order": 0,
+                    }
+                ],
+                "edges": [],
+            },
+        },
+        "certificate": {
+            "result": "valid",
+            "counterexamples": [],
+            "bounded_reason": None,
+        },
+    }
     return CampaignOperationsSource(
         campaign={"id": "campaign-a", "version": 7},
         admission={
+            "id": "admission-a",
             "outcome": "admitted",
             "reason_code": "admitted",
-            "receipt_sha256": "c" * 64,
-            "receipt_payload": {
-                "signed_authority_sha256": "a" * 64,
-                "authority_sha256": "b" * 64,
-                "certificate_sha256": "d" * 64,
-                "lifecycle_epoch": 4,
-                "policy_revocation_epoch": 2,
-                "roe_revocation_epoch": 1,
-                "kill_switch_epoch": 0,
-                "expires_at": (NOW + timedelta(hours=1)).isoformat(),
-            },
+            "receipt_sha256": receipt_sha256,
+            "receipt_payload": receipt_payload,
         },
         ledger=budget,
         reservations=({"reservation_state": "reserved", **reservation},),
@@ -271,35 +349,23 @@ def _source() -> CampaignOperationsSource:
             "max_transitions": 20,
             "stop_requested": False,
             "terminal_reason": None,
+            "tenant_id": "tenant-a",
+            "campaign_id": "campaign-a",
+            "admission_receipt_id": "admission-a",
+            "reservation_id": "reservation-a",
             "authority_sha256": "b" * 64,
             "signed_authority_sha256": "a" * 64,
-            "admission_receipt_sha256": "c" * 64,
+            "domain_sha256": "3" * 64,
+            "plan_sha256": "4" * 64,
+            "certificate_sha256": "d" * 64,
+            "admission_receipt_sha256": receipt_sha256,
+            "reserved_budget_sha256": canonical_planning_sha256(receipt_payload["reserved_budget"]),
             "lifecycle_epoch": 4,
             "policy_revocation_epoch": 2,
             "roe_revocation_epoch": 1,
             "kill_switch_epoch": 0,
-            "input_payload": {
-                "revision": {
-                    "revision_id": "revision-initial",
-                    "parent_revision_id": None,
-                    "candidate_plan": {
-                        "nodes": [
-                            {
-                                "node_id": "node-internal",
-                                "operator_id": "http-posture",
-                                "target_id": "target-internal",
-                                "order": 0,
-                            }
-                        ],
-                        "edges": [],
-                    },
-                },
-                "certificate": {
-                    "result": "valid",
-                    "counterexamples": [],
-                    "bounded_reason": None,
-                },
-            },
+            "input_sha256": canonical_planning_sha256(input_payload),
+            "input_payload": input_payload,
         },
         nodes=(
             {
