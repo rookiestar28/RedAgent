@@ -422,6 +422,33 @@ def test_coherently_repinned_malformed_or_reordered_bundle_fails_closed(tmp_path
         verify_campaign_evidence_bundle(path, trust_anchor=anchor)
 
 
+@pytest.mark.parametrize(
+    ("attack", "malformed_value"),
+    [
+        ("heterogeneous-parents", [0, "b" * 64]),
+        ("unhashable-parents", [["b" * 64]]),
+        ("heterogeneous-loss", [0, "fabricated_loss"]),
+        ("unhashable-loss", [["fabricated_loss"]]),
+    ],
+)
+def test_coherently_repinned_container_types_raise_typed_verification_error(
+    tmp_path,
+    attack: str,
+    malformed_value: list[object],
+) -> None:
+    _, path, anchor = _bundle(tmp_path)
+
+    def mutate(artifacts):
+        if attack.endswith("parents"):
+            artifacts[2]["payload"]["source_parent_sha256s"] = malformed_value
+        else:
+            artifacts[-1]["payload"]["loss_reasons"] = malformed_value
+
+    anchor = _coherently_rewrite_artifacts(path, anchor, mutate)
+    with pytest.raises(CampaignEvidenceVerificationError):
+        verify_campaign_evidence_bundle(path, trust_anchor=anchor)
+
+
 @pytest.mark.parametrize("attack", ["cardinality", "duplicate-source", "terminal-lie"])
 def test_coherently_repinned_semantic_lineage_lies_fail_closed(tmp_path, attack: str) -> None:
     _, path, anchor = _bundle(tmp_path)

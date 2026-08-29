@@ -879,15 +879,12 @@ def _safe_payload(
             raise ValueError("campaign_evidence_source_payload_shape_invalid")
         _sha256("source_record_sha256", normalized["source_record_sha256"])
         parents = normalized["source_parent_sha256s"]
-        if (
-            not isinstance(parents, list)
-            or len(parents) > MAX_CAMPAIGN_EVIDENCE_ARTIFACTS
-            or len(set(parents)) != len(parents)
-            or sorted(parents) != parents
-        ):
+        if not isinstance(parents, list) or len(parents) > MAX_CAMPAIGN_EVIDENCE_ARTIFACTS:
             raise ValueError("campaign_evidence_source_parents_invalid")
         for parent in parents:
             _sha256("source_parent_sha256", parent)
+        if len(set(parents)) != len(parents) or sorted(parents) != parents:
+            raise ValueError("campaign_evidence_source_parents_invalid")
         _bounded_int("record_index", normalized["record_index"], 0, MAX_CAMPAIGN_EVIDENCE_ARTIFACTS - 1)
         _bounded_int("record_count", normalized["record_count"], 1, MAX_CAMPAIGN_EVIDENCE_ARTIFACTS)
         if normalized["record_index"] >= normalized["record_count"]:
@@ -921,7 +918,8 @@ def _safe_payload_for_verification(
         raise CampaignEvidenceVerificationError("campaign_evidence_payload_invalid")
     try:
         return _safe_payload(value, kind=kind, state=state)
-    except ValueError as exc:
+    # CRITICAL: malformed retained JSON must never escape the verifier as a raw schema exception.
+    except (TypeError, ValueError) as exc:
         raise CampaignEvidenceVerificationError(str(exc)) from exc
 
 
@@ -929,9 +927,9 @@ def _loss_reasons(value: tuple[str, ...]) -> tuple[str, ...]:
     if (
         not isinstance(value, tuple)
         or len(value) > 32
+        or any(not isinstance(item, str) or not _REASON.fullmatch(item) for item in value)
         or len(set(value)) != len(value)
         or tuple(sorted(value)) != value
-        or any(not isinstance(item, str) or not _REASON.fullmatch(item) for item in value)
     ):
         raise ValueError("campaign_evidence_loss_reasons_invalid")
     return value
