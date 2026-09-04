@@ -202,6 +202,7 @@ def register_autonomous_campaign_approval_routes(
     async def approve_plan(
         payload: AutonomousCampaignApprovalRequest,
         request: Request,
+        response: Response,
         campaign_id: str = Path(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$"),
         if_match: str = Header(min_length=3, max_length=100, alias="If-Match"),
         guard: RequestGuard = Depends(require_guard("campaign:approve", mutation=True)),
@@ -225,7 +226,13 @@ def register_autonomous_campaign_approval_routes(
             result = await _service(request, api_error).approve_plan(command)
         except ApplicationOutcomeError as exc:
             _raise_api_error(exc, api_error)
-        return {"data": _decision_payload(_service(request, api_error), result)}
+        response.headers["Cache-Control"] = "no-store"
+        if request.app.state.autonomous_campaign_admission_start_configured:
+            response.headers["ETag"] = (
+                f'"r173-{result.application.aggregate_revision}-'
+                f'{result.receipt.receipt_sha256}"'
+            )
+        return {"data": _decision_payload(request, _service(request, api_error), result)}
 
     @router.post(
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial",
@@ -259,7 +266,7 @@ def register_autonomous_campaign_approval_routes(
             result = await _service(request, api_error).deny_plan(command)
         except ApplicationOutcomeError as exc:
             _raise_api_error(exc, api_error)
-        return {"data": _decision_payload(_service(request, api_error), result)}
+        return {"data": _decision_payload(request, _service(request, api_error), result)}
 
 
 def _service(
@@ -292,10 +299,16 @@ def _preview_payload(preview: AutonomousCampaignPlanPreviewV1) -> dict[str, obje
 
 
 def _decision_payload(
+    request: Request,
     service: AutonomousCampaignApplicationService,
     result: AutonomousCampaignApprovalDecisionResultV1,
 ) -> dict[str, object]:
-    readiness = service.project(result.application)
+    readiness = service.project(
+        result.application,
+        admission_start_available=bool(
+            request.app.state.autonomous_campaign_admission_start_configured
+        ),
+    )
     return {
         "receipt_id": result.receipt.receipt_id,
         "receipt_sha256": result.receipt.receipt_sha256,

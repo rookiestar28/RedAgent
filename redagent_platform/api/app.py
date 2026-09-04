@@ -38,6 +38,12 @@ from redagent_platform.campaign_service.application_service import (
     AutonomousCampaignApplicationService,
 )
 from redagent_platform.campaign_service.approval_api import register_autonomous_campaign_approval_routes
+from redagent_platform.campaign_service.admission_start_api import (
+    register_autonomous_campaign_admission_start_routes,
+)
+from redagent_platform.campaign_service.admission_start_service import (
+    AutonomousCampaignAdmissionStartService,
+)
 from redagent_platform.campaign_service.composition import CampaignApiRuntimeServices
 from redagent_platform.campaign_service.qualification import (
     CampaignQualificationService,
@@ -159,6 +165,15 @@ def create_app(
         | None
     ) = None,
     autonomous_campaign_application_service: AutonomousCampaignApplicationService | None = None,
+    autonomous_campaign_admission_start_service_factory: (
+        Callable[
+            [object],
+            AutonomousCampaignAdmissionStartService
+            | Awaitable[AutonomousCampaignAdmissionStartService],
+        ]
+        | None
+    ) = None,
+    autonomous_campaign_admission_start_service: AutonomousCampaignAdmissionStartService | None = None,
     r124_campaign_core_service: object | None = None,
     campaign_operations_owner: object | None = None,
     operator_shell_context: OperatorShellContextData | None = None,
@@ -180,6 +195,16 @@ def create_app(
         raise ValueError("autonomous_campaign_factory_requires_database")
     if autonomous_campaign_service_factory is not None and autonomous_campaign_application_service is not None:
         raise ValueError("autonomous_campaign_runtime_services_ambiguous")
+    if (
+        autonomous_campaign_admission_start_service_factory is not None
+        and database_settings is None
+    ):
+        raise ValueError("autonomous_campaign_admission_factory_requires_database")
+    if (
+        autonomous_campaign_admission_start_service_factory is not None
+        and autonomous_campaign_admission_start_service is not None
+    ):
+        raise ValueError("autonomous_campaign_admission_runtime_services_ambiguous")
     static_root = _static_root(static_directory)
     resolved_operator_shell_context = operator_shell_context or OperatorShellContextData()
 
@@ -241,6 +266,23 @@ def create_app(
                     ):
                         raise RuntimeError("autonomous_campaign_factory_result_invalid")
                     application.state.autonomous_campaign_application_service = application_service
+                if autonomous_campaign_admission_start_service_factory is not None:
+                    admission_service = autonomous_campaign_admission_start_service_factory(
+                        application.state.session_factory
+                    )
+                    if inspect.isawaitable(admission_service):
+                        admission_service = await admission_service
+                    if not isinstance(
+                        admission_service,
+                        AutonomousCampaignAdmissionStartService,
+                    ):
+                        raise RuntimeError(
+                            "autonomous_campaign_admission_factory_result_invalid"
+                        )
+                    application.state.autonomous_campaign_admission_start_service = (
+                        admission_service
+                    )
+                    application.state.autonomous_campaign_admission_start_configured = True
             yield
         finally:
             if r123_service_factory is not None:
@@ -254,6 +296,14 @@ def create_app(
                 application.state.campaign_operations_owner = campaign_operations_owner
             if autonomous_campaign_service_factory is not None:
                 application.state.autonomous_campaign_application_service = autonomous_campaign_application_service
+            if autonomous_campaign_admission_start_service_factory is not None:
+                application.state.autonomous_campaign_admission_start_service = (
+                    autonomous_campaign_admission_start_service
+                )
+                application.state.autonomous_campaign_admission_start_configured = isinstance(
+                    autonomous_campaign_admission_start_service,
+                    AutonomousCampaignAdmissionStartService,
+                )
             application.state.session_factory = None
             if engine is not None:
                 await engine.dispose()
@@ -286,6 +336,13 @@ def create_app(
     app.state.r124_campaign_core_service = r124_campaign_core_service
     app.state.campaign_operations_owner = campaign_operations_owner
     app.state.autonomous_campaign_application_service = autonomous_campaign_application_service
+    app.state.autonomous_campaign_admission_start_service = (
+        autonomous_campaign_admission_start_service
+    )
+    app.state.autonomous_campaign_admission_start_configured = isinstance(
+        autonomous_campaign_admission_start_service,
+        AutonomousCampaignAdmissionStartService,
+    )
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
@@ -433,6 +490,11 @@ def create_app(
         router=app.router,
     )
     register_autonomous_campaign_approval_routes(
+        app.router,
+        require_guard=dependencies.require_guard,
+        api_error=ApiError,
+    )
+    register_autonomous_campaign_admission_start_routes(
         app.router,
         require_guard=dependencies.require_guard,
         api_error=ApiError,

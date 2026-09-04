@@ -7,7 +7,7 @@ from datetime import datetime
 import hashlib
 import json
 import re
-from typing import Protocol
+from typing import Generic, Protocol, TypeVar
 
 from redagent_platform.campaign_service.admission_contracts import (
     AdmissionOutcome,
@@ -20,7 +20,6 @@ from redagent_platform.campaign_service.dag_execution import (
 from redagent_platform.campaign_service.dag_execution_contracts import (
     DAG_EXECUTION_SCHEMA_VERSION,
     DagExecutionMode,
-    DagExecutionSnapshotV1,
     DagNodeState,
     DagRunState,
     DagWorkflowInputV1,
@@ -216,15 +215,21 @@ class DagExecutionStartMaterialV1:
             raise ValueError("dag_material_outbox_type_invalid")
 
 
-class DagExecutionStartStore(Protocol):
+_DagExecutionStartResult_co = TypeVar("_DagExecutionStartResult_co", covariant=True)
+_DagExecutionStartResult = TypeVar("_DagExecutionStartResult")
+
+
+class DagExecutionStartStore(Protocol[_DagExecutionStartResult_co]):
     async def start(
         self, material: DagExecutionStartMaterialV1, *, now: datetime
-    ) -> DagExecutionSnapshotV1: ...
+    ) -> _DagExecutionStartResult_co: ...
 
 
-class DagExecutionStartService:
+class DagExecutionStartService(Generic[_DagExecutionStartResult]):
     def __init__(
-        self, mode: DagExecutionMode, store: DagExecutionStartStore
+        self,
+        mode: DagExecutionMode,
+        store: DagExecutionStartStore[_DagExecutionStartResult],
     ) -> None:
         if not isinstance(mode, DagExecutionMode):
             raise ValueError("dag_execution_mode_invalid")
@@ -233,7 +238,7 @@ class DagExecutionStartService:
 
     async def start(
         self, request: DagExecutionStartRequestV1, *, now: datetime
-    ) -> DagExecutionSnapshotV1:
+    ) -> _DagExecutionStartResult:
         if self._mode is DagExecutionMode.DISABLED:
             raise RuntimeError("dag_execution_disabled")
         if not isinstance(request, DagExecutionStartRequestV1):
@@ -399,6 +404,36 @@ class DagExecutionStartService:
             outbox_payload=asdict(workflow_input),
         )
         return await self._store.start(material, now=now)
+
+
+async def prepare_dag_execution_start(
+    request: DagExecutionStartRequestV1,
+    *,
+    now: datetime,
+) -> DagExecutionStartMaterialV1:
+    """Run accepted DAG validation/materialization without persistence or Workflow start."""
+
+    class _Capture:
+        material: DagExecutionStartMaterialV1 | None = None
+
+        async def start(
+            self,
+            material: DagExecutionStartMaterialV1,
+            *,
+            now: datetime,
+        ) -> DagExecutionStartMaterialV1:
+            del now
+            self.material = material
+            return material
+
+    capture = _Capture()
+    prepared = await DagExecutionStartService(DagExecutionMode.OWNED_LOOPBACK, capture).start(
+        request,
+        now=now,
+    )
+    if not isinstance(prepared, DagExecutionStartMaterialV1) or capture.material is not prepared:
+        raise RuntimeError("dag_start_preparation_failed")
+    return prepared
 
 
 def _identifier(name: str, value: object) -> None:

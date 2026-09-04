@@ -54,6 +54,12 @@ def _staged_app(monkeypatch):
     ), staged
 
 
+def _configured_staged_app(monkeypatch):
+    app, staged = _staged_app(monkeypatch)
+    app.state.autonomous_campaign_admission_start_configured = True
+    return app, staged
+
+
 def test_safe_preview_route_is_tenant_guarded_complete_and_no_store(monkeypatch) -> None:
     app, staged = _staged_app(monkeypatch)
     response = TestClient(app).get(
@@ -114,6 +120,29 @@ def test_exact_approval_requires_campaign_approve_and_matching_if_match(monkeypa
     assert data["application"]["lifecycle_state"] == "APPROVED"
     assert data["application"]["admission_ready"] is False
     assert data["application"]["start_ready"] is False
+    assert data["application"]["unavailable_reason"] == "admission_start_not_configured"
+
+
+def test_exact_approval_projects_r173_readiness_only_when_the_service_is_configured(monkeypatch) -> None:
+    app, staged = _configured_staged_app(monkeypatch)
+    response = TestClient(app).post(
+        "/api/v1/autonomous-campaigns/campaign-a/plan-approval",
+        headers={**APPROVE_AUTH, "If-Match": staged.preview.etag},
+        json={
+            "preview_id": staged.preview.preview_id,
+            "preview_sha256": staged.preview.preview_sha256,
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["etag"] == (
+        f'"r173-{staged.application.aggregate_revision + 1}-'
+        f'{response.json()["data"]["receipt_sha256"]}"'
+    )
+    assert response.headers["cache-control"] == "no-store"
+    readiness = response.json()["data"]["application"]
+    assert readiness["admission_ready"] is True
+    assert readiness["start_ready"] is True
+    assert readiness["unavailable_reason"] == "ready_for_admission_start"
 
 
 def test_explicit_denial_route_persists_terminal_reason(monkeypatch) -> None:
@@ -151,9 +180,10 @@ def test_revoked_or_superseded_lifecycle_returns_typed_conflict(monkeypatch) -> 
     assert response.json()["error"]["code"] == "application_lifecycle_transition_invalid"
 
 
-def test_openapi_exposes_only_read_and_explicit_decision_routes() -> None:
+def test_openapi_exposes_read_decision_and_r173_admission_start_routes() -> None:
     paths = create_app(test_issuer_enabled=True).openapi()["paths"]
     assert "/api/v1/autonomous-campaigns/{campaign_id}/plan-preview" in paths
     assert "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval" in paths
     assert "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial" in paths
-    assert not any("stage" in path or "admit" in path or "start" in path for path in paths if "autonomous" in path)
+    assert "/api/v1/autonomous-campaigns/{campaign_id}/admission-start" in paths
+    assert not any("stage" in path for path in paths if "autonomous" in path)

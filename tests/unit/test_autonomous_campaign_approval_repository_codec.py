@@ -7,6 +7,7 @@ import pytest
 
 from redagent_platform.campaign_service.application_contracts import ApplicationBindingConflict
 from redagent_platform.campaign_service.application_repository import (
+    PostgresAutonomousCampaignApplicationRepository,
     _approval_decision_result_from_payload,
     _approval_decision_result_payload,
     _json_payload,
@@ -76,3 +77,13 @@ def test_preview_persistence_codec_verifies_the_stored_digest() -> None:
     payload["objective_id"] = "tampered-objective"
     with pytest.raises(ApplicationBindingConflict, match="plan_preview_persistence_digest_mismatch"):
         _verified_preview_from_payload(payload, staged.preview.preview_sha256)
+
+
+def test_repository_exposes_authoritative_current_approval_bundle_read() -> None:
+    assert callable(
+        getattr(
+            PostgresAutonomousCampaignApplicationRepository,
+            "read_current_approval_bundle",
+            None,
+        )
+    )

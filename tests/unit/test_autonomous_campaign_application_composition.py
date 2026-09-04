@@ -90,13 +90,14 @@ def test_r172_configured_factory_can_stage_and_decide_end_to_end(monkeypatch) ->
     assert approved.application.lifecycle_state is AutonomousCampaignLifecycle.APPROVED
 
 
-def test_r171_base_now_exposes_only_r172_human_decision_routes() -> None:
+def test_phase26_application_exposes_r172_decision_and_r173_start_bridge_routes() -> None:
     paths = create_app(test_issuer_enabled=True).openapi()["paths"]
     autonomous = {path for path in paths if "autonomous" in path}
     assert autonomous == {
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-preview",
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval",
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial",
+        "/api/v1/autonomous-campaigns/{campaign_id}/admission-start",
     }
     assert "/api/v1/campaign-core/campaigns" in paths
     assert "/api/v1/internal/r123/qualification" in paths
@@ -123,3 +124,14 @@ def test_r172_unconfigured_runtime_lifespan_keeps_the_service_unavailable(tmp_pa
     with TestClient(app):
         assert app.state.autonomous_campaign_application_service is None
     assert app.state.autonomous_campaign_application_service is None
+
+
+def test_r173_admission_factory_requires_database_configuration() -> None:
+    with pytest.raises(
+        ValueError,
+        match="autonomous_campaign_admission_factory_requires_database",
+    ):
+        create_app(
+            test_issuer_enabled=True,
+            autonomous_campaign_admission_start_service_factory=lambda _: object(),
+        )

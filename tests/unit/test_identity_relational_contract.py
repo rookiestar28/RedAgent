@@ -97,7 +97,7 @@ def test_durable_role_permissions_deny_unknown_roles_and_require_jit_for_elevate
 
 
 def test_r124_production_roles_expose_inspection_and_safety_recovery_permissions() -> None:
-    assert {"campaign:read", "campaign:create", "campaign:inspect", "campaign:stop"}.issubset(
+    assert {"campaign:read", "campaign:create", "campaign:inspect", "campaign:admit", "campaign:stop"}.issubset(
         ROLE_PERMISSIONS["operator"]
     )
     assert {"campaign:read", "campaign:inspect", "campaign:approve"}.issubset(

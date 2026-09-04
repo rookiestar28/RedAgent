@@ -6,6 +6,7 @@ from pathlib import Path
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
+from redagent_platform.campaign_service.admission_repository import CampaignAdmissionRepository
 from redagent_platform.persistence.database import DatabaseSettings
 from redagent_platform.persistence.models import metadata
 
@@ -18,11 +19,11 @@ def test_admission_migration_is_the_single_additive_head() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["0030_autonomous_plan_approval"]
+    assert scripts.get_heads() == ["0031_autonomous_admission_start"]
     source = MIGRATION.read_text(encoding="utf-8")
     assert 'revision = "0026_campaign_plan_admission"' in source
     assert 'down_revision = "0025_r123_closed_loop"' in source
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0030_autonomous_plan_approval")
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0031_autonomous_admission_start")
 
 
 def test_admission_metadata_is_closed_tenant_owned_and_bounded() -> None:
@@ -60,6 +61,10 @@ def test_admission_metadata_is_closed_tenant_owned_and_bounded() -> None:
     assert {"receipt_sha256", "receipt_payload", "outcome", "request_sha256"}.issubset(
         metadata.tables["plan_admission_receipts"].c.keys()
     )
+
+
+def test_admission_repository_exposes_transaction_neutral_denial() -> None:
+    assert callable(getattr(CampaignAdmissionRepository, "deny", None))
 
 
 def test_admission_metadata_uses_tenant_bound_composite_relationships() -> None:

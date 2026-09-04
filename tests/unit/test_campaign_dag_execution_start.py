@@ -21,6 +21,7 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
 from redagent_platform.campaign_service.dag_execution_service import (
     DagExecutionStartRequestV1,
     DagExecutionStartService,
+    prepare_dag_execution_start,
 )
 from redagent_platform.campaign_service.planning.contracts import (
     CapabilityIdentityV1,
@@ -172,6 +173,21 @@ def test_start_material_is_canonical_admission_bound_and_outbox_only() -> None:
     assert material.nodes[0].node_state.value == "pending"
     assert material.outbox_event_type == "campaign.dag.start.requested.v1"
     assert material.reserved_budget_sha256 == _request().admission_receipt.reserved_budget.budget_sha256
+
+
+def test_pure_start_preparation_reuses_r159_validation_without_persistence_or_io() -> None:
+    request = _request()
+    material = asyncio.run(
+        prepare_dag_execution_start(
+            request,
+            now=NOW + timedelta(seconds=40),
+        )
+    )
+
+    assert material.admission_receipt_id == request.admission_receipt.receipt_id
+    assert material.plan_sha256 == request.revision.candidate_plan.plan_sha256
+    assert material.nodes[0].node_state.value == "pending"
+    assert material.run_state is DagRunState.START_PENDING
 
 
 @pytest.mark.parametrize(

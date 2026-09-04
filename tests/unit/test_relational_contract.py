@@ -38,6 +38,7 @@ EXPECTED_TABLES = {
     "autonomous_campaign_application_events",
     "autonomous_campaign_plan_approval_receipts",
     "autonomous_campaign_plan_previews",
+    "autonomous_campaign_execution_starts",
     "jobs",
     "workflow_commands",
     "evidence_operations",

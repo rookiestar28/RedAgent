@@ -28,6 +28,9 @@ from redagent_platform.campaign_service.application_contracts import (
     assert_lifecycle_transition,
 )
 from redagent_platform.campaign_service.admission_contracts import CampaignBudgetVectorV1
+from redagent_platform.campaign_service.admission_start_contracts import (
+    AutonomousCampaignApprovalBundleV1,
+)
 from redagent_platform.campaign_service.approval_contracts import (
     ApproveAutonomousCampaignPlanV1,
     AutonomousCampaignApprovalDecision,
@@ -446,6 +449,103 @@ class PostgresAutonomousCampaignApplicationRepository:
             None
             if row is None
             else _verified_preview_from_payload(row["preview_payload"], str(row["preview_sha256"]))
+        )
+
+    async def read_current_approval_bundle(
+        self,
+        *,
+        tenant_id: str,
+        campaign_id: str,
+        approval_receipt_id: str,
+    ) -> AutonomousCampaignApprovalBundleV1 | None:
+        """Reload the exact current R172 approval lineage from immutable rows."""
+        _identifier("tenant_id", tenant_id, 64)
+        _identifier("campaign_id", campaign_id, 64)
+        _identifier("approval_receipt_id", approval_receipt_id, 64)
+        applications = metadata.tables["autonomous_campaign_applications"]
+        previews = metadata.tables["autonomous_campaign_plan_previews"]
+        receipts = metadata.tables["autonomous_campaign_plan_approval_receipts"]
+        async with self._sessions() as session, session.begin():
+            await _tenant_context(session, tenant_id)
+            application_row = (
+                (
+                    await session.execute(
+                        select(applications).where(
+                            applications.c.tenant_id == tenant_id,
+                            applications.c.id == campaign_id,
+                        )
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if application_row is None:
+                return None
+            receipt_row = (
+                (
+                    await session.execute(
+                        select(receipts).where(
+                            receipts.c.tenant_id == tenant_id,
+                            receipts.c.application_id == campaign_id,
+                            receipts.c.id == approval_receipt_id,
+                        )
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if receipt_row is None:
+                return None
+            preview_row = (
+                (
+                    await session.execute(
+                        select(previews).where(
+                            previews.c.tenant_id == tenant_id,
+                            previews.c.application_id == campaign_id,
+                            previews.c.id == receipt_row["preview_id"],
+                        )
+                    )
+                )
+                .mappings()
+                .one_or_none()
+            )
+            if preview_row is None:
+                return None
+
+        application = _state_from_row(application_row)
+        preview = _verified_preview_from_payload(
+            preview_row["preview_payload"], str(preview_row["preview_sha256"])
+        )
+        receipt = _verified_receipt_from_payload(
+            receipt_row["receipt_payload"], str(receipt_row["receipt_sha256"])
+        )
+        if (
+            application.lifecycle_state
+            not in {
+                AutonomousCampaignLifecycle.APPROVED,
+                AutonomousCampaignLifecycle.ADMITTED,
+                AutonomousCampaignLifecycle.EXECUTION_QUEUED,
+                AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED,
+                AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,
+                AutonomousCampaignLifecycle.FAILED_CONTAINED,
+                AutonomousCampaignLifecycle.DENIED,
+                AutonomousCampaignLifecycle.EXPIRED,
+                AutonomousCampaignLifecycle.REVOKED,
+            }
+            or receipt.decision is not AutonomousCampaignApprovalDecision.APPROVED
+            or receipt.application_revision > application.aggregate_revision
+            or int(receipt_row["application_revision"]) != receipt.application_revision
+            or preview.application_revision + 1 != receipt.application_revision
+            or int(preview_row["application_revision"]) != preview.application_revision
+            or str(receipt_row["preview_id"]) != preview.preview_id
+            or receipt.preview_id != preview.preview_id
+            or receipt.receipt_id != approval_receipt_id
+        ):
+            return None
+        return AutonomousCampaignApprovalBundleV1(
+            application=application,
+            preview=preview,
+            approval_receipt=receipt,
         )
 
     async def decide_plan(

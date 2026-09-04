@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from scripts.redagent_workflow_worker import (
+    build_runtime_admission_start_relay_factory,
     build_runtime_dag_factory,
     build_runtime_dag_relay_factory,
     build_runtime_r123_factory,
@@ -150,6 +151,13 @@ def test_stock_worker_entrypoint_selects_dag_factories_from_the_same_environment
             tmp_path,
             {"REDAGENT_DAG_EXECUTION_MODE": "owned_loopback"},
         )
+
+
+def test_stock_worker_entrypoint_selects_start_bridge_from_autonomous_mode() -> None:
+    assert build_runtime_admission_start_relay_factory(
+        {"REDAGENT_AUTONOMOUS_CAMPAIGN_MODE": "disabled"}
+    ) is None
+    assert callable(build_runtime_admission_start_relay_factory({}))
 
 
 def test_worker_and_relay_share_one_fail_closed_lifecycle() -> None:

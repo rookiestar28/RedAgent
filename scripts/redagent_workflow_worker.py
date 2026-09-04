@@ -25,6 +25,9 @@ from redagent_platform.campaign_service.dag_composition import (  # noqa: E402
     build_stock_campaign_dag_factory,
     build_stock_campaign_dag_relay_factory,
 )
+from redagent_platform.campaign_service.admission_start_composition import (  # noqa: E402
+    build_stock_autonomous_campaign_start_bridge_relay_factory,
+)
 from redagent_platform.orchestration.gateway import OrchestrationUnavailable  # noqa: E402
 from redagent_platform.orchestration.worker import run_workflow_worker  # noqa: E402
 from redagent_platform.persistence.database import DatabaseConfigError  # noqa: E402
@@ -54,6 +57,11 @@ def build_runtime_dag_factory(
 def build_runtime_dag_relay_factory(env: Mapping[str, str]):
     """Select the mandatory Phase 25 DAG relay from the startup environment."""
     return build_stock_campaign_dag_relay_factory(env)
+
+
+def build_runtime_admission_start_relay_factory(env: Mapping[str, str]):
+    """Select the R173 inert start bridge from the autonomous application mode."""
+    return build_stock_autonomous_campaign_start_bridge_relay_factory(env)
 
 
 def worker_health_response(path: str, *, ready: bool) -> tuple[int, bytes]:
@@ -112,6 +120,7 @@ async def _run(*, health_host: str, health_port: int, graceful_shutdown_seconds:
             values,
         )
         dag_relay_factory = build_runtime_dag_relay_factory(values)
+        admission_start_relay_factory = build_runtime_admission_start_relay_factory(values)
         await run_workflow_worker(
             REPO_ROOT,
             env=values,
@@ -120,6 +129,7 @@ async def _run(*, health_host: str, health_port: int, graceful_shutdown_seconds:
             r123_relay_factory=r123_relay_factory,
             dag_activities_factory=dag_factory,
             dag_relay_factory=dag_relay_factory,
+            admission_start_relay_factory=admission_start_relay_factory,
             readiness_event=ready,
         )
 

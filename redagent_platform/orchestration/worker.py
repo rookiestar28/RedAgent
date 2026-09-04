@@ -15,6 +15,9 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 
 from redagent_platform.orchestration.activities import WorkflowActivities
+from redagent_platform.orchestration.admission_start_workflow import (
+    AutonomousCampaignStartBridgeWorkflow,
+)
 from redagent_platform.orchestration.dag_execution_workflow import (
     CampaignDagExecutionWorkflow,
 )
@@ -50,8 +53,12 @@ class WorkerRegistration:
     runner_capability: bool
 
 
-def worker_registration(*, dag_execution_enabled: bool = False) -> WorkerRegistration:
-    if type(dag_execution_enabled) is not bool:
+def worker_registration(
+    *,
+    dag_execution_enabled: bool = False,
+    start_bridge_enabled: bool = False,
+) -> WorkerRegistration:
+    if type(dag_execution_enabled) is not bool or type(start_bridge_enabled) is not bool:
         raise ValueError("dag_execution_registration_flag_invalid")
     dag_workflows = (
         ("redagent.campaign-dag-execution.v1",) if dag_execution_enabled else ()
@@ -71,7 +78,8 @@ def worker_registration(*, dag_execution_enabled: bool = False) -> WorkerRegistr
             "redagent.r096.campaign-lifecycle.v1",
             "redagent.r123.campaign-closed-loop.v1",
         )
-        + dag_workflows,
+        + dag_workflows
+        + (("redagent.autonomous-campaign-start-bridge.v1",) if start_bridge_enabled else ()),
         activity_names=(
             "r096_admit_job",
             "r096_apply_command",
@@ -150,10 +158,14 @@ def build_workflow_worker(
     containment_dispatcher=None,
     r123_coordinator=None,
     dag_activities=None,
+    start_bridge_enabled: bool = False,
 ) -> Worker:
     if isinstance(graceful_shutdown_seconds, bool) or not 1 <= graceful_shutdown_seconds <= 300:
         raise ValueError("worker_graceful_shutdown_invalid")
-    registration = worker_registration(dag_execution_enabled=dag_activities is not None)
+    registration = worker_registration(
+        dag_execution_enabled=dag_activities is not None,
+        start_bridge_enabled=start_bridge_enabled,
+    )
     activities = WorkflowActivities(
         sessions, runner_dispatcher=runner_dispatcher,
         containment_dispatcher=containment_dispatcher,
@@ -180,6 +192,8 @@ def build_workflow_worker(
                 dag_activities.contain,
             ]
         )
+    if start_bridge_enabled:
+        workflows.append(AutonomousCampaignStartBridgeWorkflow)
     return Worker(
         client,
         task_queue=settings.task_queue,
@@ -206,6 +220,7 @@ async def run_workflow_worker(
     dag_activities=None,
     dag_activities_factory=None,
     dag_relay_factory=None,
+    admission_start_relay_factory=None,
     readiness_event: asyncio.Event | None = None,
 ) -> None:
     values = dict(os.environ if env is None else env)
@@ -264,6 +279,7 @@ async def run_workflow_worker(
             containment_dispatcher=containment_dispatcher,
             r123_coordinator=r123_coordinator,
             dag_activities=dag_activities,
+            start_bridge_enabled=admission_start_relay_factory is not None,
         )
         relays = []
         if selected_relay is not None:
@@ -286,6 +302,16 @@ async def run_workflow_worker(
             if not callable(getattr(dag_relay, "run", None)):
                 raise ValueError("dag_relay_factory_result_invalid")
             relays.append(dag_relay)
+        if admission_start_relay_factory is not None:
+            created_start_relay = admission_start_relay_factory(sessions, client, temporal)
+            start_relay = (
+                await created_start_relay
+                if inspect.isawaitable(created_start_relay)
+                else created_start_relay
+            )
+            if not callable(getattr(start_relay, "run", None)):
+                raise ValueError("admission_start_relay_factory_result_invalid")
+            relays.append(start_relay)
         if readiness_event is not None:
             readiness_event.set()
         if not relays:

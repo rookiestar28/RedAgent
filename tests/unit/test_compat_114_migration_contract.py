@@ -20,7 +20,7 @@ def test_r114_revision_exists_and_advances_head() -> None:
     assert REVISION.is_file(), "compat_114 RED: revision 0021 MCP/workbench persistence is missing"
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0021_r114_mcp"' in source and 'down_revision = "0020_r113_agent"' in source
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0030_autonomous_plan_approval"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0031_autonomous_admission_start"
 
 
 def test_revision_0021_defines_force_rls_owned_tables() -> None:

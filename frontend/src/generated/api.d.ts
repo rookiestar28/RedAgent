@@ -276,6 +276,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/autonomous-campaigns/{campaign_id}/admission-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admit And Queue */
+        post: operations["admit_and_queue_autonomous_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval": {
         parameters: {
             query?: never;
@@ -3106,6 +3123,62 @@ export interface components {
             /** Runner Id */
             runner_id: string;
         };
+        /** AutonomousCampaignAdmissionApplicationData */
+        AutonomousCampaignAdmissionApplicationData: {
+            /** Admission Ready */
+            admission_ready: boolean;
+            /** Aggregate Revision */
+            aggregate_revision: number;
+            /** Campaign Id */
+            campaign_id: string;
+            /** Lifecycle State */
+            lifecycle_state: string;
+            /** Start Ready */
+            start_ready: boolean;
+            /** Unavailable Reason */
+            unavailable_reason: string;
+        };
+        /** AutonomousCampaignAdmissionData */
+        AutonomousCampaignAdmissionData: {
+            /** Denial Stage */
+            denial_stage: string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "admitted" | "denied";
+            /** Reason Code */
+            reason_code: string;
+            /** Receipt Id */
+            receipt_id: string;
+            /** Receipt Sha256 */
+            receipt_sha256: string;
+            /** Reservation Id */
+            reservation_id: string | null;
+        };
+        /** AutonomousCampaignAdmissionStartData */
+        AutonomousCampaignAdmissionStartData: {
+            admission: components["schemas"]["AutonomousCampaignAdmissionData"];
+            application: components["schemas"]["AutonomousCampaignAdmissionApplicationData"];
+            /** Approval Receipt Id */
+            approval_receipt_id: string;
+            /** Approval Receipt Sha256 */
+            approval_receipt_sha256: string;
+            /** Replayed */
+            replayed: boolean;
+            start: components["schemas"]["AutonomousCampaignStartData"];
+        };
+        /** AutonomousCampaignAdmissionStartRequest */
+        AutonomousCampaignAdmissionStartRequest: {
+            /** Approval Receipt Id */
+            approval_receipt_id: string;
+            /** Approval Receipt Sha256 */
+            approval_receipt_sha256: string;
+        };
+        /** AutonomousCampaignAdmissionStartResponse */
+        AutonomousCampaignAdmissionStartResponse: {
+            data: components["schemas"]["AutonomousCampaignAdmissionStartData"];
+        };
         /** AutonomousCampaignApprovalDecisionData */
         AutonomousCampaignApprovalDecisionData: {
             application: components["schemas"]["AutonomousCampaignReadinessData"];
@@ -3328,6 +3401,21 @@ export interface components {
             start_ready: boolean;
             /** Unavailable Reason */
             unavailable_reason: string;
+        };
+        /** AutonomousCampaignStartData */
+        AutonomousCampaignStartData: {
+            /** Execution Run Id */
+            execution_run_id: string | null;
+            /** Reason Code */
+            reason_code: string | null;
+            /** State */
+            state: string | null;
+            /** Workflow Id */
+            workflow_id: string | null;
+            /** Workflow Request Sha256 */
+            workflow_request_sha256: string | null;
+            /** Workflow Run Id */
+            workflow_run_id: string | null;
         };
         /** CampaignCreateRequest */
         CampaignCreateRequest: {
@@ -8990,6 +9078,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtifactRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admit_and_queue_autonomous_campaign: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutonomousCampaignAdmissionStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignAdmissionStartResponse"];
                 };
             };
             /** @description Validation Error */

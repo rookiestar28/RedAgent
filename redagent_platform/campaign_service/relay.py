@@ -30,6 +30,7 @@ class RelayDeliveryResult(str, Enum):
     DUPLICATE_CONFIRMED = "duplicate_confirmed"
     RETRY_SCHEDULED = "retry_scheduled"
     RECONCILIATION_REQUIRED = "reconciliation_required"
+    MANUAL_REVIEW_REQUIRED = "manual_review_required"
     AUTHORITY_DENIED = "authority_denied"
 
 
@@ -38,6 +39,12 @@ class WorkflowAlreadyStarted(RuntimeError):
 
 
 class WorkflowStartUnavailable(RuntimeError):
+    pass
+
+
+class WorkflowStartUnknown(RuntimeError):
+    """The start RPC may have committed but no authoritative response was observed."""
+
     pass
 
 

@@ -67,6 +67,70 @@ class CampaignDagExecutionRepository:
             return replay
         await self._lock_current_admission(material, now=now)
 
+        await self.insert_prepared_material(material, now=now)
+
+        stable = hashlib.sha256(material.execution_run_id.encode("utf-8")).hexdigest()[:32]
+        await self.session.execute(
+            insert(metadata.tables["audit_events"]).values(
+                id=f"audit-dag-{stable}",
+                actor_user_id=self.actor_user_id,
+                action="campaign.dag.start.requested",
+                subject_type="campaign_execution",
+                subject_id=material.execution_run_id,
+                correlation_id=self.correlation_id,
+                details={
+                    "input_sha256": material.input_sha256,
+                    "plan_sha256": material.plan_sha256,
+                    "admission_receipt_sha256": material.admission_receipt_sha256,
+                    "workflow_request_sha256": material.workflow_request_sha256,
+                },
+                tenant_id=self.tenant_id,
+                version=1,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        await self.session.execute(
+            insert(metadata.tables["outbox_events"]).values(
+                id=f"outbox-dag-{stable}",
+                event_type="campaign.dag.start.requested.v1",
+                aggregate_id=material.execution_run_id,
+                payload=material.outbox_payload,
+                published=False,
+                schema_revision=2,
+                aggregate_type="campaign_execution",
+                aggregate_sequence=1,
+                available_at=now,
+                claim_owner=None,
+                claim_expires_at=None,
+                attempt_count=0,
+                last_error=None,
+                delivered_at=None,
+                delivery_state="pending",
+                reconciliation_state="none",
+                dead_lettered_at=None,
+                tenant_id=self.tenant_id,
+                version=1,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        return _start_snapshot(material)
+
+    async def insert_prepared_material(
+        self,
+        material: DagExecutionStartMaterialV1,
+        *,
+        now: datetime,
+    ) -> None:
+        """Insert one already-validated DAG run/node graph in the caller transaction."""
+        if not isinstance(material, DagExecutionStartMaterialV1):
+            raise ValueError("dag_start_material_invalid")
+        if material.tenant_id != self.tenant_id:
+            raise ValueError("dag_start_material_tenant_mismatch")
+        _aware("dag_start_store_now", now)
+        # CRITICAL: callers must lock and validate admission before this insert-only seam.
+        await self._set_tenant()
         runs = metadata.tables["campaign_execution_runs"]
         await self.session.execute(
             insert(runs).values(
@@ -138,53 +202,6 @@ class CampaignDagExecutionRepository:
                 )
             )
 
-        stable = hashlib.sha256(material.execution_run_id.encode("utf-8")).hexdigest()[:32]
-        await self.session.execute(
-            insert(metadata.tables["audit_events"]).values(
-                id=f"audit-dag-{stable}",
-                actor_user_id=self.actor_user_id,
-                action="campaign.dag.start.requested",
-                subject_type="campaign_execution",
-                subject_id=material.execution_run_id,
-                correlation_id=self.correlation_id,
-                details={
-                    "input_sha256": material.input_sha256,
-                    "plan_sha256": material.plan_sha256,
-                    "admission_receipt_sha256": material.admission_receipt_sha256,
-                    "workflow_request_sha256": material.workflow_request_sha256,
-                },
-                tenant_id=self.tenant_id,
-                version=1,
-                created_at=now,
-                updated_at=now,
-            )
-        )
-        await self.session.execute(
-            insert(metadata.tables["outbox_events"]).values(
-                id=f"outbox-dag-{stable}",
-                event_type="campaign.dag.start.requested.v1",
-                aggregate_id=material.execution_run_id,
-                payload=material.outbox_payload,
-                published=False,
-                schema_revision=2,
-                aggregate_type="campaign_execution",
-                aggregate_sequence=1,
-                available_at=now,
-                claim_owner=None,
-                claim_expires_at=None,
-                attempt_count=0,
-                last_error=None,
-                delivered_at=None,
-                delivery_state="pending",
-                reconciliation_state="none",
-                dead_lettered_at=None,
-                tenant_id=self.tenant_id,
-                version=1,
-                created_at=now,
-                updated_at=now,
-            )
-        )
-        return _start_snapshot(material)
 
     async def _existing(
         self, material: DagExecutionStartMaterialV1

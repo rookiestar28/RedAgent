@@ -249,6 +249,156 @@ class CampaignAdmissionRepository:
         )
         return receipt
 
+    async def deny(self, **values: object) -> PlanAdmissionReceiptV1:
+        """Persist one denial inside the caller-owned transaction."""
+        context = values.get("context")
+        if not isinstance(context, dict):
+            raise ValueError("plan_admission_denial_context_invalid")
+        tenant_id = str(context["tenant_id"])
+        if tenant_id != self.tenant_id:
+            raise ValueError("plan_admission_denial_tenant_mismatch")
+        campaign_id = str(values["campaign_id"])
+        idempotency_key = str(values["idempotency_key"])
+        request_sha256 = str(values["request_sha256"])
+        occurred_at = context["issued_at"]
+        if not isinstance(occurred_at, datetime):
+            raise ValueError("plan_admission_denial_time_invalid")
+        await self._set_tenant()
+        await self.session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:scope, 0))"),
+            {"scope": f"campaign-budget:{tenant_id}:{campaign_id}"},
+        )
+        existing = await self.existing_receipt(
+            campaign_id=campaign_id,
+            idempotency_key=idempotency_key,
+            request_sha256=request_sha256,
+        )
+        if existing is not None:
+            return _receipt_from_payload(existing["receipt_payload"])
+
+        policy_request = values.get("policy_request")
+        policy_decision = values.get("policy_decision")
+        policy_row_id: str | None = None
+        policy_receipt_id: str | None = None
+        if isinstance(policy_request, PolicyDecisionInput) and isinstance(
+            policy_decision, PolicyDecision
+        ):
+            policy_row_id, policy_receipt_id = await _persist_denied_policy(
+                self.session,
+                self,
+                policy_request,
+                policy_decision,
+                campaign_id=campaign_id,
+                occurred_at=occurred_at,
+                request_sha256=request_sha256,
+            )
+
+        receipt_id = f"admission-{uuid4().hex}"
+        audit_id = f"audit-{uuid4().hex}"
+        outbox_id = f"outbox-{uuid4().hex}"
+        pre_residual = None
+        if isinstance(policy_request, PolicyDecisionInput):
+            candidate = policy_request.attributes.get("campaign_residual_budget_sha256")
+            pre_residual = candidate if isinstance(candidate, str) else None
+        receipt = PlanAdmissionReceiptV1(
+            schema_version=PLAN_ADMISSION_RECEIPT_SCHEMA_VERSION,
+            receipt_id=receipt_id,
+            tenant_id=tenant_id,
+            campaign_id=campaign_id,
+            engagement_id=str(context["engagement_id"]),
+            signed_authority_sha256=str(context["signed_authority_sha256"]),
+            authority_sha256=str(context["authority_sha256"]),
+            domain_sha256=str(context["domain_sha256"]),
+            plan_sha256=str(context["plan_sha256"]),
+            certificate_sha256=str(context["certificate_sha256"]),
+            validator_version=str(context["validator_version"]),
+            validator_sha256=str(context["validator_sha256"]),
+            subset_proof_sha256=str(context["subset_proof_sha256"]),
+            policy_decision_id=(
+                policy_decision.decision_id
+                if isinstance(policy_decision, PolicyDecision)
+                else None
+            ),
+            policy_input_sha256=(
+                policy_decision.input_hash
+                if isinstance(policy_decision, PolicyDecision)
+                else None
+            ),
+            policy_bundle_revision=(
+                policy_decision.bundle_revision
+                if isinstance(policy_decision, PolicyDecision)
+                else None
+            ),
+            policy_bundle_sha256=str(context["policy_bundle_sha256"]),
+            pre_residual_budget_sha256=pre_residual,
+            post_residual_budget_sha256=None,
+            reserved_budget=None,
+            reservation_id=None,
+            idempotency_key=idempotency_key,
+            request_sha256=request_sha256,
+            lifecycle_epoch=cast(int, context["lifecycle_epoch"]),
+            policy_revocation_epoch=cast(int, context["policy_revocation_epoch"]),
+            roe_revocation_epoch=cast(int, context["roe_revocation_epoch"]),
+            kill_switch_epoch=cast(int, context["kill_switch_epoch"]),
+            issued_at=occurred_at,
+            expires_at=occurred_at + timedelta(minutes=5),
+            outcome=AdmissionOutcome.DENIED,
+            denial_stage=str(values["denial_stage"]),
+            reason_code=str(values["reason_code"]),
+            audit_id=audit_id,
+            outbox_id=outbox_id,
+        )
+        payload = json.loads(canonical_planning_bytes(receipt))
+        details = {
+            "campaign_id": campaign_id,
+            "plan_sha256": context["plan_sha256"],
+            "receipt_id": receipt_id,
+            "receipt_sha256": receipt.receipt_sha256,
+            "denial_stage": values["denial_stage"],
+            "reason_code": values["reason_code"],
+            "outcome": "denied",
+        }
+        owned = self._owned(occurred_at)
+        await self.session.execute(
+            insert(metadata.tables["plan_admission_receipts"]).values(
+                id=receipt_id,
+                campaign_id=campaign_id,
+                reservation_id=None,
+                policy_decision_id=policy_row_id,
+                policy_boundary_receipt_id=policy_receipt_id,
+                outcome="denied",
+                reason_code=values["reason_code"],
+                idempotency_key=idempotency_key,
+                request_sha256=request_sha256,
+                receipt_sha256=receipt.receipt_sha256,
+                receipt_payload=payload,
+                **owned,
+            )
+        )
+        await self.session.execute(
+            insert(metadata.tables["audit_events"]).values(
+                id=audit_id,
+                actor_user_id=self.actor_user_id,
+                action="campaign.plan.denied.v1",
+                subject_type="campaign_plan",
+                subject_id=campaign_id,
+                correlation_id=self.correlation_id,
+                details=details,
+                **owned,
+            )
+        )
+        await self.session.execute(
+            insert(metadata.tables["outbox_events"]).values(
+                id=outbox_id,
+                event_type="campaign.plan.denied.v1",
+                aggregate_id=campaign_id,
+                payload=details,
+                published=False,
+                **owned,
+            )
+        )
+        return receipt
+
     async def lock_campaign_binding(self, *, campaign_id: str, engagement_id: str) -> None:
         campaigns = metadata.tables["campaigns"]
         # CRITICAL: a globally valid campaign ID is not tenant authority; lock the exact tenant/engagement row.
@@ -704,141 +854,8 @@ class TransactionalCampaignAdmissionStore:
         if not isinstance(context, dict):
             raise ValueError("plan_admission_denial_context_invalid")
         tenant_id = str(context["tenant_id"])
-        campaign_id = str(values["campaign_id"])
-        idempotency_key = str(values["idempotency_key"])
-        request_sha256 = str(values["request_sha256"])
-        occurred_at = context["issued_at"]
-        if not isinstance(occurred_at, datetime):
-            raise ValueError("plan_admission_denial_time_invalid")
         async with self.session_factory() as session, session.begin():
-            repo = self._repo(session, tenant_id)
-            await repo._set_tenant()
-            await session.execute(
-                text("SELECT pg_advisory_xact_lock(hashtextextended(:scope, 0))"),
-                {"scope": f"campaign-budget:{tenant_id}:{campaign_id}"},
-            )
-            existing = await repo.existing_receipt(
-                campaign_id=campaign_id,
-                idempotency_key=idempotency_key,
-                request_sha256=request_sha256,
-            )
-            if existing is not None:
-                return _receipt_from_payload(existing["receipt_payload"])
-
-            policy_request = values.get("policy_request")
-            policy_decision = values.get("policy_decision")
-            policy_row_id: str | None = None
-            policy_receipt_id: str | None = None
-            if isinstance(policy_request, PolicyDecisionInput) and isinstance(policy_decision, PolicyDecision):
-                policy_row_id, policy_receipt_id = await _persist_denied_policy(
-                    session,
-                    repo,
-                    policy_request,
-                    policy_decision,
-                    campaign_id=campaign_id,
-                    occurred_at=occurred_at,
-                    request_sha256=request_sha256,
-                )
-
-            receipt_id = f"admission-{uuid4().hex}"
-            audit_id = f"audit-{uuid4().hex}"
-            outbox_id = f"outbox-{uuid4().hex}"
-            pre_residual = None
-            if isinstance(policy_request, PolicyDecisionInput):
-                candidate = policy_request.attributes.get("campaign_residual_budget_sha256")
-                pre_residual = candidate if isinstance(candidate, str) else None
-            receipt = PlanAdmissionReceiptV1(
-                schema_version=PLAN_ADMISSION_RECEIPT_SCHEMA_VERSION,
-                receipt_id=receipt_id,
-                tenant_id=tenant_id,
-                campaign_id=campaign_id,
-                engagement_id=str(context["engagement_id"]),
-                signed_authority_sha256=str(context["signed_authority_sha256"]),
-                authority_sha256=str(context["authority_sha256"]),
-                domain_sha256=str(context["domain_sha256"]),
-                plan_sha256=str(context["plan_sha256"]),
-                certificate_sha256=str(context["certificate_sha256"]),
-                validator_version=str(context["validator_version"]),
-                validator_sha256=str(context["validator_sha256"]),
-                subset_proof_sha256=str(context["subset_proof_sha256"]),
-                policy_decision_id=(
-                    policy_decision.decision_id if isinstance(policy_decision, PolicyDecision) else None
-                ),
-                policy_input_sha256=(
-                    policy_decision.input_hash if isinstance(policy_decision, PolicyDecision) else None
-                ),
-                policy_bundle_revision=(
-                    policy_decision.bundle_revision if isinstance(policy_decision, PolicyDecision) else None
-                ),
-                policy_bundle_sha256=str(context["policy_bundle_sha256"]),
-                pre_residual_budget_sha256=pre_residual,
-                post_residual_budget_sha256=None,
-                reserved_budget=None,
-                reservation_id=None,
-                idempotency_key=idempotency_key,
-                request_sha256=request_sha256,
-                lifecycle_epoch=cast(int, context["lifecycle_epoch"]),
-                policy_revocation_epoch=cast(int, context["policy_revocation_epoch"]),
-                roe_revocation_epoch=cast(int, context["roe_revocation_epoch"]),
-                kill_switch_epoch=cast(int, context["kill_switch_epoch"]),
-                issued_at=occurred_at,
-                expires_at=occurred_at + timedelta(minutes=5),
-                outcome=AdmissionOutcome.DENIED,
-                denial_stage=str(values["denial_stage"]),
-                reason_code=str(values["reason_code"]),
-                audit_id=audit_id,
-                outbox_id=outbox_id,
-            )
-            payload = json.loads(canonical_planning_bytes(receipt))
-            details = {
-                "campaign_id": campaign_id,
-                "plan_sha256": context["plan_sha256"],
-                "receipt_id": receipt_id,
-                "receipt_sha256": receipt.receipt_sha256,
-                "denial_stage": values["denial_stage"],
-                "reason_code": values["reason_code"],
-                "outcome": "denied",
-            }
-            owned = repo._owned(occurred_at)
-            await session.execute(
-                insert(metadata.tables["plan_admission_receipts"]).values(
-                    id=receipt_id,
-                    campaign_id=campaign_id,
-                    reservation_id=None,
-                    policy_decision_id=policy_row_id,
-                    policy_boundary_receipt_id=policy_receipt_id,
-                    outcome="denied",
-                    reason_code=values["reason_code"],
-                    idempotency_key=idempotency_key,
-                    request_sha256=request_sha256,
-                    receipt_sha256=receipt.receipt_sha256,
-                    receipt_payload=payload,
-                    **owned,
-                )
-            )
-            await session.execute(
-                insert(metadata.tables["audit_events"]).values(
-                    id=audit_id,
-                    actor_user_id=self.actor_user_id,
-                    action="campaign.plan.denied.v1",
-                    subject_type="campaign_plan",
-                    subject_id=campaign_id,
-                    correlation_id=self.correlation_id,
-                    details=details,
-                    **owned,
-                )
-            )
-            await session.execute(
-                insert(metadata.tables["outbox_events"]).values(
-                    id=outbox_id,
-                    event_type="campaign.plan.denied.v1",
-                    aggregate_id=campaign_id,
-                    payload=details,
-                    published=False,
-                    **owned,
-                )
-            )
-            return receipt
+            return await self._repo(session, tenant_id).deny(**values)
 
     def _repo(self, session: AsyncSession, tenant_id: str) -> CampaignAdmissionRepository:
         return CampaignAdmissionRepository(

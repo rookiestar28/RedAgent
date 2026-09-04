@@ -131,7 +131,12 @@ _LIFECYCLE_EDGES: Mapping[AutonomousCampaignLifecycle, frozenset[AutonomousCampa
         }
     ),
     AutonomousCampaignLifecycle.ADMITTED: frozenset(
-        {AutonomousCampaignLifecycle.EXECUTION_QUEUED, *_FAIL_CLOSED_EDGES}
+        {
+            AutonomousCampaignLifecycle.EXECUTION_QUEUED,
+            AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED,
+            AutonomousCampaignLifecycle.FAILED_CONTAINED,
+            *_FAIL_CLOSED_EDGES,
+        }
     ),
     AutonomousCampaignLifecycle.EXECUTION_QUEUED: frozenset(
         {
@@ -161,6 +166,7 @@ _LIFECYCLE_EDGES: Mapping[AutonomousCampaignLifecycle, frozenset[AutonomousCampa
     ),
     AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED: frozenset(
         {
+            AutonomousCampaignLifecycle.EXECUTION_QUEUED,
             AutonomousCampaignLifecycle.RUNNING,
             AutonomousCampaignLifecycle.FAILED_CONTAINED,
             AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,

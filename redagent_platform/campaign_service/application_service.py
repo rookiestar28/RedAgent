@@ -162,9 +162,15 @@ class AutonomousCampaignApplicationService:
         return await self._decide_plan(command, AutonomousCampaignApprovalDecision.DENIED, command.reason_code)
 
     @staticmethod
-    def project(state: AutonomousCampaignApplicationStateV1) -> AutonomousCampaignReadinessV1:
+    def project(
+        state: AutonomousCampaignApplicationStateV1,
+        *,
+        admission_start_available: bool = False,
+    ) -> AutonomousCampaignReadinessV1:
         if not isinstance(state, AutonomousCampaignApplicationStateV1):
             raise ValueError("autonomous_campaign_state_invalid")
+        if type(admission_start_available) is not bool:
+            raise ValueError("autonomous_campaign_admission_availability_invalid")
         plan_ready = state.lifecycle_state in {
             AutonomousCampaignLifecycle.PLAN_VALIDATED,
             AutonomousCampaignLifecycle.AWAITING_APPROVAL,
@@ -177,7 +183,11 @@ class AutonomousCampaignApplicationService:
         if state.lifecycle_state is AutonomousCampaignLifecycle.AWAITING_APPROVAL:
             unavailable_reason = "human_approval_required"
         elif state.lifecycle_state is AutonomousCampaignLifecycle.APPROVED:
-            unavailable_reason = "r173_not_accepted"
+            unavailable_reason = (
+                "ready_for_admission_start"
+                if admission_start_available
+                else "admission_start_not_configured"
+            )
         elif state.lifecycle_state is AutonomousCampaignLifecycle.PLAN_VALIDATED:
             unavailable_reason = "plan_preview_transition_pending"
         else:
@@ -187,8 +197,14 @@ class AutonomousCampaignApplicationService:
             mode=state.mode,
             plan_ready=plan_ready,
             approval_ready=approval_ready,
-            admission_ready=False,
-            start_ready=False,
+            admission_ready=(
+                state.lifecycle_state is AutonomousCampaignLifecycle.APPROVED
+                and admission_start_available
+            ),
+            start_ready=(
+                state.lifecycle_state is AutonomousCampaignLifecycle.APPROVED
+                and admission_start_available
+            ),
             unavailable_reason=unavailable_reason,
         )
 

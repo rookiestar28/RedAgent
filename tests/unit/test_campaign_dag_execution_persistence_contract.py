@@ -9,6 +9,7 @@ from sqlalchemy import CheckConstraint, ForeignKeyConstraint, UniqueConstraint
 from redagent_platform.persistence.database import DatabaseSettings
 from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.dag_execution_contracts import DagNodeState, DagRunState
+from redagent_platform.campaign_service.dag_execution_store import CampaignDagExecutionRepository
 from redagent_platform.campaign_service.authority_envelope import CampaignAuthorityLifecycleState
 
 
@@ -18,12 +19,12 @@ MIGRATION = ROOT / "migrations/versions/0027_campaign_dag_execution.py"
 
 def test_dag_execution_migration_is_the_single_head_and_runtime_default() -> None:
     scripts = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini")))
-    assert scripts.get_heads() == ["0030_autonomous_plan_approval"]
+    assert scripts.get_heads() == ["0031_autonomous_admission_start"]
     assert scripts.get_revision("0027_campaign_dag_execution").down_revision == (
         "0026_campaign_plan_admission"
     )
     assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0030_autonomous_plan_approval"
+        "0031_autonomous_admission_start"
     )
     source = MIGRATION.read_text(encoding="utf-8")
     assert "OLD.input_payload::jsonb" in source
@@ -51,6 +52,10 @@ def test_metadata_has_exact_new_tables_and_shared_lineage_columns() -> None:
     assert _has_check(effects, "campaign_effect_lineage_exactly_one")
     assert _has_check(jobs, "jobs_campaign_lineage_not_ambiguous")
     assert _has_unique(effects, {"tenant_id", "execution_run_id", "node_id"})
+
+
+def test_dag_repository_exposes_transaction_neutral_prepared_material_insert() -> None:
+    assert callable(getattr(CampaignDagExecutionRepository, "insert_prepared_material", None))
 
 
 def test_run_relationships_are_tenant_campaign_plan_bound() -> None:
