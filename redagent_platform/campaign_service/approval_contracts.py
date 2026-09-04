@@ -31,6 +31,7 @@ PLAN_DENY_SCHEMA_VERSION = "redagent.autonomous-campaign-plan-deny/v1"
 APPROVAL_RECEIPT_SCHEMA_VERSION = "redagent.autonomous-campaign-plan-approval-receipt/v1"
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")
+_POLICY_REFERENCE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$")
 _REASON = re.compile(r"^[a-z][a-z0-9_:]{0,149}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -38,6 +39,41 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 class AutonomousCampaignApprovalDecision(str, Enum):
     APPROVED = "approved"
     DENIED = "denied"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AutonomousCampaignApprovalContextV1:
+    """Server-owned current signed authority and lifecycle for one application."""
+
+    tenant_id: str
+    campaign_id: str
+    signed_authority: SignedCampaignAuthorityEnvelopeV2
+    authority_lifecycle: CampaignAuthorityLifecycleV2
+
+    def __post_init__(self) -> None:
+        _identifier("approval_context_tenant_id", self.tenant_id, 64)
+        _identifier("approval_context_campaign_id", self.campaign_id, 64)
+        if not isinstance(self.signed_authority, SignedCampaignAuthorityEnvelopeV2) or not isinstance(
+            self.authority_lifecycle, CampaignAuthorityLifecycleV2
+        ):
+            raise ValueError("approval_context_material_invalid")
+        authority = self.signed_authority.authority
+        if (
+            authority.tenant_id != self.tenant_id
+            or self.authority_lifecycle.tenant_id != self.tenant_id
+            or self.authority_lifecycle.engagement_id != authority.engagement_id
+            or self.authority_lifecycle.authority_sha256 != authority.authority_sha256
+        ):
+            raise ValueError("approval_context_binding_mismatch")
+
+
+class AutonomousCampaignApprovalContextProvider(Protocol):
+    async def read_current_approval_context(
+        self,
+        *,
+        tenant_id: str,
+        campaign_id: str,
+    ) -> AutonomousCampaignApprovalContextV1 | None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,6 +311,7 @@ class ApproveAutonomousCampaignPlanV1:
     preview_sha256: str
     actor_user_id: str
     actor_permissions: tuple[str, ...]
+    policy_reference: str
     expected_revision: int
     idempotency_key: str
     correlation_id: str
@@ -297,6 +334,7 @@ class DenyAutonomousCampaignPlanV1:
     preview_sha256: str
     actor_user_id: str
     actor_permissions: tuple[str, ...]
+    policy_reference: str
     reason_code: str
     expected_revision: int
     idempotency_key: str
@@ -334,6 +372,7 @@ def canonical_approval_decision_request_sha256(
             "preview_sha256": command.preview_sha256,
             "actor_user_id": command.actor_user_id,
             "actor_permissions": command.actor_permissions,
+            "policy_reference": command.policy_reference,
             "expected_revision": command.expected_revision,
             "decision": decision.value,
             "reason_code": reason_code,
@@ -375,6 +414,7 @@ class AutonomousCampaignApprovalReceiptV1:
     approver_user_id: str
     approver_role: str
     permission_set_sha256: str
+    policy_reference: str
     idempotency_key: str
     request_sha256: str
     decided_at: datetime
@@ -404,6 +444,7 @@ class AutonomousCampaignApprovalReceiptV1:
             ("idempotency_key", 200),
         ):
             _identifier(f"approval_receipt_{name}", getattr(self, name), maximum)
+        _policy_reference("approval_receipt_policy_reference", self.policy_reference)
         _integer("approval_receipt_application_revision", self.application_revision, 1)
         for name in (
             "preview_sha256",
@@ -510,6 +551,7 @@ def _decision_command(value: object, *, expected_schema: str, schema_error: str)
     ):
         _identifier(f"approval_{name}", getattr(value, name), maximum)
     _sha256("approval_preview_sha256", getattr(value, "preview_sha256"))
+    _policy_reference("approval_policy_reference", getattr(value, "policy_reference"))
     permissions = getattr(value, "actor_permissions")
     _closed_identifiers("approval_permissions", permissions)
     if tuple(sorted(permissions)) != permissions:
@@ -532,6 +574,11 @@ def _closed_identifiers(name: str, values: tuple[str, ...]) -> None:
 
 def _identifier(name: str, value: object, maximum: int) -> None:
     if not isinstance(value, str) or len(value) > maximum or not _IDENTIFIER.fullmatch(value):
+        raise ValueError(f"{name}_invalid")
+
+
+def _policy_reference(name: str, value: object) -> None:
+    if not isinstance(value, str) or not _POLICY_REFERENCE.fullmatch(value):
         raise ValueError(f"{name}_invalid")
 
 

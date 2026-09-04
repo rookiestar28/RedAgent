@@ -14,7 +14,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-32b55780-c08b8b7d-719998e5-7460f5f0-43f9c18e-de774b36-d83df747-46e41c3e",
-      "line": 419,
+      "line": 506,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/application_service.py",
       "rationale": "The application boundary preserves typed domain outcomes and translates any otherwise-unclassified repository failure to the closed dependency-unavailable outcome."
@@ -32,7 +32,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-0ff21b05-ac03ad14-d15e25f4-1e983e32-7838cccf-8270bedc-a90f0650-48b84c60",
-      "line": 145,
+      "line": 150,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/composition.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -41,7 +41,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-a3f63bb2-5402540c-ca0d8f96-3c567ede-66418394-b8629993-e7e27cea-bdd13151",
-      "line": 150,
+      "line": 155,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/composition.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."

@@ -49,6 +49,7 @@ def test_preview_and_decision_persistence_codecs_round_trip_exact_contracts() ->
                 preview_sha256=staged.preview.preview_sha256,
                 actor_user_id="approver-a",
                 actor_permissions=("campaign:approve",),
+                policy_reference="policy:r172:approval",
                 expected_revision=staged.application.aggregate_revision,
                 idempotency_key="codec-approval-a",
                 correlation_id="codec-correlation-a",

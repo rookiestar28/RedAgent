@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 import hashlib
 import json
@@ -275,9 +276,8 @@ class PostgresAutonomousCampaignApplicationRepository:
                 )
                 replay = await _read_plan_preview_replay(
                     session,
-                    tenant_id=command.tenant_id,
+                    command=command,
                     operation=_STAGE_PLAN_OPERATION,
-                    idempotency_key=command.idempotency_key,
                     request_sha256=request_sha256,
                 )
                 if replay is not None:
@@ -474,9 +474,8 @@ class PostgresAutonomousCampaignApplicationRepository:
                 )
                 replay = await _read_approval_decision_replay(
                     session,
-                    tenant_id=command.tenant_id,
+                    command=command,
                     operation=operation,
-                    idempotency_key=command.idempotency_key,
                     request_sha256=request_sha256,
                 )
                 if replay is not None:
@@ -584,7 +583,9 @@ class PostgresAutonomousCampaignApplicationRepository:
                         "receipt_id": receipt.receipt_id,
                         "receipt_sha256": receipt.receipt_sha256,
                         "reason_code": receipt.reason_code,
+                        "policy_reference": receipt.policy_reference,
                     },
+                    policy_reference=receipt.policy_reference,
                     occurred_at=command.occurred_at,
                 )
                 result = AutonomousCampaignApprovalDecisionResultV1(
@@ -707,10 +708,17 @@ async def _record_lifecycle_event(
     previous_state: AutonomousCampaignLifecycle | None,
     event_payload: dict[str, object],
     occurred_at: datetime,
+    policy_reference: str | None = None,
 ) -> tuple[str, str]:
     audit_id = f"audit-{uuid4().hex}"
     event_id = f"event-{uuid4().hex}"
     lifecycle_sha256 = _lifecycle_sha256(state)
+    audit_details: dict[str, object] = {
+        "aggregate_revision": state.aggregate_revision,
+        "lifecycle_sha256": lifecycle_sha256,
+    }
+    if policy_reference is not None:
+        audit_details["policy_reference"] = policy_reference
     await session.execute(
         insert(metadata.tables["audit_events"]).values(
             id=audit_id,
@@ -720,10 +728,7 @@ async def _record_lifecycle_event(
             subject_type="autonomous_campaign_application",
             subject_id=state.campaign_id,
             correlation_id=correlation_id,
-            details={
-                "aggregate_revision": state.aggregate_revision,
-                "lifecycle_sha256": lifecycle_sha256,
-            },
+            details=audit_details,
             version=1,
             created_at=occurred_at,
             updated_at=occurred_at,
@@ -811,37 +816,61 @@ async def _read_replay(
 async def _read_plan_preview_replay(
     session: AsyncSession,
     *,
-    tenant_id: str,
+    command: StageAutonomousCampaignPlanV1,
     operation: str,
-    idempotency_key: str,
     request_sha256: str,
 ) -> AutonomousCampaignPlanPreviewResultV1 | None:
     payload = await _read_idempotency_payload(
         session,
-        tenant_id=tenant_id,
+        tenant_id=command.tenant_id,
         operation=operation,
-        idempotency_key=idempotency_key,
+        idempotency_key=command.idempotency_key,
         request_sha256=request_sha256,
     )
-    return None if payload is None else _plan_preview_result_from_payload(payload, replayed=True)
+    if payload is None:
+        return None
+    try:
+        result = _plan_preview_result_from_payload(payload, replayed=True)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ApplicationBindingConflict("plan_preview_replay_copy_invalid") from exc
+    await _verify_plan_preview_replay(
+        session,
+        command=command,
+        operation=operation,
+        request_sha256=request_sha256,
+        result=result,
+    )
+    return result
 
 
 async def _read_approval_decision_replay(
     session: AsyncSession,
     *,
-    tenant_id: str,
+    command: ApproveAutonomousCampaignPlanV1 | DenyAutonomousCampaignPlanV1,
     operation: str,
-    idempotency_key: str,
     request_sha256: str,
 ) -> AutonomousCampaignApprovalDecisionResultV1 | None:
     payload = await _read_idempotency_payload(
         session,
-        tenant_id=tenant_id,
+        tenant_id=command.tenant_id,
         operation=operation,
-        idempotency_key=idempotency_key,
+        idempotency_key=command.idempotency_key,
         request_sha256=request_sha256,
     )
-    return None if payload is None else _approval_decision_result_from_payload(payload, replayed=True)
+    if payload is None:
+        return None
+    try:
+        result = _approval_decision_result_from_payload(payload, replayed=True)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ApplicationBindingConflict("approval_replay_copy_invalid") from exc
+    await _verify_approval_decision_replay(
+        session,
+        command=command,
+        operation=operation,
+        request_sha256=request_sha256,
+        result=result,
+    )
+    return result
 
 
 async def _read_idempotency_payload(
@@ -871,6 +900,327 @@ async def _read_idempotency_payload(
     if row["request_hash"] != request_sha256:
         raise ApplicationIdempotencyConflict("application_idempotency_mismatch")
     return row["response_body"]
+
+
+async def _verify_plan_preview_replay(
+    session: AsyncSession,
+    *,
+    command: StageAutonomousCampaignPlanV1,
+    operation: str,
+    request_sha256: str,
+    result: AutonomousCampaignPlanPreviewResultV1,
+) -> None:
+    preview = await _read_immutable_preview(
+        session,
+        tenant_id=command.tenant_id,
+        campaign_id=command.campaign_id,
+        preview_id=result.preview.preview_id,
+    )
+    if (
+        preview != result.preview
+        or result.application.tenant_id != command.tenant_id
+        or result.application.campaign_id != command.campaign_id
+        or result.application.engagement_id != preview.engagement_id
+        or result.application.aggregate_revision != preview.application_revision
+        or result.application.lifecycle_state is not AutonomousCampaignLifecycle.AWAITING_APPROVAL
+        or preview.signed_authority_sha256 != command.signed_authority.signed_authority_sha256
+        or preview.authority_sha256 != command.signed_authority.authority.authority_sha256
+        or preview.domain_sha256 != command.domain.domain_sha256
+        or preview.plan_revision_sha256 != command.revision.revision_sha256
+        or preview.certificate_sha256 != command.certificate.certificate_sha256
+    ):
+        raise ApplicationBindingConflict("plan_preview_replay_immutable_binding_mismatch")
+    validated = replace(
+        result.application,
+        lifecycle_state=AutonomousCampaignLifecycle.PLAN_VALIDATED,
+        aggregate_revision=result.application.aggregate_revision - 1,
+    )
+    await _verify_replay_lineage(
+        session,
+        state=validated,
+        operation=operation,
+        request_sha256=request_sha256,
+        actor_user_id=command.actor_user_id,
+        audit_id=result.audit_ids[0],
+        event_id=result.event_ids[0],
+        event_type="autonomous_campaign.plan.validated.v1",
+        previous_states=(
+            AutonomousCampaignLifecycle.INTENT_CREATED,
+            AutonomousCampaignLifecycle.AWAITING_APPROVAL,
+            AutonomousCampaignLifecycle.APPROVED,
+        ),
+        event_payload={
+            "preview_id": preview.preview_id,
+            "preview_sha256": preview.preview_sha256,
+            "certificate_sha256": preview.certificate_sha256,
+        },
+        policy_reference=None,
+    )
+    await _verify_replay_lineage(
+        session,
+        state=result.application,
+        operation=operation,
+        request_sha256=request_sha256,
+        actor_user_id=command.actor_user_id,
+        audit_id=result.audit_ids[1],
+        event_id=result.event_ids[1],
+        event_type="autonomous_campaign.plan.awaiting_approval.v1",
+        previous_states=(AutonomousCampaignLifecycle.PLAN_VALIDATED,),
+        event_payload={
+            "preview_id": preview.preview_id,
+            "preview_sha256": preview.preview_sha256,
+            "expires_at": preview.expires_at.isoformat(),
+        },
+        policy_reference=None,
+    )
+
+
+async def _verify_approval_decision_replay(
+    session: AsyncSession,
+    *,
+    command: ApproveAutonomousCampaignPlanV1 | DenyAutonomousCampaignPlanV1,
+    operation: str,
+    request_sha256: str,
+    result: AutonomousCampaignApprovalDecisionResultV1,
+) -> None:
+    receipts = metadata.tables["autonomous_campaign_plan_approval_receipts"]
+    row = (
+        (
+            await session.execute(
+                select(receipts).where(
+                    receipts.c.tenant_id == command.tenant_id,
+                    receipts.c.application_id == command.campaign_id,
+                    receipts.c.id == result.receipt.receipt_id,
+                )
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        raise ApplicationBindingConflict("approval_replay_immutable_binding_mismatch")
+    try:
+        immutable_receipt = _verified_receipt_from_payload(
+            row["receipt_payload"],
+            str(row["receipt_sha256"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ApplicationBindingConflict("approval_replay_immutable_binding_mismatch") from exc
+    preview = await _read_immutable_preview(
+        session,
+        tenant_id=command.tenant_id,
+        campaign_id=command.campaign_id,
+        preview_id=immutable_receipt.preview_id,
+    )
+    expected_decision = (
+        AutonomousCampaignApprovalDecision.APPROVED
+        if isinstance(command, ApproveAutonomousCampaignPlanV1)
+        else AutonomousCampaignApprovalDecision.DENIED
+    )
+    expected_state = (
+        AutonomousCampaignLifecycle.APPROVED
+        if expected_decision is AutonomousCampaignApprovalDecision.APPROVED
+        else AutonomousCampaignLifecycle.DENIED
+    )
+    if (
+        immutable_receipt != result.receipt
+        or str(row["contract_version"]) != immutable_receipt.schema_version
+        or str(row["decision"]) != immutable_receipt.decision.value
+        or str(row["reason_code"]) != immutable_receipt.reason_code
+        or str(row["preview_id"]) != immutable_receipt.preview_id
+        or int(row["application_revision"]) != immutable_receipt.application_revision
+        or str(row["decided_by_user_id"]) != immutable_receipt.approver_user_id
+        or immutable_receipt.decision is not expected_decision
+        or immutable_receipt.tenant_id != command.tenant_id
+        or immutable_receipt.campaign_id != command.campaign_id
+        or immutable_receipt.preview_id != command.preview_id
+        or immutable_receipt.preview_sha256 != command.preview_sha256
+        or immutable_receipt.application_revision != command.expected_revision + 1
+        or immutable_receipt.approver_user_id != command.actor_user_id
+        or immutable_receipt.permission_set_sha256 != canonical_planning_sha256(command.actor_permissions)
+        or immutable_receipt.policy_reference != command.policy_reference
+        or immutable_receipt.idempotency_key != command.idempotency_key
+        or immutable_receipt.request_sha256 != request_sha256
+        or not _receipt_matches_preview(immutable_receipt, preview)
+        or result.application.tenant_id != command.tenant_id
+        or result.application.campaign_id != command.campaign_id
+        or result.application.engagement_id != immutable_receipt.engagement_id
+        or result.application.aggregate_revision != immutable_receipt.application_revision
+        or result.application.lifecycle_state is not expected_state
+    ):
+        raise ApplicationBindingConflict("approval_replay_immutable_binding_mismatch")
+    await _verify_replay_lineage(
+        session,
+        state=result.application,
+        operation=operation,
+        request_sha256=request_sha256,
+        actor_user_id=command.actor_user_id,
+        audit_id=result.audit_id,
+        event_id=result.event_id,
+        event_type=(
+            "autonomous_campaign.plan.approved.v1"
+            if expected_decision is AutonomousCampaignApprovalDecision.APPROVED
+            else "autonomous_campaign.plan.denied.v1"
+        ),
+        previous_states=(AutonomousCampaignLifecycle.AWAITING_APPROVAL,),
+        event_payload={
+            "preview_id": immutable_receipt.preview_id,
+            "preview_sha256": immutable_receipt.preview_sha256,
+            "receipt_id": immutable_receipt.receipt_id,
+            "receipt_sha256": immutable_receipt.receipt_sha256,
+            "reason_code": immutable_receipt.reason_code,
+            "policy_reference": immutable_receipt.policy_reference,
+        },
+        policy_reference=immutable_receipt.policy_reference,
+    )
+
+
+async def _read_immutable_preview(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    campaign_id: str,
+    preview_id: str,
+) -> AutonomousCampaignPlanPreviewV1:
+    previews = metadata.tables["autonomous_campaign_plan_previews"]
+    row = (
+        (
+            await session.execute(
+                select(previews).where(
+                    previews.c.tenant_id == tenant_id,
+                    previews.c.application_id == campaign_id,
+                    previews.c.id == preview_id,
+                )
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    if row is None:
+        raise ApplicationBindingConflict("plan_preview_replay_immutable_binding_mismatch")
+    try:
+        preview = _verified_preview_from_payload(row["preview_payload"], str(row["preview_sha256"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ApplicationBindingConflict("plan_preview_replay_immutable_binding_mismatch") from exc
+    if (
+        str(row["contract_version"]) != preview.schema_version
+        or int(row["application_revision"]) != preview.application_revision
+        or str(row["created_by_user_id"]) == ""
+        or row["expires_at"] != preview.expires_at
+    ):
+        raise ApplicationBindingConflict("plan_preview_replay_immutable_binding_mismatch")
+    return preview
+
+
+def _receipt_matches_preview(
+    receipt: AutonomousCampaignApprovalReceiptV1,
+    preview: AutonomousCampaignPlanPreviewV1,
+) -> bool:
+    return (
+        receipt.tenant_id == preview.tenant_id
+        and receipt.campaign_id == preview.campaign_id
+        and receipt.engagement_id == preview.engagement_id
+        and receipt.application_revision == preview.application_revision + 1
+        and receipt.preview_id == preview.preview_id
+        and receipt.preview_sha256 == preview.preview_sha256
+        and receipt.signed_authority_sha256 == preview.signed_authority_sha256
+        and receipt.authority_sha256 == preview.authority_sha256
+        and receipt.domain_sha256 == preview.domain_sha256
+        and receipt.plan_revision_id == preview.plan_revision_id
+        and receipt.plan_revision_sha256 == preview.plan_revision_sha256
+        and receipt.plan_sha256 == preview.plan_sha256
+        and receipt.certificate_sha256 == preview.certificate_sha256
+        and receipt.validator_version == preview.validator_version
+        and receipt.validator_sha256 == preview.validator_sha256
+        and receipt.target_id == preview.target_id
+        and receipt.capability_set_sha256 == preview.capability_set_sha256
+        and receipt.authorized_budget_sha256 == preview.authorized_budget.budget_sha256
+        and receipt.plan_budget_sha256 == preview.plan_budget.budget_sha256
+        and receipt.policy_revision == preview.policy_revision
+        and receipt.policy_bundle_sha256 == preview.policy_bundle_sha256
+        and receipt.lifecycle_epoch == preview.lifecycle_epoch
+        and receipt.policy_revocation_epoch == preview.policy_revocation_epoch
+        and receipt.roe_revocation_epoch == preview.roe_revocation_epoch
+        and receipt.kill_switch_epoch == preview.kill_switch_epoch
+        and receipt.expires_at == preview.expires_at
+    )
+
+
+async def _verify_replay_lineage(
+    session: AsyncSession,
+    *,
+    state: AutonomousCampaignApplicationStateV1,
+    operation: str,
+    request_sha256: str,
+    actor_user_id: str,
+    audit_id: str,
+    event_id: str,
+    event_type: str,
+    previous_states: tuple[AutonomousCampaignLifecycle, ...],
+    event_payload: dict[str, object],
+    policy_reference: str | None,
+) -> None:
+    events = metadata.tables["autonomous_campaign_application_events"]
+    audits = metadata.tables["audit_events"]
+    row = (
+        (
+            await session.execute(
+                select(
+                    events.c.application_id.label("event_application_id"),
+                    events.c.audit_event_id.label("event_audit_id"),
+                    events.c.event_sequence,
+                    events.c.event_type,
+                    events.c.previous_state,
+                    events.c.next_state,
+                    events.c.actor_user_id.label("event_actor_user_id"),
+                    events.c.request_sha256,
+                    events.c.lifecycle_sha256,
+                    events.c.event_payload,
+                    audits.c.actor_user_id.label("audit_actor_user_id"),
+                    audits.c.action.label("audit_action"),
+                    audits.c.subject_type.label("audit_subject_type"),
+                    audits.c.subject_id.label("audit_subject_id"),
+                    audits.c.details.label("audit_details"),
+                )
+                .join(audits, audits.c.id == events.c.audit_event_id)
+                .where(
+                    events.c.tenant_id == state.tenant_id,
+                    audits.c.tenant_id == state.tenant_id,
+                    events.c.id == event_id,
+                    audits.c.id == audit_id,
+                )
+            )
+        )
+        .mappings()
+        .one_or_none()
+    )
+    lifecycle_sha256 = _lifecycle_sha256(state)
+    audit_details: dict[str, object] = {
+        "aggregate_revision": state.aggregate_revision,
+        "lifecycle_sha256": lifecycle_sha256,
+    }
+    if policy_reference is not None:
+        audit_details["policy_reference"] = policy_reference
+    if (
+        row is None
+        or str(row["event_application_id"]) != state.campaign_id
+        or str(row["event_audit_id"]) != audit_id
+        or int(row["event_sequence"]) != state.aggregate_revision
+        or str(row["event_type"]) != event_type
+        or str(row["previous_state"]) not in {item.value for item in previous_states}
+        or str(row["next_state"]) != state.lifecycle_state.value
+        or str(row["event_actor_user_id"]) != actor_user_id
+        or str(row["request_sha256"]) != request_sha256
+        or str(row["lifecycle_sha256"]) != lifecycle_sha256
+        or row["event_payload"] != event_payload
+        or str(row["audit_actor_user_id"]) != actor_user_id
+        or str(row["audit_action"]) != operation
+        or str(row["audit_subject_type"]) != "autonomous_campaign_application"
+        or str(row["audit_subject_id"]) != state.campaign_id
+        or row["audit_details"] != audit_details
+    ):
+        # CRITICAL: replay copies are hints; immutable lifecycle and audit lineage remain authoritative.
+        raise ApplicationBindingConflict("approval_replay_immutable_binding_mismatch")
 
 
 async def _read_row(session: AsyncSession, *, tenant_id: str, campaign_id: str) -> RowMapping | None:
@@ -1152,6 +1502,14 @@ def _receipt_from_payload(payload: object) -> AutonomousCampaignApprovalReceiptV
     values["decided_at"] = datetime.fromisoformat(str(values["decided_at"]))
     values["expires_at"] = datetime.fromisoformat(str(values["expires_at"]))
     return AutonomousCampaignApprovalReceiptV1(**values)
+
+
+def _verified_receipt_from_payload(payload: object, expected_sha256: str) -> AutonomousCampaignApprovalReceiptV1:
+    receipt = _receipt_from_payload(payload)
+    # CRITICAL: the immutable relational digest, not a replay copy, authenticates receipt content.
+    if receipt.receipt_sha256 != expected_sha256:
+        raise ApplicationBindingConflict("approval_receipt_persistence_digest_mismatch")
+    return receipt
 
 
 def _action_from_payload(payload: object) -> AutonomousCampaignPlanActionV1:

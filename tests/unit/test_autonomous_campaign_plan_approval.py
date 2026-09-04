@@ -23,6 +23,7 @@ from redagent_platform.campaign_service.approval_contracts import (
     APPROVAL_RECEIPT_SCHEMA_VERSION,
     PLAN_PREVIEW_SCHEMA_VERSION,
     ApproveAutonomousCampaignPlanV1,
+    AutonomousCampaignApprovalContextV1,
     AutonomousCampaignApprovalDecision,
     AutonomousCampaignApprovalDecisionResultV1,
     AutonomousCampaignPlanPreviewResultV1,
@@ -183,9 +184,33 @@ class Repository:
         )
 
 
-def _service(repository: Repository, command: StageAutonomousCampaignPlanV1, key: object):
+class ApprovalContextProvider:
+    def __init__(self, command: StageAutonomousCampaignPlanV1) -> None:
+        self.context = AutonomousCampaignApprovalContextV1(
+            tenant_id=command.tenant_id,
+            campaign_id=command.campaign_id,
+            signed_authority=command.signed_authority,
+            authority_lifecycle=command.authority_lifecycle,
+        )
+        self.read_calls = 0
+
+    async def read_current_approval_context(self, *, tenant_id: str, campaign_id: str):
+        self.read_calls += 1
+        if tenant_id != self.context.tenant_id or campaign_id != self.context.campaign_id:
+            return None
+        return self.context
+
+
+def _service(
+    repository: Repository,
+    command: StageAutonomousCampaignPlanV1,
+    key: object,
+    *,
+    provider: ApprovalContextProvider | None = None,
+):
     return AutonomousCampaignApplicationService(
         repository,
+        approval_context_provider=provider or ApprovalContextProvider(command),
         trusted_approval_keys={"key-a": key},
         validation_limits=limits(),
         trusted_validator_version=VALIDATOR_VERSION,
@@ -260,30 +285,28 @@ def test_staging_rejects_unknown_or_tampered_validation_before_repository_mutati
 def test_lifecycle_drift_revocation_and_expiry_fail_closed_before_decision() -> None:
     command, key = _stage_command()
     repository = Repository()
-    service = _service(repository, command, key)
+    drifted = replace(
+        command,
+        authority_lifecycle=replace(
+            command.authority_lifecycle,
+            lifecycle_epoch=command.authority_lifecycle.lifecycle_epoch + 1,
+        ),
+    )
 
     with pytest.raises(ApplicationPlanInvalid, match="campaign_lifecycle_epoch_mismatch"):
-        asyncio.run(
-            service.stage_plan(
-                replace(
-                    command,
-                    authority_lifecycle=replace(
-                        command.authority_lifecycle,
-                        lifecycle_epoch=command.authority_lifecycle.lifecycle_epoch + 1,
-                    ),
-                )
-            )
-        )
+        asyncio.run(_service(repository, drifted, key).stage_plan(drifted))
     revoked = replace(
         command.authority_lifecycle,
         state=CampaignAuthorityLifecycleState.REVOKED,
         revoked_at=command.authority_lifecycle.observed_at,
         reason_code="operator_revoked",
     )
+    revoked_command = replace(command, authority_lifecycle=revoked)
     with pytest.raises(ApplicationPlanInvalid, match="campaign_authority_not_active"):
-        asyncio.run(service.stage_plan(replace(command, authority_lifecycle=revoked)))
+        asyncio.run(_service(repository, revoked_command, key).stage_plan(revoked_command))
     assert repository.stage_calls == 0
 
+    service = _service(repository, command, key)
     staged = asyncio.run(service.stage_plan(command))
     expired = ApproveAutonomousCampaignPlanV1(
         schema_version="redagent.autonomous-campaign-plan-approve/v1",
@@ -293,6 +316,7 @@ def test_lifecycle_drift_revocation_and_expiry_fail_closed_before_decision() -> 
         preview_sha256=staged.preview.preview_sha256,
         actor_user_id="approver-a",
         actor_permissions=("campaign:approve",),
+        policy_reference="policy:r172:approval",
         expected_revision=staged.application.aggregate_revision,
         idempotency_key="approve-expired-a",
         correlation_id="correlation-approve-expired-a",
@@ -317,6 +341,7 @@ def test_exact_human_approval_binds_actor_permission_preview_epochs_and_zero_adm
         preview_sha256=staged.preview.preview_sha256,
         actor_user_id="approver-a",
         actor_permissions=("campaign:approve", "campaign:read"),
+        policy_reference="policy:r172:approval",
         expected_revision=staged.application.aggregate_revision,
         idempotency_key="approve-a",
         correlation_id="correlation-approve-a",
@@ -333,6 +358,7 @@ def test_exact_human_approval_binds_actor_permission_preview_epochs_and_zero_adm
     assert result.receipt.lifecycle_epoch == staged.preview.lifecycle_epoch
     assert result.receipt.policy_revocation_epoch == staged.preview.policy_revocation_epoch
     assert result.receipt.permission_set_sha256
+    assert result.receipt.policy_reference == "policy:r172:approval"
     assert result.receipt.request_sha256 == canonical_approval_decision_request_sha256(approval)
     assert result.receipt.receipt_sha256 == replace(result.receipt).receipt_sha256
     assert result.application.lifecycle_state is AutonomousCampaignLifecycle.APPROVED
@@ -354,6 +380,7 @@ def test_restage_supersedes_prior_approval_and_requires_a_new_exact_decision() -
         preview_sha256=first.preview.preview_sha256,
         actor_user_id="approver-a",
         actor_permissions=("campaign:approve",),
+        policy_reference="policy:r172:approval",
         expected_revision=first.application.aggregate_revision,
         idempotency_key="approve-before-restage-a",
         correlation_id="correlation-approve-before-restage-a",
@@ -392,6 +419,7 @@ def test_nonrequired_actor_or_missing_exact_permission_cannot_approve() -> None:
         preview_sha256=staged.preview.preview_sha256,
         actor_user_id="operator-a",
         actor_permissions=("campaign:approve",),
+        policy_reference="policy:r172:approval",
         expected_revision=3,
         idempotency_key="approve-denied-a",
         correlation_id="correlation-denied-a",
@@ -421,6 +449,7 @@ def test_explicit_denial_is_a_bound_immutable_terminal_decision() -> None:
         preview_sha256=staged.preview.preview_sha256,
         actor_user_id="approver-a",
         actor_permissions=("campaign:approve",),
+        policy_reference="policy:r172:denial",
         reason_code="operator_denied_exact_plan",
         expected_revision=3,
         idempotency_key="deny-a",
@@ -445,6 +474,7 @@ def test_approval_contracts_reject_client_supplied_or_noncanonical_fields() -> N
             preview_sha256="a" * 64,
             actor_user_id="approver-a",
             actor_permissions=("campaign:approve",),
+            policy_reference="policy:r172:approval",
             expected_revision=3,
             idempotency_key="approve-a",
             correlation_id="correlation-a",
@@ -460,8 +490,87 @@ def test_approval_contracts_reject_client_supplied_or_noncanonical_fields() -> N
             preview_sha256="a" * 64,
             actor_user_id="approver-a",
             actor_permissions=("campaign:read", "campaign:approve"),
+            policy_reference="policy:r172:approval",
             expected_revision=3,
             idempotency_key="approve-a",
             correlation_id="correlation-a",
             occurred_at=NOW,
         )
+
+
+def test_decision_reloads_current_authority_and_rejects_post_preview_revocation() -> None:
+    command, key = _stage_command()
+    repository = Repository()
+    provider = ApprovalContextProvider(command)
+    service = _service(repository, command, key, provider=provider)
+    staged = asyncio.run(service.stage_plan(command))
+    provider.context = replace(
+        provider.context,
+        authority_lifecycle=replace(
+            provider.context.authority_lifecycle,
+            state=CampaignAuthorityLifecycleState.REVOKED,
+            revoked_at=provider.context.authority_lifecycle.observed_at,
+            reason_code="operator_revoked",
+        ),
+    )
+    approval = ApproveAutonomousCampaignPlanV1(
+        schema_version="redagent.autonomous-campaign-plan-approve/v1",
+        tenant_id="tenant-a",
+        campaign_id="campaign-a",
+        preview_id=staged.preview.preview_id,
+        preview_sha256=staged.preview.preview_sha256,
+        actor_user_id="approver-a",
+        actor_permissions=("campaign:approve",),
+        policy_reference="policy:r172:approval",
+        expected_revision=staged.application.aggregate_revision,
+        idempotency_key="approve-revoked-a",
+        correlation_id="correlation-approve-revoked-a",
+        occurred_at=NOW + timedelta(seconds=4),
+    )
+
+    with pytest.raises(ApplicationPlanInvalid, match="campaign_authority_not_active"):
+        asyncio.run(service.approve_plan(approval))
+    assert provider.read_calls == 2
+    assert repository.decision_calls == 0
+
+    provider.context = replace(
+        provider.context,
+        authority_lifecycle=replace(
+            command.authority_lifecycle,
+            lifecycle_epoch=command.authority_lifecycle.lifecycle_epoch + 1,
+        ),
+    )
+    with pytest.raises(ApplicationPlanInvalid, match="campaign_lifecycle_epoch_mismatch"):
+        asyncio.run(
+            service.approve_plan(
+                replace(
+                    approval,
+                    idempotency_key="approve-epoch-drift-a",
+                    correlation_id="correlation-approve-epoch-drift-a",
+                )
+            )
+        )
+    assert provider.read_calls == 3
+    assert repository.decision_calls == 0
+
+
+def test_policy_reference_is_part_of_the_exact_decision_request_identity() -> None:
+    command, _ = _stage_command()
+    base = ApproveAutonomousCampaignPlanV1(
+        schema_version="redagent.autonomous-campaign-plan-approve/v1",
+        tenant_id=command.tenant_id,
+        campaign_id=command.campaign_id,
+        preview_id="preview-a",
+        preview_sha256="a" * 64,
+        actor_user_id="approver-a",
+        actor_permissions=("campaign:approve",),
+        policy_reference="policy:r172:a",
+        expected_revision=3,
+        idempotency_key="approve-policy-a",
+        correlation_id="correlation-policy-a",
+        occurred_at=NOW,
+    )
+
+    assert canonical_approval_decision_request_sha256(base) != canonical_approval_decision_request_sha256(
+        replace(base, policy_reference="policy:r172:b")
+    )

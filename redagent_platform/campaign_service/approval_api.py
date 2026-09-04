@@ -153,6 +153,7 @@ class AutonomousCampaignApprovalDecisionData(_StrictModel):
     preview_sha256: str
     decision: Literal["approved", "denied"]
     reason_code: str
+    policy_reference: str
     application: AutonomousCampaignReadinessData
     replayed: bool
 
@@ -214,6 +215,7 @@ def register_autonomous_campaign_approval_routes(
             preview_sha256=payload.preview_sha256,
             actor_user_id=guard.security.subject,
             actor_permissions=tuple(sorted(guard.security.permissions)),
+            policy_reference=guard.policy_reference,
             expected_revision=revision,
             idempotency_key=str(guard.idempotency_key),
             correlation_id=guard.correlation_id,
@@ -246,6 +248,7 @@ def register_autonomous_campaign_approval_routes(
             preview_sha256=payload.preview_sha256,
             actor_user_id=guard.security.subject,
             actor_permissions=tuple(sorted(guard.security.permissions)),
+            policy_reference=guard.policy_reference,
             reason_code=payload.reason_code,
             expected_revision=revision,
             idempotency_key=str(guard.idempotency_key),
@@ -300,6 +303,7 @@ def _decision_payload(
         "preview_sha256": result.receipt.preview_sha256,
         "decision": result.receipt.decision.value,
         "reason_code": result.receipt.reason_code,
+        "policy_reference": result.receipt.policy_reference,
         "application": {
             "campaign_id": result.application.campaign_id,
             "lifecycle_state": result.application.lifecycle_state.value,

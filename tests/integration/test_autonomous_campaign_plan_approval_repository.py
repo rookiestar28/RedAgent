@@ -15,6 +15,7 @@ from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.exc import DBAPIError
 
 from redagent_platform.campaign_service.application_contracts import (
+    ApplicationBindingConflict,
     ApplicationIdempotencyConflict,
     AutonomousCampaignLifecycle,
 )
@@ -26,6 +27,7 @@ from redagent_platform.campaign_service.approval_contracts import (
     PLAN_APPROVE_SCHEMA_VERSION,
     PLAN_STAGE_SCHEMA_VERSION,
     ApproveAutonomousCampaignPlanV1,
+    AutonomousCampaignApprovalContextV1,
     StageAutonomousCampaignPlanV1,
     canonical_approval_decision_request_sha256,
 )
@@ -143,8 +145,15 @@ async def _approval_scenario() -> None:
             correlation_id=f"stage-correlation-{suffix}"[:100],
             occurred_at=NOW + timedelta(seconds=3),
         )
+        current_context = AutonomousCampaignApprovalContextV1(
+            tenant_id=tenant,
+            campaign_id=create.campaign_id,
+            signed_authority=signed,
+            authority_lifecycle=stage.authority_lifecycle,
+        )
         service = AutonomousCampaignApplicationService(
             repository,
+            approval_context_provider=_ApprovalContextProvider(current_context),
             trusted_approval_keys={"key-a": trusted_key(private_key, approver_id=approver)},
             validation_limits=limits(),
             trusted_validator_version=VALIDATOR_VERSION,
@@ -164,6 +173,31 @@ async def _approval_scenario() -> None:
             campaign_id=create.campaign_id,
         ) is None
 
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant)
+            idempotency_records = metadata.tables["idempotency_records"]
+            stage_replay_body = await session.scalar(
+                select(idempotency_records.c.response_body).where(
+                    idempotency_records.c.tenant_id == tenant,
+                    idempotency_records.c.operation == "autonomous_campaign.plan.stage.v1",
+                    idempotency_records.c.idempotency_key == stage.idempotency_key,
+                )
+            )
+            assert isinstance(stage_replay_body, dict)
+            tampered_stage_replay = json.loads(json.dumps(stage_replay_body))
+            tampered_stage_replay["preview"]["objective_id"] = "tampered-objective"
+            await session.execute(
+                update(idempotency_records)
+                .where(
+                    idempotency_records.c.tenant_id == tenant,
+                    idempotency_records.c.operation == "autonomous_campaign.plan.stage.v1",
+                    idempotency_records.c.idempotency_key == stage.idempotency_key,
+                )
+                .values(response_body=tampered_stage_replay)
+            )
+        with pytest.raises(ApplicationBindingConflict, match="plan_preview_replay_immutable_binding_mismatch"):
+            await repository.stage_plan(stage, staged.preview)
+
         approval = ApproveAutonomousCampaignPlanV1(
             schema_version=PLAN_APPROVE_SCHEMA_VERSION,
             tenant_id=tenant,
@@ -172,26 +206,45 @@ async def _approval_scenario() -> None:
             preview_sha256=staged.preview.preview_sha256,
             actor_user_id=approver,
             actor_permissions=("campaign:approve", "campaign:read"),
+            policy_reference="policy:r172:approval",
             expected_revision=3,
             idempotency_key=f"approve-{suffix}",
             correlation_id=f"approve-correlation-{suffix}"[:100],
             occurred_at=NOW + timedelta(seconds=4),
         )
+        restarted_service = AutonomousCampaignApplicationService(
+            restarted_repository,
+            approval_context_provider=_ApprovalContextProvider(current_context),
+            trusted_approval_keys={"key-a": trusted_key(private_key, approver_id=approver)},
+            validation_limits=limits(),
+            trusted_validator_version=VALIDATOR_VERSION,
+            trusted_validator_sha256=VALIDATOR_SHA256,
+        )
         first, replay = await asyncio.gather(
             service.approve_plan(approval),
-            AutonomousCampaignApplicationService(restarted_repository).approve_plan(approval),
+            restarted_service.approve_plan(approval),
         )
         assert sorted((first.replayed, replay.replayed)) == [False, True]
         accepted = first if not first.replayed else replay
         assert accepted.application.lifecycle_state is AutonomousCampaignLifecycle.APPROVED
         assert accepted.application.aggregate_revision == 4
         assert accepted.receipt.request_sha256 == canonical_approval_decision_request_sha256(approval)
+        assert accepted.receipt.policy_reference == approval.policy_reference
 
         with pytest.raises(ApplicationIdempotencyConflict, match="application_idempotency_mismatch"):
             await service.approve_plan(
                 replace(
                     approval,
                     actor_permissions=("campaign:approve", "campaign:read", "job:read"),
+                    occurred_at=NOW + timedelta(seconds=5),
+                )
+            )
+
+        with pytest.raises(ApplicationIdempotencyConflict, match="application_idempotency_mismatch"):
+            await service.approve_plan(
+                replace(
+                    approval,
+                    policy_reference="policy:r172:changed",
                     occurred_at=NOW + timedelta(seconds=5),
                 )
             )
@@ -222,7 +275,22 @@ async def _approval_scenario() -> None:
                     events.c.event_type == "autonomous_campaign.plan.approved.v1",
                 )
             )
-            idempotency_records = metadata.tables["idempotency_records"]
+            event_payload = await session.scalar(
+                select(events.c.event_payload).where(
+                    events.c.tenant_id == tenant,
+                    events.c.application_id == create.campaign_id,
+                    events.c.event_type == "autonomous_campaign.plan.approved.v1",
+                )
+            )
+            audit_details = await session.scalar(
+                select(metadata.tables["audit_events"].c.details)
+                .join(events, events.c.audit_event_id == metadata.tables["audit_events"].c.id)
+                .where(
+                    events.c.tenant_id == tenant,
+                    events.c.application_id == create.campaign_id,
+                    events.c.event_type == "autonomous_campaign.plan.approved.v1",
+                )
+            )
             idempotency_request_sha256 = await session.scalar(
                 select(idempotency_records.c.request_hash).where(
                     idempotency_records.c.tenant_id == tenant,
@@ -231,7 +299,28 @@ async def _approval_scenario() -> None:
                 )
             )
             assert event_request_sha256 == accepted.receipt.request_sha256
+            assert event_payload["policy_reference"] == approval.policy_reference
+            assert audit_details["policy_reference"] == approval.policy_reference
             assert idempotency_request_sha256 == accepted.receipt.request_sha256
+            replay_body = await session.scalar(
+                select(idempotency_records.c.response_body).where(
+                    idempotency_records.c.tenant_id == tenant,
+                    idempotency_records.c.operation == "autonomous_campaign.plan.approve.v1",
+                    idempotency_records.c.idempotency_key == approval.idempotency_key,
+                )
+            )
+            assert isinstance(replay_body, dict)
+            tampered_replay = json.loads(json.dumps(replay_body))
+            tampered_replay["receipt"]["policy_revision"] = "tampered-policy-revision"
+            await session.execute(
+                update(idempotency_records)
+                .where(
+                    idempotency_records.c.tenant_id == tenant,
+                    idempotency_records.c.operation == "autonomous_campaign.plan.approve.v1",
+                    idempotency_records.c.idempotency_key == approval.idempotency_key,
+                )
+                .values(response_body=tampered_replay)
+            )
             previews = metadata.tables["autonomous_campaign_plan_previews"]
             persisted_preview = await session.scalar(
                 select(previews.c.preview_payload).where(
@@ -250,6 +339,27 @@ async def _approval_scenario() -> None:
                     await session.execute(
                         update(receipts).where(receipts.c.tenant_id == tenant).values(reason_code="tampered")
                     )
+
+        with pytest.raises(ApplicationBindingConflict, match="approval_replay_immutable_binding_mismatch"):
+            await service.approve_plan(approval)
+
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant)
+            lineage_replay = json.loads(json.dumps(replay_body))
+            lineage_replay["application"]["updated_at"] = (NOW + timedelta(seconds=6)).isoformat()
+            await session.execute(
+                update(metadata.tables["idempotency_records"])
+                .where(
+                    metadata.tables["idempotency_records"].c.tenant_id == tenant,
+                    metadata.tables["idempotency_records"].c.operation
+                    == "autonomous_campaign.plan.approve.v1",
+                    metadata.tables["idempotency_records"].c.idempotency_key
+                    == approval.idempotency_key,
+                )
+                .values(response_body=lineage_replay)
+            )
+        with pytest.raises(ApplicationBindingConflict, match="approval_replay_immutable_binding_mismatch"):
+            await service.approve_plan(approval)
 
         migration = _load_migration()
         role_name = f"r172_owner_{suffix}"
@@ -278,6 +388,16 @@ async def _approval_scenario() -> None:
                 await transaction.rollback()
     finally:
         await engine.dispose()
+
+
+class _ApprovalContextProvider:
+    def __init__(self, context: AutonomousCampaignApprovalContextV1) -> None:
+        self._context = context
+
+    async def read_current_approval_context(self, *, tenant_id: str, campaign_id: str):
+        if tenant_id != self._context.tenant_id or campaign_id != self._context.campaign_id:
+            return None
+        return self._context
 
 
 def _load_migration() -> ModuleType:

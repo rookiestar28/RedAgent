@@ -2314,6 +2314,10 @@
             "title": "Decision",
             "type": "string"
           },
+          "policy_reference": {
+            "title": "Policy Reference",
+            "type": "string"
+          },
           "preview_id": {
             "title": "Preview Id",
             "type": "string"
@@ -2346,6 +2350,7 @@
           "preview_sha256",
           "decision",
           "reason_code",
+          "policy_reference",
           "application",
           "replayed"
         ],

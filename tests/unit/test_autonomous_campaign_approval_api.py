@@ -110,6 +110,7 @@ def test_exact_approval_requires_campaign_approve_and_matching_if_match(monkeypa
     assert approved.status_code == 200
     data = approved.json()["data"]
     assert data["decision"] == "approved"
+    assert data["policy_reference"] == APPROVE_AUTH["X-RedAgent-Policy-Reference"]
     assert data["application"]["lifecycle_state"] == "APPROVED"
     assert data["application"]["admission_ready"] is False
     assert data["application"]["start_ready"] is False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
+from datetime import datetime
 from typing import Mapping, TypeVar, cast
 
 from redagent_platform.campaign_service.application_contracts import (
@@ -29,6 +30,8 @@ from redagent_platform.campaign_service.approval_contracts import (
     APPROVAL_RECEIPT_SCHEMA_VERSION,
     PLAN_PREVIEW_SCHEMA_VERSION,
     ApproveAutonomousCampaignPlanV1,
+    AutonomousCampaignApprovalContextProvider,
+    AutonomousCampaignApprovalContextV1,
     AutonomousCampaignApprovalDecision,
     AutonomousCampaignApprovalDecisionResultV1,
     AutonomousCampaignApprovalReceiptV1,
@@ -63,6 +66,7 @@ class AutonomousCampaignApplicationService:
         repository: AutonomousCampaignApplicationRepository,
         *,
         mode: AutonomousCampaignMode = AutonomousCampaignMode.PLAN_ONLY,
+        approval_context_provider: AutonomousCampaignApprovalContextProvider | None = None,
         trusted_approval_keys: Mapping[str, TrustedCampaignApproverKeyV2] | None = None,
         validation_limits: ValidationLimitsV1 | None = None,
         trusted_validator_version: str | None = None,
@@ -72,6 +76,7 @@ class AutonomousCampaignApplicationService:
             raise ValueError("autonomous_campaign_mode_invalid")
         self._repository = repository
         self._mode = mode
+        self._approval_context_provider = approval_context_provider
         self._trusted_approval_keys = None if trusted_approval_keys is None else dict(trusted_approval_keys)
         self._validation_limits = validation_limits
         self._trusted_validator_version = trusted_validator_version
@@ -105,6 +110,10 @@ class AutonomousCampaignApplicationService:
         self._require_plan_staging_configured()
         if not isinstance(command, StageAutonomousCampaignPlanV1):
             raise ValueError("stage_plan_command_invalid")
+        context = await self._read_current_approval_context(
+            tenant_id=command.tenant_id,
+            campaign_id=command.campaign_id,
+        )
         state = await _await_repository(
             self._repository.read(tenant_id=command.tenant_id, campaign_id=command.campaign_id)
         )
@@ -118,7 +127,7 @@ class AutonomousCampaignApplicationService:
             AutonomousCampaignLifecycle.APPROVED,
         }:
             raise ApplicationPlanInvalid("plan_staging_state_invalid")
-        preview = self._build_preview(command, state)
+        preview = self._build_preview(command, state, context)
         repository = cast(object, self._repository)
         stage = getattr(repository, "stage_plan", None)
         if not callable(stage):
@@ -187,10 +196,16 @@ class AutonomousCampaignApplicationService:
         self,
         command: StageAutonomousCampaignPlanV1,
         state: AutonomousCampaignApplicationStateV1,
+        context: AutonomousCampaignApprovalContextV1,
     ) -> AutonomousCampaignPlanPreviewV1:
-        signed = command.signed_authority
+        if (
+            command.signed_authority != context.signed_authority
+            or command.authority_lifecycle != context.authority_lifecycle
+        ):
+            raise ApplicationPlanInvalid("plan_approval_context_mismatch")
+        signed = context.signed_authority
         authority = signed.authority
-        lifecycle = command.authority_lifecycle
+        lifecycle = context.authority_lifecycle
         revision = command.revision
         certificate = command.certificate
         domain = command.domain
@@ -349,6 +364,11 @@ class AutonomousCampaignApplicationService:
         )
         if len(matches) != 1:
             raise ApplicationApprovalForbidden("approval_actor_not_required")
+        context = await self._read_current_approval_context(
+            tenant_id=command.tenant_id,
+            campaign_id=command.campaign_id,
+        )
+        self._verify_current_approval_context(context, preview=preview, now=command.occurred_at)
         request_sha256 = canonical_approval_decision_request_sha256(command)
         receipt_identity = canonical_planning_sha256(
             {"request_sha256": request_sha256, "idempotency_key": command.idempotency_key}
@@ -386,6 +406,7 @@ class AutonomousCampaignApplicationService:
             approver_user_id=command.actor_user_id,
             approver_role=matches[0].role_id,
             permission_set_sha256=canonical_planning_sha256(command.actor_permissions),
+            policy_reference=command.policy_reference,
             idempotency_key=command.idempotency_key,
             request_sha256=request_sha256,
             decided_at=command.occurred_at,
@@ -398,12 +419,78 @@ class AutonomousCampaignApplicationService:
 
     def _require_plan_staging_configured(self) -> None:
         if (
-            not self._trusted_approval_keys
+            self._approval_context_provider is None
+            or not self._trusted_approval_keys
             or self._validation_limits is None
             or not self._trusted_validator_version
             or not self._trusted_validator_sha256
         ):
             raise ApplicationPlanUnavailable("r172_plan_validation_not_configured")
+
+    async def _read_current_approval_context(
+        self,
+        *,
+        tenant_id: str,
+        campaign_id: str,
+    ) -> AutonomousCampaignApprovalContextV1:
+        provider = self._approval_context_provider
+        if provider is None:
+            raise ApplicationPlanUnavailable("r172_approval_context_not_configured")
+        read = getattr(cast(object, provider), "read_current_approval_context", None)
+        if not callable(read):
+            raise ApplicationDependencyUnavailable("application_dependency_unavailable")
+        context = await _await_repository(read(tenant_id=tenant_id, campaign_id=campaign_id))
+        if context is None:
+            raise ApplicationPlanUnavailable("current_approval_context_unavailable")
+        if (
+            not isinstance(context, AutonomousCampaignApprovalContextV1)
+            or context.tenant_id != tenant_id
+            or context.campaign_id != campaign_id
+        ):
+            raise ApplicationPlanInvalid("current_approval_context_binding_mismatch")
+        return context
+
+    def _verify_current_approval_context(
+        self,
+        context: AutonomousCampaignApprovalContextV1,
+        *,
+        preview: AutonomousCampaignPlanPreviewV1,
+        now: datetime,
+    ) -> None:
+        signed = context.signed_authority
+        authority = signed.authority
+        lifecycle = context.authority_lifecycle
+        try:
+            verify_signed_campaign_authority(
+                signed,
+                lifecycle,
+                trusted_keys=self._trusted_approval_keys or {},
+                now=now,
+            )
+        except ValueError as exc:
+            raise ApplicationPlanInvalid(str(exc)) from exc
+        current_expires_at = min(
+            authority.expires_at,
+            lifecycle.valid_until,
+            *(approval.expires_at for approval in signed.approvals),
+        )
+        if (
+            context.tenant_id != preview.tenant_id
+            or context.campaign_id != preview.campaign_id
+            or authority.engagement_id != preview.engagement_id
+            or preview.target_id not in authority.target_ids
+            or signed.signed_authority_sha256 != preview.signed_authority_sha256
+            or authority.authority_sha256 != preview.authority_sha256
+            or authority.policy_revision != preview.policy_revision
+            or authority.policy_bundle_sha256 != preview.policy_bundle_sha256
+            or lifecycle.lifecycle_epoch != preview.lifecycle_epoch
+            or lifecycle.policy_revocation_epoch != preview.policy_revocation_epoch
+            or lifecycle.roe_revocation_epoch != preview.roe_revocation_epoch
+            or lifecycle.kill_switch_epoch != preview.kill_switch_epoch
+            or current_expires_at != preview.expires_at
+        ):
+            # CRITICAL: a persisted preview is evidence, never current authority for a later decision.
+            raise ApplicationPlanInvalid("approval_authority_context_drift")
 
     def _require_enabled(self) -> None:
         # CRITICAL: every entry point rejects DISABLED before repository access or tenant state leaks.

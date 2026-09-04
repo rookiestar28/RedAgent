@@ -3114,6 +3114,8 @@ export interface components {
              * @enum {string}
              */
             decision: "approved" | "denied";
+            /** Policy Reference */
+            policy_reference: string;
             /** Preview Id */
             preview_id: string;
             /** Preview Sha256 */

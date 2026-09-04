@@ -34,6 +34,11 @@ from redagent_platform.campaign_service.application_repository import (
 from redagent_platform.campaign_service.application_service import (
     AutonomousCampaignApplicationService,
 )
+from redagent_platform.campaign_service.approval_contracts import (
+    AutonomousCampaignApprovalContextProvider,
+)
+from redagent_platform.campaign_service.authority_envelope import TrustedCampaignApproverKeyV2
+from redagent_platform.campaign_service.planning.contracts import ValidationLimitsV1
 from redagent_platform.campaign_service.resolver import CampaignContextResolver
 from redagent_platform.campaign_service.relay_runtime import (
     PostgresRelayTenantSource,
@@ -236,11 +241,28 @@ class CampaignApiRuntimeServices:
 
 def build_autonomous_campaign_application_factory(
     env: Mapping[str, str],
+    *,
+    approval_context_provider: AutonomousCampaignApprovalContextProvider | None = None,
+    trusted_approval_keys: Mapping[str, TrustedCampaignApproverKeyV2] | None = None,
+    validation_limits: ValidationLimitsV1 | None = None,
+    trusted_validator_version: str | None = None,
+    trusted_validator_sha256: str | None = None,
 ) -> Callable[[object], AutonomousCampaignApplicationService] | None:
-    """Build the sole Phase 26 application boundary in its zero-I/O mode."""
+    """Build R172 only when every server-owned approval dependency is explicit."""
     mode = load_autonomous_campaign_mode(env)
     if mode is AutonomousCampaignMode.DISABLED:
         return None
+    configured = (
+        approval_context_provider is not None,
+        bool(trusted_approval_keys),
+        validation_limits is not None,
+        bool(trusted_validator_version),
+        bool(trusted_validator_sha256),
+    )
+    if not any(configured):
+        return None
+    if not all(configured):
+        raise ValueError("r172_approval_configuration_incomplete")
 
     def factory(sessions: object) -> AutonomousCampaignApplicationService:
         return AutonomousCampaignApplicationService(
@@ -248,6 +270,11 @@ def build_autonomous_campaign_application_factory(
                 cast(async_sessionmaker[AsyncSession], sessions)
             ),
             mode=AutonomousCampaignMode.PLAN_ONLY,
+            approval_context_provider=approval_context_provider,
+            trusted_approval_keys=trusted_approval_keys,
+            validation_limits=validation_limits,
+            trusted_validator_version=trusted_validator_version,
+            trusted_validator_sha256=trusted_validator_sha256,
         )
 
     return factory
