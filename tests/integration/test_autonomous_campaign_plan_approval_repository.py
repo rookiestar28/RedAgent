@@ -96,7 +96,7 @@ async def _approval_scenario() -> None:
             engagement_id=engagement,
             target_ids=(target,),
             valid_from=NOW,
-            expires_at=NOW + timedelta(minutes=20),
+            expires_at=NOW + timedelta(seconds=60),
             required_approvers=(CampaignApproverRequirementV2(approver, "campaign-owner"),),
             nonce=f"nonce-{suffix}"[:100],
         )
@@ -108,7 +108,7 @@ async def _approval_scenario() -> None:
             approver_role="campaign-owner",
             key_id="key-a",
             approved_at=NOW + timedelta(seconds=1),
-            expires_at=NOW + timedelta(minutes=15),
+            expires_at=NOW + timedelta(seconds=45),
         )
         signed = SignedCampaignAuthorityEnvelopeV2(
             authority=current_authority,
@@ -134,7 +134,7 @@ async def _approval_scenario() -> None:
             authority_lifecycle=lifecycle(
                 current_authority,
                 observed_at=NOW + timedelta(seconds=1),
-                valid_until=NOW + timedelta(minutes=10),
+                valid_until=NOW + timedelta(seconds=50),
             ),
             domain=current_domain,
             revision=planned.revision,

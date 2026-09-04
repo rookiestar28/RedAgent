@@ -168,7 +168,7 @@ def _now() -> datetime:
 def register_autonomous_campaign_approval_routes(
     router: APIRouter,
     *,
-    require_guard: Callable[..., object],
+    require_guard: Callable[..., Callable[..., object]],
     api_error: Callable[[int, str, str], Exception],
 ) -> None:
     @router.get(

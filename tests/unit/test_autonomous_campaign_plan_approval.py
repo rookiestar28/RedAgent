@@ -212,6 +212,7 @@ def test_server_staging_builds_complete_safe_immutable_preview_and_readiness() -
     assert preview.actions[0].operator_id == "collect-artifact-posture"
     assert preview.actions[0].cleanup_mode.value == "required"
     assert preview.required_approvers[0].principal_id == "approver-a"
+    assert preview.expires_at == command.signed_authority.approvals[0].expires_at
     assert preview.preview_sha256 == replace(preview).preview_sha256
     serialized = repr(preview)
     assert "signature_hex" not in serialized

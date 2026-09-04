@@ -1015,11 +1015,13 @@ def _plan_preview_result_from_payload(
 ) -> AutonomousCampaignPlanPreviewResultV1:
     if not isinstance(payload, dict):
         raise ValueError("plan_preview_replay_payload_invalid")
+    audit_ids = _stored_pair("audit_ids", payload.get("audit_ids"))
+    event_ids = _stored_pair("event_ids", payload.get("event_ids"))
     return AutonomousCampaignPlanPreviewResultV1(
         application=_state_from_payload(payload.get("application")),
         preview=_preview_from_payload(payload.get("preview")),
-        audit_ids=tuple(str(item) for item in _stored_list("audit_ids", payload.get("audit_ids"))),
-        event_ids=tuple(str(item) for item in _stored_list("event_ids", payload.get("event_ids"))),
+        audit_ids=audit_ids,
+        event_ids=event_ids,
         replayed=replayed,
     )
 
@@ -1115,17 +1117,9 @@ def _preview_from_payload(payload: object) -> AutonomousCampaignPlanPreviewV1:
         capability_ids=tuple(str(item) for item in _stored_list("capability_ids", payload.get("capability_ids"))),
         capability_set_sha256=str(payload["capability_set_sha256"]),
         effect_classes=tuple(str(item) for item in _stored_list("effect_classes", payload.get("effect_classes"))),
-        actions=tuple(
-            AutonomousCampaignPlanActionV1(
-                **{
-                    **_stored_dict("action", item),
-                    "cleanup_mode": CleanupMode(str(_stored_dict("action", item)["cleanup_mode"])),
-                }
-            )
-            for item in actions
-        ),
-        authorized_budget=CampaignBudgetVectorV1(**_stored_dict("authorized_budget", payload.get("authorized_budget"))),
-        plan_budget=CampaignBudgetVectorV1(**_stored_dict("plan_budget", payload.get("plan_budget"))),
+        actions=tuple(_action_from_payload(item) for item in actions),
+        authorized_budget=_budget_from_payload("authorized_budget", payload.get("authorized_budget")),
+        plan_budget=_budget_from_payload("plan_budget", payload.get("plan_budget")),
         certificate_sha256=str(payload["certificate_sha256"]),
         validator_version=str(payload["validator_version"]),
         validator_sha256=str(payload["validator_sha256"]),
@@ -1136,9 +1130,7 @@ def _preview_from_payload(payload: object) -> AutonomousCampaignPlanPreviewV1:
         policy_revocation_epoch=int(payload["policy_revocation_epoch"]),
         roe_revocation_epoch=int(payload["roe_revocation_epoch"]),
         kill_switch_epoch=int(payload["kill_switch_epoch"]),
-        required_approvers=tuple(
-            AutonomousCampaignPlanApproverV1(**_stored_dict("required_approver", item)) for item in approvers
-        ),
+        required_approvers=tuple(_approver_from_payload(item) for item in approvers),
         issued_at=datetime.fromisoformat(str(payload["issued_at"])),
         expires_at=datetime.fromisoformat(str(payload["expires_at"])),
     )
@@ -1162,6 +1154,53 @@ def _receipt_from_payload(payload: object) -> AutonomousCampaignApprovalReceiptV
     return AutonomousCampaignApprovalReceiptV1(**values)
 
 
+def _action_from_payload(payload: object) -> AutonomousCampaignPlanActionV1:
+    value = _stored_dict("action", payload)
+    return AutonomousCampaignPlanActionV1(
+        node_id=str(value["node_id"]),
+        order=_stored_integer("action_order", value["order"]),
+        operator_id=str(value["operator_id"]),
+        target_id=str(value["target_id"]),
+        capability_id=str(value["capability_id"]),
+        capability_revision=_stored_integer("action_capability_revision", value["capability_revision"]),
+        effect_class=str(value["effect_class"]),
+        executable=_stored_boolean("action_executable", value["executable"]),
+        max_duration_seconds=_stored_integer("action_max_duration_seconds", value["max_duration_seconds"]),
+        max_requests=_stored_integer("action_max_requests", value["max_requests"]),
+        max_rate_per_minute=_stored_integer("action_max_rate_per_minute", value["max_rate_per_minute"]),
+        concurrency_weight=_stored_integer("action_concurrency_weight", value["concurrency_weight"]),
+        max_retries=_stored_integer("action_max_retries", value["max_retries"]),
+        max_risk_micropoints=_stored_integer("action_max_risk_micropoints", value["max_risk_micropoints"]),
+        max_cost_microunits=_stored_integer("action_max_cost_microunits", value["max_cost_microunits"]),
+        max_evidence_bytes=_stored_integer("action_max_evidence_bytes", value["max_evidence_bytes"]),
+        max_data_bytes=_stored_integer("action_max_data_bytes", value["max_data_bytes"]),
+        cleanup_mode=CleanupMode(str(value["cleanup_mode"])),
+    )
+
+
+def _budget_from_payload(name: str, payload: object) -> CampaignBudgetVectorV1:
+    value = _stored_dict(name, payload)
+    return CampaignBudgetVectorV1(
+        schema_version=str(value["schema_version"]),
+        duration_seconds=_stored_integer(f"{name}_duration_seconds", value["duration_seconds"]),
+        requests=_stored_integer(f"{name}_requests", value["requests"]),
+        rate_per_minute=_stored_integer(f"{name}_rate_per_minute", value["rate_per_minute"]),
+        concurrency=_stored_integer(f"{name}_concurrency", value["concurrency"]),
+        risk_micropoints=_stored_integer(f"{name}_risk_micropoints", value["risk_micropoints"]),
+        cost_microunits=_stored_integer(f"{name}_cost_microunits", value["cost_microunits"]),
+        evidence_bytes=_stored_integer(f"{name}_evidence_bytes", value["evidence_bytes"]),
+        data_bytes=_stored_integer(f"{name}_data_bytes", value["data_bytes"]),
+    )
+
+
+def _approver_from_payload(payload: object) -> AutonomousCampaignPlanApproverV1:
+    value = _stored_dict("required_approver", payload)
+    return AutonomousCampaignPlanApproverV1(
+        principal_id=str(value["principal_id"]),
+        role_id=str(value["role_id"]),
+    )
+
+
 def _json_payload(value: object) -> dict[str, object]:
     normalized = json.loads(canonical_planning_bytes(value).decode("utf-8"))
     if not isinstance(normalized, dict):
@@ -1179,6 +1218,13 @@ def _stored_list(name: str, value: object) -> list[object]:
     if not isinstance(value, list):
         raise ValueError(f"application_{name}_invalid")
     return value
+
+
+def _stored_pair(name: str, value: object) -> tuple[str, str]:
+    items = _stored_list(name, value)
+    if len(items) != 2:
+        raise ValueError(f"application_{name}_invalid")
+    return str(items[0]), str(items[1])
 
 
 def _state_from_row(row: RowMapping) -> AutonomousCampaignApplicationStateV1:
@@ -1242,6 +1288,12 @@ def _identifier(name: str, value: str, maximum: int) -> None:
 
 def _stored_integer(name: str, value: object) -> int:
     if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"application_{name}_invalid")
+    return value
+
+
+def _stored_boolean(name: str, value: object) -> bool:
+    if type(value) is not bool:
         raise ValueError(f"application_{name}_invalid")
     return value
 

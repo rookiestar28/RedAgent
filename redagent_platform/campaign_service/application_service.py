@@ -264,7 +264,12 @@ class AutonomousCampaignApplicationService:
         authorized = authority_budget(authority)
         if not plan_budget.fits_within(authorized):
             raise ApplicationPlanInvalid("plan_preview_budget_exceeded")
-        expires_at = min(authority.expires_at, lifecycle.valid_until)
+        # CRITICAL: preview approval cannot outlive any signature that made the authority acceptable.
+        expires_at = min(
+            authority.expires_at,
+            lifecycle.valid_until,
+            *(approval.expires_at for approval in signed.approvals),
+        )
         if command.occurred_at >= expires_at:
             raise ApplicationApprovalExpired("plan_preview_expired")
         capability_ids = tuple(sorted({item.capability_id for item in actions}))
