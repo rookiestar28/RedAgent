@@ -93,7 +93,7 @@ def test_unconsumed_r118_validation_families_are_absent_from_active_source_and_g
 
 
 def test_current_schema_retires_r118_campaign_controller_tables_additively() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0029_autonomous_campaign_app")
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0030_autonomous_plan_approval")
     assert "r118_campaign_controller_records" not in metadata.tables
     assert "r118_campaign_controller_artifacts" not in metadata.tables
 

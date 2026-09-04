@@ -123,3 +123,96 @@ Table(
         name="autonomous_campaign_application_event_sequence_bounded",
     ),
 )
+
+
+Table(
+    "autonomous_campaign_plan_previews",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("application_id", String(64), nullable=False),
+    Column("application_revision", BigInteger, nullable=False),
+    Column("contract_version", String(100), nullable=False),
+    Column("preview_sha256", String(64), nullable=False),
+    Column("preview_payload", JSON, nullable=False),
+    Column("created_by_user_id", String(64), ForeignKey("users.id"), nullable=False),
+    Column("expires_at", DateTime(timezone=True), nullable=False),
+    *_owned_columns(),
+    ForeignKeyConstraint(
+        ("tenant_id", "application_id"),
+        ("autonomous_campaign_applications.tenant_id", "autonomous_campaign_applications.id"),
+        name="fk_autonomous_campaign_plan_preview_tenant_application",
+    ),
+    UniqueConstraint("tenant_id", "id", name="uq_autonomous_campaign_plan_preview_tenant_identity"),
+    UniqueConstraint(
+        "tenant_id",
+        "application_id",
+        "application_revision",
+        name="uq_autonomous_campaign_plan_preview_revision",
+    ),
+    UniqueConstraint(
+        "tenant_id",
+        "application_id",
+        "preview_sha256",
+        name="uq_autonomous_campaign_plan_preview_digest",
+    ),
+    CheckConstraint(
+        "contract_version = 'redagent.autonomous-campaign-plan-preview/v1'",
+        name="autonomous_campaign_plan_preview_contract_version_closed",
+    ),
+    CheckConstraint(
+        "application_revision BETWEEN 1 AND 2147483647",
+        name="autonomous_campaign_plan_preview_revision_bounded",
+    ),
+)
+
+
+Table(
+    "autonomous_campaign_plan_approval_receipts",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("application_id", String(64), nullable=False),
+    Column("preview_id", String(64), nullable=False),
+    Column("application_revision", BigInteger, nullable=False),
+    Column("contract_version", String(100), nullable=False),
+    Column("decision", String(16), nullable=False),
+    Column("reason_code", String(150), nullable=False),
+    Column("receipt_sha256", String(64), nullable=False),
+    Column("receipt_payload", JSON, nullable=False),
+    Column("decided_by_user_id", String(64), ForeignKey("users.id"), nullable=False),
+    *_owned_columns(),
+    ForeignKeyConstraint(
+        ("tenant_id", "application_id"),
+        ("autonomous_campaign_applications.tenant_id", "autonomous_campaign_applications.id"),
+        name="fk_autonomous_campaign_approval_tenant_application",
+    ),
+    ForeignKeyConstraint(
+        ("tenant_id", "preview_id"),
+        ("autonomous_campaign_plan_previews.tenant_id", "autonomous_campaign_plan_previews.id"),
+        name="fk_autonomous_campaign_approval_tenant_preview",
+    ),
+    UniqueConstraint("tenant_id", "id", name="uq_autonomous_campaign_approval_tenant_identity"),
+    UniqueConstraint(
+        "tenant_id",
+        "application_id",
+        "application_revision",
+        name="uq_autonomous_campaign_approval_revision",
+    ),
+    UniqueConstraint(
+        "tenant_id",
+        "application_id",
+        "receipt_sha256",
+        name="uq_autonomous_campaign_approval_digest",
+    ),
+    CheckConstraint(
+        "contract_version = 'redagent.autonomous-campaign-plan-approval-receipt/v1'",
+        name="autonomous_campaign_approval_contract_version_closed",
+    ),
+    CheckConstraint(
+        "decision IN ('approved','denied')",
+        name="autonomous_campaign_approval_decision_closed",
+    ),
+    CheckConstraint(
+        "application_revision BETWEEN 1 AND 2147483647",
+        name="autonomous_campaign_approval_revision_bounded",
+    ),
+)

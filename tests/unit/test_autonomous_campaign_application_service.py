@@ -112,7 +112,7 @@ def test_application_service_exposes_truthful_plan_only_readiness() -> None:
     assert projected.approval_ready is False
     assert projected.admission_ready is False
     assert projected.start_ready is False
-    assert projected.unavailable_reason == "r172_not_accepted"
+    assert projected.unavailable_reason == "plan_not_prepared"
     assert repository.create_calls == 1
 
 

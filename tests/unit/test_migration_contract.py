@@ -13,7 +13,7 @@ def test_alembic_has_one_head_and_initial_schema_revision() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == ["0029_autonomous_campaign_app"]
+    assert scripts.get_heads() == ["0030_autonomous_plan_approval"]
 
 
 def test_r118_retirement_migration_is_additive_reversible_and_table_scoped() -> None:

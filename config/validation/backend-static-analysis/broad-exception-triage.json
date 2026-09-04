@@ -14,7 +14,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-32b55780-c08b8b7d-719998e5-7460f5f0-43f9c18e-de774b36-d83df747-46e41c3e",
-      "line": 88,
+      "line": 414,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/application_service.py",
       "rationale": "The application boundary preserves typed domain outcomes and translates any otherwise-unclassified repository failure to the closed dependency-unavailable outcome."

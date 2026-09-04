@@ -2300,6 +2300,594 @@
         "title": "ArtifactRunnerOptionData",
         "type": "object"
       },
+      "AutonomousCampaignApprovalDecisionData": {
+        "additionalProperties": false,
+        "properties": {
+          "application": {
+            "$ref": "#/components/schemas/AutonomousCampaignReadinessData"
+          },
+          "decision": {
+            "enum": [
+              "approved",
+              "denied"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "preview_id": {
+            "title": "Preview Id",
+            "type": "string"
+          },
+          "preview_sha256": {
+            "title": "Preview Sha256",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "receipt_id": {
+            "title": "Receipt Id",
+            "type": "string"
+          },
+          "receipt_sha256": {
+            "title": "Receipt Sha256",
+            "type": "string"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "receipt_id",
+          "receipt_sha256",
+          "preview_id",
+          "preview_sha256",
+          "decision",
+          "reason_code",
+          "application",
+          "replayed"
+        ],
+        "title": "AutonomousCampaignApprovalDecisionData",
+        "type": "object"
+      },
+      "AutonomousCampaignApprovalDecisionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AutonomousCampaignApprovalDecisionData"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "AutonomousCampaignApprovalDecisionResponse",
+        "type": "object"
+      },
+      "AutonomousCampaignApprovalRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "preview_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:-]+$",
+            "title": "Preview Id",
+            "type": "string"
+          },
+          "preview_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_id",
+          "preview_sha256"
+        ],
+        "title": "AutonomousCampaignApprovalRequest",
+        "type": "object"
+      },
+      "AutonomousCampaignBudgetData": {
+        "additionalProperties": false,
+        "properties": {
+          "concurrency": {
+            "minimum": 0.0,
+            "title": "Concurrency",
+            "type": "integer"
+          },
+          "cost_microunits": {
+            "minimum": 0.0,
+            "title": "Cost Microunits",
+            "type": "integer"
+          },
+          "data_bytes": {
+            "minimum": 0.0,
+            "title": "Data Bytes",
+            "type": "integer"
+          },
+          "duration_seconds": {
+            "minimum": 0.0,
+            "title": "Duration Seconds",
+            "type": "integer"
+          },
+          "evidence_bytes": {
+            "minimum": 0.0,
+            "title": "Evidence Bytes",
+            "type": "integer"
+          },
+          "rate_per_minute": {
+            "minimum": 0.0,
+            "title": "Rate Per Minute",
+            "type": "integer"
+          },
+          "requests": {
+            "minimum": 0.0,
+            "title": "Requests",
+            "type": "integer"
+          },
+          "risk_micropoints": {
+            "minimum": 0.0,
+            "title": "Risk Micropoints",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "redagent.campaign-budget-vector/v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "duration_seconds",
+          "requests",
+          "rate_per_minute",
+          "concurrency",
+          "risk_micropoints",
+          "cost_microunits",
+          "evidence_bytes",
+          "data_bytes"
+        ],
+        "title": "AutonomousCampaignBudgetData",
+        "type": "object"
+      },
+      "AutonomousCampaignDenialRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "preview_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._:-]+$",
+            "title": "Preview Id",
+            "type": "string"
+          },
+          "preview_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Sha256",
+            "type": "string"
+          },
+          "reason_code": {
+            "maxLength": 150,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_:]{0,149}$",
+            "title": "Reason Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preview_id",
+          "preview_sha256",
+          "reason_code"
+        ],
+        "title": "AutonomousCampaignDenialRequest",
+        "type": "object"
+      },
+      "AutonomousCampaignPlanActionData": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "capability_revision": {
+            "minimum": 1.0,
+            "title": "Capability Revision",
+            "type": "integer"
+          },
+          "cleanup_mode": {
+            "title": "Cleanup Mode",
+            "type": "string"
+          },
+          "concurrency_weight": {
+            "minimum": 1.0,
+            "title": "Concurrency Weight",
+            "type": "integer"
+          },
+          "effect_class": {
+            "title": "Effect Class",
+            "type": "string"
+          },
+          "executable": {
+            "title": "Executable",
+            "type": "boolean"
+          },
+          "max_cost_microunits": {
+            "minimum": 0.0,
+            "title": "Max Cost Microunits",
+            "type": "integer"
+          },
+          "max_data_bytes": {
+            "minimum": 0.0,
+            "title": "Max Data Bytes",
+            "type": "integer"
+          },
+          "max_duration_seconds": {
+            "minimum": 0.0,
+            "title": "Max Duration Seconds",
+            "type": "integer"
+          },
+          "max_evidence_bytes": {
+            "minimum": 0.0,
+            "title": "Max Evidence Bytes",
+            "type": "integer"
+          },
+          "max_rate_per_minute": {
+            "minimum": 0.0,
+            "title": "Max Rate Per Minute",
+            "type": "integer"
+          },
+          "max_requests": {
+            "minimum": 0.0,
+            "title": "Max Requests",
+            "type": "integer"
+          },
+          "max_retries": {
+            "minimum": 0.0,
+            "title": "Max Retries",
+            "type": "integer"
+          },
+          "max_risk_micropoints": {
+            "minimum": 0.0,
+            "title": "Max Risk Micropoints",
+            "type": "integer"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "operator_id": {
+            "title": "Operator Id",
+            "type": "string"
+          },
+          "order": {
+            "minimum": 0.0,
+            "title": "Order",
+            "type": "integer"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "order",
+          "operator_id",
+          "target_id",
+          "capability_id",
+          "capability_revision",
+          "effect_class",
+          "executable",
+          "max_duration_seconds",
+          "max_requests",
+          "max_rate_per_minute",
+          "concurrency_weight",
+          "max_retries",
+          "max_risk_micropoints",
+          "max_cost_microunits",
+          "max_evidence_bytes",
+          "max_data_bytes",
+          "cleanup_mode"
+        ],
+        "title": "AutonomousCampaignPlanActionData",
+        "type": "object"
+      },
+      "AutonomousCampaignPlanApproverData": {
+        "additionalProperties": false,
+        "properties": {
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "role_id": {
+            "title": "Role Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "principal_id",
+          "role_id"
+        ],
+        "title": "AutonomousCampaignPlanApproverData",
+        "type": "object"
+      },
+      "AutonomousCampaignPlanPreviewData": {
+        "additionalProperties": false,
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/AutonomousCampaignPlanActionData"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "application_intent_sha256": {
+            "title": "Application Intent Sha256",
+            "type": "string"
+          },
+          "application_revision": {
+            "minimum": 1.0,
+            "title": "Application Revision",
+            "type": "integer"
+          },
+          "authority_sha256": {
+            "title": "Authority Sha256",
+            "type": "string"
+          },
+          "authorized_budget": {
+            "$ref": "#/components/schemas/AutonomousCampaignBudgetData"
+          },
+          "campaign_id": {
+            "title": "Campaign Id",
+            "type": "string"
+          },
+          "capability_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capability Ids",
+            "type": "array"
+          },
+          "capability_set_sha256": {
+            "title": "Capability Set Sha256",
+            "type": "string"
+          },
+          "certificate_sha256": {
+            "title": "Certificate Sha256",
+            "type": "string"
+          },
+          "domain_sha256": {
+            "title": "Domain Sha256",
+            "type": "string"
+          },
+          "effect_classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Effect Classes",
+            "type": "array"
+          },
+          "engagement_id": {
+            "title": "Engagement Id",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "issued_at": {
+            "format": "date-time",
+            "title": "Issued At",
+            "type": "string"
+          },
+          "kill_switch_epoch": {
+            "minimum": 0.0,
+            "title": "Kill Switch Epoch",
+            "type": "integer"
+          },
+          "lifecycle_epoch": {
+            "minimum": 0.0,
+            "title": "Lifecycle Epoch",
+            "type": "integer"
+          },
+          "objective_id": {
+            "title": "Objective Id",
+            "type": "string"
+          },
+          "objective_sha256": {
+            "title": "Objective Sha256",
+            "type": "string"
+          },
+          "plan_budget": {
+            "$ref": "#/components/schemas/AutonomousCampaignBudgetData"
+          },
+          "plan_revision_id": {
+            "title": "Plan Revision Id",
+            "type": "string"
+          },
+          "plan_revision_sha256": {
+            "title": "Plan Revision Sha256",
+            "type": "string"
+          },
+          "plan_sha256": {
+            "title": "Plan Sha256",
+            "type": "string"
+          },
+          "policy_bundle_sha256": {
+            "title": "Policy Bundle Sha256",
+            "type": "string"
+          },
+          "policy_revision": {
+            "title": "Policy Revision",
+            "type": "string"
+          },
+          "policy_revocation_epoch": {
+            "minimum": 0.0,
+            "title": "Policy Revocation Epoch",
+            "type": "integer"
+          },
+          "preview_id": {
+            "title": "Preview Id",
+            "type": "string"
+          },
+          "preview_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Preview Sha256",
+            "type": "string"
+          },
+          "required_approvers": {
+            "items": {
+              "$ref": "#/components/schemas/AutonomousCampaignPlanApproverData"
+            },
+            "title": "Required Approvers",
+            "type": "array"
+          },
+          "roe_revocation_epoch": {
+            "minimum": 0.0,
+            "title": "Roe Revocation Epoch",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "redagent.autonomous-campaign-plan-preview/v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "signed_authority_sha256": {
+            "title": "Signed Authority Sha256",
+            "type": "string"
+          },
+          "source_binding_sha256": {
+            "title": "Source Binding Sha256",
+            "type": "string"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          },
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "validation_result": {
+            "const": "valid",
+            "title": "Validation Result",
+            "type": "string"
+          },
+          "validator_sha256": {
+            "title": "Validator Sha256",
+            "type": "string"
+          },
+          "validator_version": {
+            "title": "Validator Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "preview_id",
+          "preview_sha256",
+          "tenant_id",
+          "campaign_id",
+          "engagement_id",
+          "application_revision",
+          "application_intent_sha256",
+          "source_binding_sha256",
+          "signed_authority_sha256",
+          "authority_sha256",
+          "domain_sha256",
+          "plan_revision_id",
+          "plan_revision_sha256",
+          "plan_sha256",
+          "objective_id",
+          "objective_sha256",
+          "target_id",
+          "capability_ids",
+          "capability_set_sha256",
+          "effect_classes",
+          "actions",
+          "authorized_budget",
+          "plan_budget",
+          "certificate_sha256",
+          "validator_version",
+          "validator_sha256",
+          "validation_result",
+          "policy_revision",
+          "policy_bundle_sha256",
+          "lifecycle_epoch",
+          "policy_revocation_epoch",
+          "roe_revocation_epoch",
+          "kill_switch_epoch",
+          "required_approvers",
+          "issued_at",
+          "expires_at"
+        ],
+        "title": "AutonomousCampaignPlanPreviewData",
+        "type": "object"
+      },
+      "AutonomousCampaignPlanPreviewResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AutonomousCampaignPlanPreviewData"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "AutonomousCampaignPlanPreviewResponse",
+        "type": "object"
+      },
+      "AutonomousCampaignReadinessData": {
+        "additionalProperties": false,
+        "properties": {
+          "admission_ready": {
+            "title": "Admission Ready",
+            "type": "boolean"
+          },
+          "aggregate_revision": {
+            "minimum": 1.0,
+            "title": "Aggregate Revision",
+            "type": "integer"
+          },
+          "approval_ready": {
+            "title": "Approval Ready",
+            "type": "boolean"
+          },
+          "campaign_id": {
+            "title": "Campaign Id",
+            "type": "string"
+          },
+          "lifecycle_state": {
+            "title": "Lifecycle State",
+            "type": "string"
+          },
+          "plan_ready": {
+            "title": "Plan Ready",
+            "type": "boolean"
+          },
+          "start_ready": {
+            "title": "Start Ready",
+            "type": "boolean"
+          },
+          "unavailable_reason": {
+            "title": "Unavailable Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "campaign_id",
+          "lifecycle_state",
+          "aggregate_revision",
+          "plan_ready",
+          "approval_ready",
+          "admission_ready",
+          "start_ready",
+          "unavailable_reason"
+        ],
+        "title": "AutonomousCampaignReadinessData",
+        "type": "object"
+      },
       "CampaignCreateRequest": {
         "additionalProperties": false,
         "properties": {
@@ -18485,6 +19073,462 @@
           }
         },
         "summary": "Cancel Artifact Posture Run"
+      }
+    },
+    "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval": {
+      "post": {
+        "operationId": "approve_autonomous_campaign_plan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:-]+$",
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 3,
+              "title": "If-Match",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Policy-Reference",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Policy-Reference"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-ROE-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Roe-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Subject",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Subject"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Permissions",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Permissions"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutonomousCampaignApprovalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutonomousCampaignApprovalDecisionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Plan"
+      }
+    },
+    "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial": {
+      "post": {
+        "operationId": "deny_autonomous_campaign_plan",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:-]+$",
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 3,
+              "title": "If-Match",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Policy-Reference",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Policy-Reference"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-ROE-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Roe-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Subject",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Subject"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Permissions",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Permissions"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutonomousCampaignDenialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutonomousCampaignApprovalDecisionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Deny Plan"
+      }
+    },
+    "/api/v1/autonomous-campaigns/{campaign_id}/plan-preview": {
+      "get": {
+        "operationId": "get_autonomous_campaign_plan_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:-]+$",
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Policy-Reference",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Policy-Reference"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-ROE-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Roe-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Subject",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Subject"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Permissions",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Permissions"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutonomousCampaignPlanPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plan Preview"
       }
     },
     "/api/v1/campaign-core/attention": {

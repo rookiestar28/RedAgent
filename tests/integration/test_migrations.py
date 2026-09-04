@@ -52,7 +52,7 @@ async def _migration_scenario() -> None:
             assert upgraded.returncode == 0, upgraded.stderr
             current = _alembic(secret_file, "current")
             assert current.returncode == 0
-            assert "0029_autonomous_campaign_app (head)" in current.stdout
+            assert "0030_autonomous_plan_approval (head)" in current.stdout
 
             async with engine.begin() as connection:
                 revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
@@ -141,11 +141,13 @@ async def _migration_scenario() -> None:
                         "'campaign_observation_decisions','trusted_campaign_observations',"
                         "'campaign_replan_proposals','campaign_replan_acceptances',"
                         "'autonomous_campaign_applications',"
-                        "'autonomous_campaign_application_events')"
+                        "'autonomous_campaign_application_events',"
+                        "'autonomous_campaign_plan_previews',"
+                        "'autonomous_campaign_plan_approval_receipts')"
                     )
                 )
                 assert revision == settings.expected_revision
-                assert int(table_count or 0) == 262
+                assert int(table_count or 0) == 264
                 for retired_table in (
                     "r118_campaign_controller_records",
                     "r118_campaign_controller_artifacts",

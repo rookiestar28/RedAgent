@@ -37,6 +37,7 @@ from redagent_platform.campaign_service.application_contracts import AutonomousC
 from redagent_platform.campaign_service.application_service import (
     AutonomousCampaignApplicationService,
 )
+from redagent_platform.campaign_service.approval_api import register_autonomous_campaign_approval_routes
 from redagent_platform.campaign_service.composition import CampaignApiRuntimeServices
 from redagent_platform.campaign_service.qualification import (
     CampaignQualificationService,
@@ -430,6 +431,11 @@ def create_app(
         require_guard=dependencies.require_guard,
         api_error=ApiError,
         router=app.router,
+    )
+    register_autonomous_campaign_approval_routes(
+        app.router,
+        require_guard=dependencies.require_guard,
+        api_error=ApiError,
     )
     register_foundation_routes(app.router, dependencies)
     register_access_context_routes(app.router, dependencies)

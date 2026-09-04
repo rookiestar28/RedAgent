@@ -100,7 +100,10 @@ def test_r124_production_roles_expose_inspection_and_safety_recovery_permissions
     assert {"campaign:read", "campaign:create", "campaign:inspect", "campaign:stop"}.issubset(
         ROLE_PERMISSIONS["operator"]
     )
-    assert {"campaign:read", "campaign:inspect"}.issubset(ROLE_PERMISSIONS["approver"])
+    assert {"campaign:read", "campaign:inspect", "campaign:approve"}.issubset(
+        ROLE_PERMISSIONS["approver"]
+    )
+    assert "campaign:approve" not in ROLE_PERMISSIONS["operator"]
     assert {"campaign:read", "campaign:inspect"}.issubset(ROLE_PERMISSIONS["reviewer"])
     assert {"campaign:read", "campaign:inspect", "campaign:stop"}.issubset(
         ROLE_PERMISSIONS["tenant_admin"]

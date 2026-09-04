@@ -68,6 +68,22 @@ class ApplicationDependencyUnavailable(ApplicationOutcomeError):
     """A required application repository dependency failed closed."""
 
 
+class ApplicationPlanInvalid(ApplicationOutcomeError):
+    """Server-owned plan material is absent, stale, unsupported, or not independently valid."""
+
+
+class ApplicationPlanUnavailable(ApplicationOutcomeError):
+    """No current tenant-visible immutable plan preview is available."""
+
+
+class ApplicationApprovalForbidden(ApplicationOutcomeError):
+    """The current human actor is not permitted to decide the exact preview."""
+
+
+class ApplicationApprovalExpired(ApplicationOutcomeError):
+    """The exact preview is no longer inside its server-owned validity window."""
+
+
 _ATTENTION_STATES = frozenset(
     {
         AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,
@@ -101,9 +117,19 @@ _LIFECYCLE_EDGES: Mapping[AutonomousCampaignLifecycle, frozenset[AutonomousCampa
         {AutonomousCampaignLifecycle.AWAITING_APPROVAL, *_FAIL_CLOSED_EDGES}
     ),
     AutonomousCampaignLifecycle.AWAITING_APPROVAL: frozenset(
-        {AutonomousCampaignLifecycle.APPROVED, *_FAIL_CLOSED_EDGES}
+        {
+            AutonomousCampaignLifecycle.APPROVED,
+            AutonomousCampaignLifecycle.PLAN_VALIDATED,
+            *_FAIL_CLOSED_EDGES,
+        }
     ),
-    AutonomousCampaignLifecycle.APPROVED: frozenset({AutonomousCampaignLifecycle.ADMITTED, *_FAIL_CLOSED_EDGES}),
+    AutonomousCampaignLifecycle.APPROVED: frozenset(
+        {
+            AutonomousCampaignLifecycle.ADMITTED,
+            AutonomousCampaignLifecycle.PLAN_VALIDATED,
+            *_FAIL_CLOSED_EDGES,
+        }
+    ),
     AutonomousCampaignLifecycle.ADMITTED: frozenset(
         {AutonomousCampaignLifecycle.EXECUTION_QUEUED, *_FAIL_CLOSED_EDGES}
     ),

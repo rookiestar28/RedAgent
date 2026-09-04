@@ -3,7 +3,7 @@ from redagent_platform.persistence.models import metadata
 
 
 def test_policy_tables_remain_in_metadata_after_revision_0008() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0029_autonomous_campaign_app"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0030_autonomous_plan_approval"
     for name in (
         "policy_bundle_revisions", "policy_bundle_promotions", "policy_agent_status",
         "policy_decisions", "policy_boundary_receipts", "policy_log_receipts",

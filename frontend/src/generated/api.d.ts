@@ -276,6 +276,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Plan */
+        post: operations["approve_autonomous_campaign_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deny Plan */
+        post: operations["deny_autonomous_campaign_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomous-campaigns/{campaign_id}/plan-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plan Preview */
+        get: operations["get_autonomous_campaign_plan_preview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaign-core/attention": {
         parameters: {
             query?: never;
@@ -3054,6 +3105,227 @@ export interface components {
             required_policy_revision: string;
             /** Runner Id */
             runner_id: string;
+        };
+        /** AutonomousCampaignApprovalDecisionData */
+        AutonomousCampaignApprovalDecisionData: {
+            application: components["schemas"]["AutonomousCampaignReadinessData"];
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "denied";
+            /** Preview Id */
+            preview_id: string;
+            /** Preview Sha256 */
+            preview_sha256: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Receipt Id */
+            receipt_id: string;
+            /** Receipt Sha256 */
+            receipt_sha256: string;
+            /** Replayed */
+            replayed: boolean;
+        };
+        /** AutonomousCampaignApprovalDecisionResponse */
+        AutonomousCampaignApprovalDecisionResponse: {
+            data: components["schemas"]["AutonomousCampaignApprovalDecisionData"];
+        };
+        /** AutonomousCampaignApprovalRequest */
+        AutonomousCampaignApprovalRequest: {
+            /** Preview Id */
+            preview_id: string;
+            /** Preview Sha256 */
+            preview_sha256: string;
+        };
+        /** AutonomousCampaignBudgetData */
+        AutonomousCampaignBudgetData: {
+            /** Concurrency */
+            concurrency: number;
+            /** Cost Microunits */
+            cost_microunits: number;
+            /** Data Bytes */
+            data_bytes: number;
+            /** Duration Seconds */
+            duration_seconds: number;
+            /** Evidence Bytes */
+            evidence_bytes: number;
+            /** Rate Per Minute */
+            rate_per_minute: number;
+            /** Requests */
+            requests: number;
+            /** Risk Micropoints */
+            risk_micropoints: number;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "redagent.campaign-budget-vector/v1";
+        };
+        /** AutonomousCampaignDenialRequest */
+        AutonomousCampaignDenialRequest: {
+            /** Preview Id */
+            preview_id: string;
+            /** Preview Sha256 */
+            preview_sha256: string;
+            /** Reason Code */
+            reason_code: string;
+        };
+        /** AutonomousCampaignPlanActionData */
+        AutonomousCampaignPlanActionData: {
+            /** Capability Id */
+            capability_id: string;
+            /** Capability Revision */
+            capability_revision: number;
+            /** Cleanup Mode */
+            cleanup_mode: string;
+            /** Concurrency Weight */
+            concurrency_weight: number;
+            /** Effect Class */
+            effect_class: string;
+            /** Executable */
+            executable: boolean;
+            /** Max Cost Microunits */
+            max_cost_microunits: number;
+            /** Max Data Bytes */
+            max_data_bytes: number;
+            /** Max Duration Seconds */
+            max_duration_seconds: number;
+            /** Max Evidence Bytes */
+            max_evidence_bytes: number;
+            /** Max Rate Per Minute */
+            max_rate_per_minute: number;
+            /** Max Requests */
+            max_requests: number;
+            /** Max Retries */
+            max_retries: number;
+            /** Max Risk Micropoints */
+            max_risk_micropoints: number;
+            /** Node Id */
+            node_id: string;
+            /** Operator Id */
+            operator_id: string;
+            /** Order */
+            order: number;
+            /** Target Id */
+            target_id: string;
+        };
+        /** AutonomousCampaignPlanApproverData */
+        AutonomousCampaignPlanApproverData: {
+            /** Principal Id */
+            principal_id: string;
+            /** Role Id */
+            role_id: string;
+        };
+        /** AutonomousCampaignPlanPreviewData */
+        AutonomousCampaignPlanPreviewData: {
+            /** Actions */
+            actions: components["schemas"]["AutonomousCampaignPlanActionData"][];
+            /** Application Intent Sha256 */
+            application_intent_sha256: string;
+            /** Application Revision */
+            application_revision: number;
+            /** Authority Sha256 */
+            authority_sha256: string;
+            authorized_budget: components["schemas"]["AutonomousCampaignBudgetData"];
+            /** Campaign Id */
+            campaign_id: string;
+            /** Capability Ids */
+            capability_ids: string[];
+            /** Capability Set Sha256 */
+            capability_set_sha256: string;
+            /** Certificate Sha256 */
+            certificate_sha256: string;
+            /** Domain Sha256 */
+            domain_sha256: string;
+            /** Effect Classes */
+            effect_classes: string[];
+            /** Engagement Id */
+            engagement_id: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /** Kill Switch Epoch */
+            kill_switch_epoch: number;
+            /** Lifecycle Epoch */
+            lifecycle_epoch: number;
+            /** Objective Id */
+            objective_id: string;
+            /** Objective Sha256 */
+            objective_sha256: string;
+            plan_budget: components["schemas"]["AutonomousCampaignBudgetData"];
+            /** Plan Revision Id */
+            plan_revision_id: string;
+            /** Plan Revision Sha256 */
+            plan_revision_sha256: string;
+            /** Plan Sha256 */
+            plan_sha256: string;
+            /** Policy Bundle Sha256 */
+            policy_bundle_sha256: string;
+            /** Policy Revision */
+            policy_revision: string;
+            /** Policy Revocation Epoch */
+            policy_revocation_epoch: number;
+            /** Preview Id */
+            preview_id: string;
+            /** Preview Sha256 */
+            preview_sha256: string;
+            /** Required Approvers */
+            required_approvers: components["schemas"]["AutonomousCampaignPlanApproverData"][];
+            /** Roe Revocation Epoch */
+            roe_revocation_epoch: number;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "redagent.autonomous-campaign-plan-preview/v1";
+            /** Signed Authority Sha256 */
+            signed_authority_sha256: string;
+            /** Source Binding Sha256 */
+            source_binding_sha256: string;
+            /** Target Id */
+            target_id: string;
+            /** Tenant Id */
+            tenant_id: string;
+            /**
+             * Validation Result
+             * @constant
+             */
+            validation_result: "valid";
+            /** Validator Sha256 */
+            validator_sha256: string;
+            /** Validator Version */
+            validator_version: string;
+        };
+        /** AutonomousCampaignPlanPreviewResponse */
+        AutonomousCampaignPlanPreviewResponse: {
+            data: components["schemas"]["AutonomousCampaignPlanPreviewData"];
+        };
+        /** AutonomousCampaignReadinessData */
+        AutonomousCampaignReadinessData: {
+            /** Admission Ready */
+            admission_ready: boolean;
+            /** Aggregate Revision */
+            aggregate_revision: number;
+            /** Approval Ready */
+            approval_ready: boolean;
+            /** Campaign Id */
+            campaign_id: string;
+            /** Lifecycle State */
+            lifecycle_state: string;
+            /** Plan Ready */
+            plan_ready: boolean;
+            /** Start Ready */
+            start_ready: boolean;
+            /** Unavailable Reason */
+            unavailable_reason: string;
         };
         /** CampaignCreateRequest */
         CampaignCreateRequest: {
@@ -8716,6 +8988,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtifactRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_autonomous_campaign_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutonomousCampaignApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignApprovalDecisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deny_autonomous_campaign_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutonomousCampaignDenialRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignApprovalDecisionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_autonomous_campaign_plan_preview: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignPlanPreviewResponse"];
                 };
             };
             /** @description Validation Error */

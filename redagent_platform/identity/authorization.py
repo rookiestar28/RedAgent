@@ -49,6 +49,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "runner:read",
             "campaign:read",
             "campaign:inspect",
+            "campaign:approve",
             "jit:read",
             "jit:approve",
         }

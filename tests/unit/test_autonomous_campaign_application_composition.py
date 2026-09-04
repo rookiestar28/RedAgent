@@ -25,9 +25,14 @@ def test_r171_factory_defaults_plan_only_and_can_only_disable() -> None:
     assert build_autonomous_campaign_application_factory({"REDAGENT_AUTONOMOUS_CAMPAIGN_MODE": "disabled"}) is None
 
 
-def test_r171_does_not_register_a_premature_network_mutation_route() -> None:
+def test_r171_base_now_exposes_only_r172_human_decision_routes() -> None:
     paths = create_app(test_issuer_enabled=True).openapi()["paths"]
-    assert not any("autonomous" in path for path in paths)
+    autonomous = {path for path in paths if "autonomous" in path}
+    assert autonomous == {
+        "/api/v1/autonomous-campaigns/{campaign_id}/plan-preview",
+        "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval",
+        "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial",
+    }
     assert "/api/v1/campaign-core/campaigns" in paths
     assert "/api/v1/internal/r123/qualification" in paths
 
