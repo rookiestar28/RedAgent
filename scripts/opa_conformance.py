@@ -42,6 +42,8 @@ COMPOSE = ROOT / "compose.opa-conformance.yaml"
 APP_TOKEN = "redagent-r099-app"  # pragma: allowlist secret
 OPA_HOST_PORT_START = 58181
 OPA_HOST_PORT_END = 58281
+OPA_HOST_PORT_FALLBACK_START = 64080
+OPA_HOST_PORT_FALLBACK_END = 64180
 OPA_ENDPOINT_STATE = "opa-endpoint.json"
 OPA_PLATFORM = "linux/amd64"
 _OPA_FIXTURE_LEASE_FILENAME = "opa-conformance-fixture.lock"
@@ -109,9 +111,18 @@ def _load_opa_host_port() -> int | None:
     port = state.get("port") if isinstance(state, dict) else None
     if isinstance(port, bool) or not isinstance(port, int):
         return None
-    if not OPA_HOST_PORT_START <= port <= OPA_HOST_PORT_END:
+    if not any(start <= port <= end for start, end in _opa_host_port_ranges()):
         return None
     return port
+
+
+def _opa_host_port_ranges() -> tuple[tuple[int, int], ...]:
+    # IMPORTANT: preserve primary-first order; the fallback is only for Windows hosts
+    # that deny every bind in the established conformance range.
+    return (
+        (OPA_HOST_PORT_START, OPA_HOST_PORT_END),
+        (OPA_HOST_PORT_FALLBACK_START, OPA_HOST_PORT_FALLBACK_END),
+    )
 
 
 def _write_opa_host_port(port: int) -> None:
@@ -1007,7 +1018,8 @@ def _provision() -> dict[str, Any]:
     _prepare_bundle_server()
     _write_runtime_config()
     attempted_ports: set[int] = set()
-    for _attempt in range(OPA_HOST_PORT_END - OPA_HOST_PORT_START + 1):
+    available_port_count = sum(end - start + 1 for start, end in _opa_host_port_ranges())
+    for _attempt in range(available_port_count):
         host_port = _allocate_opa_host_port(excluded=attempted_ports)
         attempted_ports.add(host_port)
         try:
@@ -1100,9 +1112,10 @@ def _loopback_port_available(port: int) -> bool:
 
 def _allocate_opa_host_port(*, excluded: set[int] | None = None) -> int:
     excluded = excluded or set()
-    for port in range(OPA_HOST_PORT_START, OPA_HOST_PORT_END + 1):
-        if port not in excluded and _loopback_port_available(port):
-            return port
+    for start, end in _opa_host_port_ranges():
+        for port in range(start, end + 1):
+            if port not in excluded and _loopback_port_available(port):
+                return port
     raise ConformanceError("opa_no_available_loopback_port")
 
 

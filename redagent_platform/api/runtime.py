@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from redagent_platform.api.app import create_app
 from redagent_platform.api.schemas import OperatorShellContextData
 from redagent_platform.campaign_service.composition import (
+    build_autonomous_campaign_application_factory,
     build_stock_campaign_api_service_factory,
 )
 from redagent_platform.campaign_service.qualification import (
@@ -228,6 +229,10 @@ def build_runtime_app(
         raise ApiRuntimeError("policy_runtime_configuration_incomplete")
     policy_settings = load_policy_settings(workspace, values) if policy_present else None
     policy_provider = build_policy_provider(policy_settings) if policy_settings else None
+    try:
+        autonomous_campaign_service_factory = build_autonomous_campaign_application_factory(values)
+    except ValueError as exc:
+        raise ApiRuntimeError(str(exc)) from exc
     return create_app(
         database_settings=settings,
         test_issuer_enabled=test_issuer_enabled,
@@ -245,6 +250,7 @@ def build_runtime_app(
         r123_status_service=r123_status_service,
         r123_campaign_status_owner=r123_campaign_status_owner,
         r123_service_factory=r123_service_factory,
+        autonomous_campaign_service_factory=autonomous_campaign_service_factory,
         operator_shell_context=operator_shell_context,
     )
 

@@ -24,6 +24,16 @@ from redagent_platform.campaign_service.activity_store import (
     PostgresCampaignCoreRecoveryOwner,
     ResolverActivitySafetyGate,
 )
+from redagent_platform.campaign_service.application_contracts import (
+    AutonomousCampaignMode,
+    load_autonomous_campaign_mode,
+)
+from redagent_platform.campaign_service.application_repository import (
+    PostgresAutonomousCampaignApplicationRepository,
+)
+from redagent_platform.campaign_service.application_service import (
+    AutonomousCampaignApplicationService,
+)
 from redagent_platform.campaign_service.resolver import CampaignContextResolver
 from redagent_platform.campaign_service.relay_runtime import (
     PostgresRelayTenantSource,
@@ -222,6 +232,25 @@ class CampaignApiRuntimeServices:
     campaign_status_owner: CampaignStatusOwner
     campaign_core_service: CampaignCoreService
     campaign_operations_owner: PostgresCampaignOperationsOwner
+
+
+def build_autonomous_campaign_application_factory(
+    env: Mapping[str, str],
+) -> Callable[[object], AutonomousCampaignApplicationService] | None:
+    """Build the sole Phase 26 application boundary in its zero-I/O mode."""
+    mode = load_autonomous_campaign_mode(env)
+    if mode is AutonomousCampaignMode.DISABLED:
+        return None
+
+    def factory(sessions: object) -> AutonomousCampaignApplicationService:
+        return AutonomousCampaignApplicationService(
+            PostgresAutonomousCampaignApplicationRepository(
+                cast(async_sessionmaker[AsyncSession], sessions)
+            ),
+            mode=AutonomousCampaignMode.PLAN_ONLY,
+        )
+
+    return factory
 
 
 def load_campaign_signing_identity(

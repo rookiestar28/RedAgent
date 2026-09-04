@@ -5,7 +5,7 @@ from redagent_platform.persistence.models import metadata
 
 
 def test_r098_secret_tables_remain_tenant_owned_after_revision_0008() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0028_observation_replanning"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0029_autonomous_campaign_app"
     for name in (
         "secret_references", "secret_workload_clients", "secret_lease_operations",
         "secret_leases", "secret_lease_events",

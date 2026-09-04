@@ -23,7 +23,7 @@ def test_r123_remains_the_direct_additive_predecessor_of_r158() -> None:
     assert 'revision = "0025_r123_closed_loop"' in source
     assert 'down_revision = "0024_r118_retirement"' in source
     assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0028_observation_replanning"
+        "0029_autonomous_campaign_app"
     )
 
 

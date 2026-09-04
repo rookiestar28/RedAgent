@@ -57,6 +57,44 @@ def test_opa_host_port_allocator_skips_an_occupied_loopback_port(
     assert opa_conformance._allocate_opa_host_port() == second
 
 
+def test_opa_host_port_allocator_uses_secondary_range_only_after_primary_exhaustion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secondary_start = 64080
+    probed: list[int] = []
+
+    def available(port: int) -> bool:
+        probed.append(port)
+        return port == secondary_start
+
+    monkeypatch.setattr(opa_conformance, "_loopback_port_available", available)
+
+    assert opa_conformance._allocate_opa_host_port() == secondary_start
+    assert probed[:-1] == list(
+        range(
+            opa_conformance.OPA_HOST_PORT_START,
+            opa_conformance.OPA_HOST_PORT_END + 1,
+        )
+    )
+    assert probed[-1] == secondary_start
+
+
+def test_opa_host_port_allocator_fails_closed_when_both_ranges_are_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        opa_conformance,
+        "_loopback_port_available",
+        lambda _port: False,
+    )
+
+    with pytest.raises(
+        opa_conformance.ConformanceError,
+        match="opa_no_available_loopback_port",
+    ):
+        opa_conformance._allocate_opa_host_port()
+
+
 def test_locked_images_are_closed_to_the_reviewed_registry_tag_digest_and_platform() -> None:
     assert opa_conformance._image() == (
         "docker.io/openpolicyagent/opa:1.18.2-static@"
@@ -743,6 +781,36 @@ def test_opa_endpoint_uses_the_workspace_recorded_port(
     monkeypatch.setattr(opa_conformance, "RUNTIME", runtime)
 
     assert opa_conformance.opa_endpoint() == "http://127.0.0.1:58182"
+
+
+@pytest.mark.parametrize("port", (58181, 58281, 64080, 64180))
+def test_opa_endpoint_accepts_only_the_two_closed_loopback_ranges(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    port: int,
+) -> None:
+    _root, runtime = _workspace_runtime(monkeypatch, tmp_path)
+    (runtime / opa_conformance.OPA_ENDPOINT_STATE).write_text(
+        f'{{"port": {port}}}\n',
+        encoding="utf-8",
+    )
+
+    assert opa_conformance._load_opa_host_port() == port
+
+
+@pytest.mark.parametrize("port", (58180, 58282, 60000, 64181, True, "64080"))
+def test_opa_endpoint_rejects_ports_outside_the_two_closed_loopback_ranges(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    port: object,
+) -> None:
+    _root, runtime = _workspace_runtime(monkeypatch, tmp_path)
+    (runtime / opa_conformance.OPA_ENDPOINT_STATE).write_text(
+        f'{json.dumps({"port": port})}\n',
+        encoding="utf-8",
+    )
+
+    assert opa_conformance._load_opa_host_port() is None
 
 
 def test_live_conformance_integration_uses_the_workspace_recorded_endpoint() -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from contextlib import asynccontextmanager
 from fastapi import (
@@ -33,6 +33,10 @@ from redagent_platform.api.workbench_fixtures import (
     _matches_fixture_successor_plan,
 )
 from redagent_platform.campaign_service.api import build_campaign_router
+from redagent_platform.campaign_service.application_contracts import AutonomousCampaignMode
+from redagent_platform.campaign_service.application_service import (
+    AutonomousCampaignApplicationService,
+)
 from redagent_platform.campaign_service.composition import CampaignApiRuntimeServices
 from redagent_platform.campaign_service.qualification import (
     CampaignQualificationService,
@@ -146,6 +150,14 @@ def create_app(
     r123_status_service: CampaignStatusService | None = None,
     r123_campaign_status_owner: CampaignStatusOwner | None = None,
     r123_service_factory: R123ApiServiceFactory | None = None,
+    autonomous_campaign_service_factory: (
+        Callable[
+            [object],
+            AutonomousCampaignApplicationService | Awaitable[AutonomousCampaignApplicationService],
+        ]
+        | None
+    ) = None,
+    autonomous_campaign_application_service: AutonomousCampaignApplicationService | None = None,
     r124_campaign_core_service: object | None = None,
     campaign_operations_owner: object | None = None,
     operator_shell_context: OperatorShellContextData | None = None,
@@ -163,6 +175,10 @@ def create_app(
         )
     ):
         raise ValueError("r123_api_runtime_services_ambiguous")
+    if autonomous_campaign_service_factory is not None and database_settings is None:
+        raise ValueError("autonomous_campaign_factory_requires_database")
+    if autonomous_campaign_service_factory is not None and autonomous_campaign_application_service is not None:
+        raise ValueError("autonomous_campaign_runtime_services_ambiguous")
     static_root = _static_root(static_directory)
     resolved_operator_shell_context = operator_shell_context or OperatorShellContextData()
 
@@ -214,6 +230,16 @@ def create_app(
                     application.state.r123_campaign_status_owner = services.campaign_status_owner
                     application.state.r124_campaign_core_service = services.campaign_core_service
                     application.state.campaign_operations_owner = services.campaign_operations_owner
+                if autonomous_campaign_service_factory is not None:
+                    application_service = autonomous_campaign_service_factory(application.state.session_factory)
+                    if inspect.isawaitable(application_service):
+                        application_service = await application_service
+                    if (
+                        not isinstance(application_service, AutonomousCampaignApplicationService)
+                        or application_service.mode is not AutonomousCampaignMode.PLAN_ONLY
+                    ):
+                        raise RuntimeError("autonomous_campaign_factory_result_invalid")
+                    application.state.autonomous_campaign_application_service = application_service
             yield
         finally:
             if r123_service_factory is not None:
@@ -225,6 +251,8 @@ def create_app(
                 )
                 application.state.r124_campaign_core_service = r124_campaign_core_service
                 application.state.campaign_operations_owner = campaign_operations_owner
+            if autonomous_campaign_service_factory is not None:
+                application.state.autonomous_campaign_application_service = autonomous_campaign_application_service
             application.state.session_factory = None
             if engine is not None:
                 await engine.dispose()
@@ -256,6 +284,7 @@ def create_app(
     )
     app.state.r124_campaign_core_service = r124_campaign_core_service
     app.state.campaign_operations_owner = campaign_operations_owner
+    app.state.autonomous_campaign_application_service = autonomous_campaign_application_service
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
