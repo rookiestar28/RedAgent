@@ -9,11 +9,11 @@ import pytest
 from redagent_platform.campaign_service.admission_start_contracts import (
     ADMISSION_START_BRIDGE_SCHEMA_VERSION,
     AutonomousCampaignStartBridgeWorkflowInputV1,
+    ClaimedAutonomousCampaignStartBridgeV1,
 )
 from redagent_platform.campaign_service.admission_start_relay_runtime import (
     AutonomousCampaignStartBridgeRelayPump,
 )
-from redagent_platform.campaign_service.repository import ClaimedWorkflowStart
 from redagent_platform.campaign_service.relay import WorkflowStartReceipt
 
 
@@ -49,15 +49,15 @@ class Repository:
     async def claim_admission_start_bridges(self, **values):
         assert values["claim_owner"] == "start-bridge-relay-a"
         return [
-            ClaimedWorkflowStart(
+            ClaimedAutonomousCampaignStartBridgeV1(
                 event_id=f"event-{self.tenant_id}",
-                # Shared carrier field holds the R173 start aggregate, not a campaign ID.
-                campaign_id=f"start-{self.tenant_id}",
+                start_id=f"start-{self.tenant_id}",
                 aggregate_sequence=1,
                 attempt_count=1,
                 claim_owner="start-bridge-relay-a",
                 claim_expires_at=NOW + timedelta(seconds=30),
                 payload=_payload(self.claim_tenant_id),
+                reconciliation_only=False,
             )
         ]
 

@@ -19,6 +19,7 @@ from redagent_platform.campaign_service.admission_repository import (
 from redagent_platform.campaign_service.admission_start_contracts import (
     ADMISSION_START_BRIDGE_EVENT_TYPE,
     AutonomousCampaignAdmissionStartState,
+    ClaimedAutonomousCampaignStartBridgeV1,
     admission_start_bridge_request_sha256,
     deterministic_admission_start_bridge_workflow_id,
 )
@@ -44,7 +45,6 @@ from redagent_platform.campaign_service.relay import (
     RelayFailure,
     apply_relay_failure,
 )
-from redagent_platform.campaign_service.repository import ClaimedWorkflowStart
 from redagent_platform.orchestration.admission_start_gateway import (
     workflow_input_from_admission_start_payload,
 )
@@ -93,7 +93,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
         now: datetime,
         lease_seconds: int,
         limit: int,
-    ) -> list[ClaimedWorkflowStart]:
+    ) -> list[ClaimedAutonomousCampaignStartBridgeV1]:
         await self._tenant_context()
         owner = _required("start_bridge_relay_claim_owner", claim_owner, 100)
         _aware(now)
@@ -118,6 +118,10 @@ class CampaignAdmissionStartBridgeRelayRepository:
                             outbox.c.delivery_state == "claimed",
                             outbox.c.claim_expires_at <= now,
                         ),
+                        and_(
+                            outbox.c.delivery_state == "reconciliation_required",
+                            outbox.c.reconciliation_state == "start_outcome_unknown",
+                        ),
                     ),
                 )
                 .order_by(outbox.c.aggregate_sequence, outbox.c.created_at, outbox.c.id)
@@ -126,13 +130,41 @@ class CampaignAdmissionStartBridgeRelayRepository:
             )
         ).mappings().all()
         expires_at = now + timedelta(seconds=lease_seconds)
-        claimed: list[ClaimedWorkflowStart] = []
+        claimed: list[ClaimedAutonomousCampaignStartBridgeV1] = []
         for row in rows:
-            bound = await self._bound_start(row, now=now)
-            if now >= min(
-                bound.start["expires_at"],
-                bound.admission_receipt.expires_at,
-                bound.reservation["lease_expires_at"],
+            reconciliation_only = row["delivery_state"] == "reconciliation_required"
+            bound = await self._bound_start(
+                row,
+                now=now,
+                expected_reconciliation=reconciliation_only,
+            )
+            if (
+                not reconciliation_only
+                and bound.application.lifecycle_state
+                is not AutonomousCampaignLifecycle.ADMITTED
+            ):
+                # CRITICAL: a legitimate terminal transition after admission is not a
+                # binding mismatch; close the proven pre-I/O intent and release once.
+                await self._fail_before_io(
+                    bound,
+                    reason_code=(
+                        f"admission_start_{bound.application.lifecycle_state.value.lower()}_before_io"
+                    ),
+                    occurred_at=now,
+                    expired=(
+                        bound.application.lifecycle_state
+                        is AutonomousCampaignLifecycle.EXPIRED
+                    ),
+                )
+                continue
+            if (
+                not reconciliation_only
+                and now
+                >= min(
+                    bound.start["expires_at"],
+                    bound.admission_receipt.expires_at,
+                    bound.reservation["lease_expires_at"],
+                )
             ):
                 await self._fail_before_io(
                     bound,
@@ -143,6 +175,17 @@ class CampaignAdmissionStartBridgeRelayRepository:
                 continue
             attempt_count = int(row["attempt_count"]) + 1
             if attempt_count > 10:
+                if reconciliation_only:
+                    await self._record_ambiguous_state(
+                        bound,
+                        target=AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,
+                        start_state=AutonomousCampaignAdmissionStartState.MANUAL_REVIEW_REQUIRED,
+                        reason_code="start_reconciliation_attempt_budget_exhausted",
+                        delivery_state=OutboxDeliveryState.RECONCILIATION_REQUIRED,
+                        reconciliation_state="manual_review_required",
+                        occurred_at=now,
+                    )
+                    continue
                 await self._fail_before_io(
                     bound,
                     reason_code="admission_start_attempt_budget_exhausted",
@@ -171,15 +214,15 @@ class CampaignAdmissionStartBridgeRelayRepository:
             ).mappings().one_or_none()
             if changed is not None:
                 claimed.append(
-                    ClaimedWorkflowStart(
+                    ClaimedAutonomousCampaignStartBridgeV1(
                         event_id=str(changed["id"]),
-                        # Shared carrier name is historical; the bridge binds its start aggregate here.
-                        campaign_id=str(changed["aggregate_id"]),
+                        start_id=str(changed["aggregate_id"]),
                         aggregate_sequence=int(changed["aggregate_sequence"]),
                         attempt_count=int(changed["attempt_count"]),
                         claim_owner=str(changed["claim_owner"]),
                         claim_expires_at=changed["claim_expires_at"],
                         payload=dict(changed["payload"]),
+                        reconciliation_only=reconciliation_only,
                     )
                 )
         return claimed
@@ -202,7 +245,15 @@ class CampaignAdmissionStartBridgeRelayRepository:
         await self._tenant_context()
         row = await self._claimed_outbox(event, owner, occurred_at)
         bound = await self._bound_start(row, now=occurred_at)
-        if occurred_at >= min(
+        reconciling = bound.start["start_state"] == "reconciliation_required"
+        if bound.application.lifecycle_state not in {
+            AutonomousCampaignLifecycle.ADMITTED,
+            AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED,
+        }:
+            raise AdmissionStartBridgeRelayConflict(
+                "start_bridge_relay_ack_lifecycle_conflict"
+            )
+        if not reconciling and occurred_at >= min(
             bound.start["expires_at"],
             bound.admission_receipt.expires_at,
             bound.reservation["lease_expires_at"],
@@ -226,7 +277,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
                 starts.c.tenant_id == self.tenant_id,
                 starts.c.id == bound.start["id"],
                 starts.c.version == bound.start["version"],
-                starts.c.start_state == "start_pending",
+                starts.c.start_state == bound.start["start_state"],
                 starts.c.workflow_run_id.is_(None),
             )
             .values(
@@ -239,6 +290,24 @@ class CampaignAdmissionStartBridgeRelayRepository:
         )
         if getattr(changed, "rowcount", None) != 1:
             raise AdmissionStartBridgeRelayConflict("start_bridge_relay_link_ack_conflict")
+        if reconciling:
+            runs = metadata.tables["campaign_execution_runs"]
+            changed_run = await self.session.execute(
+                update(runs)
+                .where(
+                    runs.c.tenant_id == self.tenant_id,
+                    runs.c.id == bound.execution_run["id"],
+                    runs.c.version == bound.execution_run["version"],
+                    runs.c.run_state == "reconciliation_required",
+                )
+                .values(
+                    run_state="start_pending",
+                    terminal_reason=None,
+                    version=runs.c.version + 1,
+                    updated_at=occurred_at,
+                )
+            )
+            _require_single_row(changed_run, "start_bridge_relay_run_ack_conflict")
         await self._deliver_outbox(
             bound.outbox,
             occurred_at=occurred_at,
@@ -284,6 +353,19 @@ class CampaignAdmissionStartBridgeRelayRepository:
                 "start_bridge_relay_claim_payload_mismatch"
             )
         bound = await self._bound_start(row, now=occurred_at)
+        if bound.application.lifecycle_state is not AutonomousCampaignLifecycle.ADMITTED:
+            await self._fail_before_io(
+                bound,
+                reason_code=(
+                    f"admission_start_{bound.application.lifecycle_state.value.lower()}_before_io"
+                ),
+                occurred_at=occurred_at,
+                expired=(
+                    bound.application.lifecycle_state
+                    is AutonomousCampaignLifecycle.EXPIRED
+                ),
+            )
+            return False
         if occurred_at >= min(
             bound.start["expires_at"],
             bound.admission_receipt.expires_at,
@@ -321,7 +403,40 @@ class CampaignAdmissionStartBridgeRelayRepository:
         await self._tenant_context()
         row = await self._claimed_outbox(event, owner, None)
         bound = await self._bound_start(row, now=occurred_at)
+        reconciling = (
+            bound.start["start_state"] == "reconciliation_required"
+        )
+        if failure is AutonomousCampaignStartBridgeFailure.ABSENT_CONFIRMED:
+            if not reconciling:
+                raise AdmissionStartBridgeRelayConflict(
+                    "start_bridge_relay_absence_without_reconciliation"
+                )
+            await self._fail_before_io(
+                bound,
+                reason_code="start_bridge_workflow_absent",
+                occurred_at=occurred_at,
+                expired=False,
+            )
+            return
         if failure is AutonomousCampaignStartBridgeFailure.UNKNOWN_START:
+            if reconciling:
+                if int(row["attempt_count"]) >= max_attempts:
+                    await self._record_ambiguous_state(
+                        bound,
+                        target=AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,
+                        start_state=AutonomousCampaignAdmissionStartState.MANUAL_REVIEW_REQUIRED,
+                        reason_code="start_reconciliation_attempt_budget_exhausted",
+                        delivery_state=OutboxDeliveryState.RECONCILIATION_REQUIRED,
+                        reconciliation_state="manual_review_required",
+                        occurred_at=occurred_at,
+                    )
+                else:
+                    await self._requeue_reconciliation(
+                        bound,
+                        reason_code=error,
+                        occurred_at=occurred_at,
+                    )
+                return
             await self._record_ambiguous_state(
                 bound,
                 target=AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED,
@@ -379,11 +494,42 @@ class CampaignAdmissionStartBridgeRelayRepository:
             expired=False,
         )
 
+    async def _requeue_reconciliation(
+        self,
+        bound: _BoundStart,
+        *,
+        reason_code: str,
+        occurred_at: datetime,
+    ) -> None:
+        outbox = metadata.tables["outbox_events"]
+        delay_seconds = min(300, 2 ** int(bound.outbox["attempt_count"]))
+        changed = await self.session.execute(
+            update(outbox)
+            .where(
+                outbox.c.tenant_id == self.tenant_id,
+                outbox.c.id == bound.outbox["id"],
+                outbox.c.version == bound.outbox["version"],
+                outbox.c.delivery_state == "claimed",
+            )
+            .values(
+                delivery_state="reconciliation_required",
+                reconciliation_state="start_outcome_unknown",
+                available_at=occurred_at + timedelta(seconds=delay_seconds),
+                claim_owner=None,
+                claim_expires_at=None,
+                last_error=reason_code[:100],
+                version=outbox.c.version + 1,
+                updated_at=occurred_at,
+            )
+        )
+        _require_single_row(changed, "start_bridge_reconciliation_retry_conflict")
+
     async def _bound_start(
         self,
         row: RowMapping,
         *,
         now: datetime,
+        expected_reconciliation: bool | None = None,
     ) -> _BoundStart:
         starts = metadata.tables["autonomous_campaign_execution_starts"]
         applications = metadata.tables["autonomous_campaign_applications"]
@@ -391,6 +537,24 @@ class CampaignAdmissionStartBridgeRelayRepository:
         approvals = metadata.tables["autonomous_campaign_plan_approval_receipts"]
         reservations = metadata.tables["campaign_budget_reservations"]
         runs = metadata.tables["campaign_execution_runs"]
+        expected_start_states = (
+            ("reconciliation_required",)
+            if expected_reconciliation is True
+            else (
+                ("start_pending",)
+                if expected_reconciliation is False
+                else ("start_pending", "reconciliation_required")
+            )
+        )
+        expected_run_states = (
+            ("reconciliation_required",)
+            if expected_reconciliation is True
+            else (
+                ("start_pending",)
+                if expected_reconciliation is False
+                else ("start_pending", "reconciliation_required")
+            )
+        )
         start = (
             await self.session.execute(
                 select(starts)
@@ -399,7 +563,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
                     starts.c.id == row["aggregate_id"],
                     starts.c.outbox_event_id == row["id"],
                     starts.c.outbox_event_type == ADMISSION_START_BRIDGE_EVENT_TYPE,
-                    starts.c.start_state == "start_pending",
+                    starts.c.start_state.in_(expected_start_states),
                     starts.c.workflow_run_id.is_(None),
                 )
                 .with_for_update()
@@ -413,8 +577,6 @@ class CampaignAdmissionStartBridgeRelayRepository:
                 .where(
                     applications.c.tenant_id == self.tenant_id,
                     applications.c.id == start["application_id"],
-                    applications.c.lifecycle_state == "ADMITTED",
-                    applications.c.aggregate_revision == start["admitted_revision"],
                 )
                 .with_for_update()
             )
@@ -463,7 +625,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
                     runs.c.admission_receipt_id == start["admission_receipt_id"],
                     runs.c.reservation_id == start["reservation_id"],
                     runs.c.input_sha256 == start["input_sha256"],
-                    runs.c.run_state == "start_pending",
+                    runs.c.run_state.in_(expected_run_states),
                     runs.c.workflow_run_id.is_(None),
                 )
                 .with_for_update()
@@ -477,6 +639,38 @@ class CampaignAdmissionStartBridgeRelayRepository:
             or execution_run is None
         ):
             raise AdmissionStartBridgeRelayConflict("start_bridge_relay_durable_binding_mismatch")
+        application = _state_from_row(application_row)
+        normal_application_states = {
+            AutonomousCampaignLifecycle.ADMITTED,
+            AutonomousCampaignLifecycle.DENIED,
+            AutonomousCampaignLifecycle.EXPIRED,
+            AutonomousCampaignLifecycle.REVOKED,
+            AutonomousCampaignLifecycle.FAILED_CONTAINED,
+        }
+        start_is_reconciliation = (
+            start["start_state"] == "reconciliation_required"
+        )
+        if start_is_reconciliation:
+            state_pair_valid = (
+                application.lifecycle_state
+                is AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED
+                and execution_run["run_state"] == "reconciliation_required"
+                and application.aggregate_revision
+                == int(start["admitted_revision"]) + 1
+            )
+        else:
+            expected_application_revision = int(start["admitted_revision"])
+            if application.lifecycle_state is not AutonomousCampaignLifecycle.ADMITTED:
+                expected_application_revision += 1
+            state_pair_valid = (
+                application.lifecycle_state in normal_application_states
+                and execution_run["run_state"] == "start_pending"
+                and application.aggregate_revision == expected_application_revision
+            )
+        if not state_pair_valid:
+            raise AdmissionStartBridgeRelayConflict(
+                "start_bridge_relay_lifecycle_binding_mismatch"
+            )
         receipt = _receipt_from_payload(receipt_row["receipt_payload"])
         approval = _verified_receipt_from_payload(
             approval_row["receipt_payload"], str(approval_row["receipt_sha256"])
@@ -517,7 +711,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
         return _BoundStart(
             outbox=row,
             start=start,
-            application=_state_from_row(application_row),
+            application=application,
             admission_receipt=receipt,
             approval_receipt=approval,
             reservation=reservation,
@@ -590,7 +784,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
                 runs.c.tenant_id == self.tenant_id,
                 runs.c.id == bound.execution_run["id"],
                 runs.c.version == bound.execution_run["version"],
-                runs.c.run_state == "start_pending",
+                runs.c.run_state == bound.execution_run["run_state"],
             )
             .values(
                 run_state=run_state,
@@ -649,7 +843,11 @@ class CampaignAdmissionStartBridgeRelayRepository:
             reservation_id=str(bound.start["reservation_id"]),
             target=target_reservation,
             effect_started=False,
-            reconciliation_code=None,
+            reconciliation_code=(
+                None
+                if target_reservation is CampaignReservationState.EXPIRED
+                else "not_started"
+            ),
             now=occurred_at,
         )
         starts = metadata.tables["autonomous_campaign_execution_starts"]
@@ -661,6 +859,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
                 starts.c.tenant_id == self.tenant_id,
                 starts.c.id == bound.start["id"],
                 starts.c.version == bound.start["version"],
+                starts.c.start_state == bound.start["start_state"],
             )
             .values(
                 start_state="failed_before_io",
@@ -676,7 +875,7 @@ class CampaignAdmissionStartBridgeRelayRepository:
                 runs.c.tenant_id == self.tenant_id,
                 runs.c.id == bound.execution_run["id"],
                 runs.c.version == bound.execution_run["version"],
-                runs.c.run_state == "start_pending",
+                runs.c.run_state == bound.execution_run["run_state"],
             )
             .values(
                 run_state="failed_before_io",
@@ -712,29 +911,33 @@ class CampaignAdmissionStartBridgeRelayRepository:
             dead_lettered_at=occurred_at,
             occurred_at=occurred_at,
         )
-        target = (
-            AutonomousCampaignLifecycle.EXPIRED
-            if expired
-            else AutonomousCampaignLifecycle.FAILED_CONTAINED
-        )
-        await _transition_application(
-            self.session,
-            current=bound.application,
-            target=target,
-            operation=_FAILURE_OPERATION,
-            event_type="autonomous_campaign.failed_before_io.v1",
-            actor_user_id=self.actor_user_id,
-            correlation_id=self.correlation_id,
-            request_sha256=str(bound.start["request_sha256"]),
-            policy_reference=bound.approval_receipt.policy_reference,
-            event_payload={
-                "start_id": str(bound.start["id"]),
-                "execution_run_id": str(bound.start["execution_run_id"]),
-                "reason_code": reason_code,
-                "reservation_state": target_reservation.value,
-            },
-            occurred_at=occurred_at,
-        )
+        if bound.application.lifecycle_state in {
+            AutonomousCampaignLifecycle.ADMITTED,
+            AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED,
+        }:
+            target = (
+                AutonomousCampaignLifecycle.EXPIRED
+                if expired
+                else AutonomousCampaignLifecycle.FAILED_CONTAINED
+            )
+            await _transition_application(
+                self.session,
+                current=bound.application,
+                target=target,
+                operation=_FAILURE_OPERATION,
+                event_type="autonomous_campaign.failed_before_io.v1",
+                actor_user_id=self.actor_user_id,
+                correlation_id=self.correlation_id,
+                request_sha256=str(bound.start["request_sha256"]),
+                policy_reference=bound.approval_receipt.policy_reference,
+                event_payload={
+                    "start_id": str(bound.start["id"]),
+                    "execution_run_id": str(bound.start["execution_run_id"]),
+                    "reason_code": reason_code,
+                    "reservation_state": target_reservation.value,
+                },
+                occurred_at=occurred_at,
+            )
 
     async def _deliver_outbox(
         self,
@@ -818,7 +1021,7 @@ class PostgresAutonomousCampaignStartBridgeRelayRepository:
         now: datetime,
         lease_seconds: int,
         limit: int,
-    ) -> list[ClaimedWorkflowStart]:
+    ) -> list[ClaimedAutonomousCampaignStartBridgeV1]:
         async with self._sessions() as session, session.begin():
             return await self._repository(session, "claim").claim_admission_start_bridges(
                 claim_owner=claim_owner,

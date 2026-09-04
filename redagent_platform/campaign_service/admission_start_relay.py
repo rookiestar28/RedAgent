@@ -7,17 +7,18 @@ from enum import Enum
 from typing import Protocol
 
 from redagent_platform.campaign_service.admission_start_contracts import (
+    ClaimedAutonomousCampaignStartBridgeV1,
     admission_start_bridge_request_sha256,
     deterministic_admission_start_bridge_workflow_id,
 )
 from redagent_platform.campaign_service.relay import (
     RelayDeliveryResult,
     WorkflowAlreadyStarted,
+    WorkflowNotFound,
     WorkflowStartGateway,
     WorkflowStartUnknown,
     WorkflowStartUnavailable,
 )
-from redagent_platform.campaign_service.repository import ClaimedWorkflowStart
 from redagent_platform.orchestration.admission_start_gateway import (
     workflow_input_from_admission_start_payload,
 )
@@ -27,6 +28,7 @@ class AutonomousCampaignStartBridgeFailure(str, Enum):
     TRANSIENT_BEFORE_IO = "transient_before_io"
     UNKNOWN_START = "unknown_start"
     BINDING_MISMATCH = "binding_mismatch"
+    ABSENT_CONFIRMED = "absent_confirmed"
 
 
 class AutonomousCampaignStartBridgeRelayRepository(Protocol):
@@ -77,11 +79,13 @@ class AutonomousCampaignStartBridgeRelay:
 
     async def deliver(
         self,
-        claim: ClaimedWorkflowStart,
+        claim: ClaimedAutonomousCampaignStartBridgeV1,
         *,
         now: datetime,
     ) -> RelayDeliveryResult:
         _aware(now)
+        if claim.reconciliation_only:
+            return await self._reconcile_unknown(claim, now=now)
         ready = await self._repository.confirm_admission_start_bridge_ready(
             event_id=claim.event_id,
             claim_owner=claim.claim_owner,
@@ -136,7 +140,7 @@ class AutonomousCampaignStartBridgeRelay:
 
     async def _reconcile_duplicate(
         self,
-        claim: ClaimedWorkflowStart,
+        claim: ClaimedAutonomousCampaignStartBridgeV1,
         *,
         workflow_id: str,
         request_sha256: str,
@@ -170,9 +174,58 @@ class AutonomousCampaignStartBridgeRelay:
         )
         return RelayDeliveryResult.DUPLICATE_CONFIRMED
 
+    async def _reconcile_unknown(
+        self,
+        claim: ClaimedAutonomousCampaignStartBridgeV1,
+        *,
+        now: datetime,
+    ) -> RelayDeliveryResult:
+        request = workflow_input_from_admission_start_payload(claim.payload)
+        workflow_id = deterministic_admission_start_bridge_workflow_id(
+            request.tenant_id,
+            request.execution_run_id,
+        )
+        request_sha256 = admission_start_bridge_request_sha256(request)
+        try:
+            existing = await self._gateway.query(workflow_id)
+        except WorkflowNotFound as exc:
+            await self._failure(
+                claim,
+                AutonomousCampaignStartBridgeFailure.ABSENT_CONFIRMED,
+                str(exc),
+                now,
+            )
+            return RelayDeliveryResult.ABSENCE_CONFIRMED
+        except Exception:  # noqa: BLE001
+            # CRITICAL: query-only recovery must never fall back to start; an unavailable
+            # lookup leaves the possibly-started identity charged and durably retryable.
+            await self._failure(
+                claim,
+                AutonomousCampaignStartBridgeFailure.UNKNOWN_START,
+                "reconciliation_query_unavailable",
+                now,
+            )
+            return RelayDeliveryResult.RECONCILIATION_REQUIRED
+        if existing.workflow_id != workflow_id or existing.request_sha256 != request_sha256:
+            await self._failure(
+                claim,
+                AutonomousCampaignStartBridgeFailure.BINDING_MISMATCH,
+                "reconciliation_binding_mismatch",
+                now,
+            )
+            return RelayDeliveryResult.MANUAL_REVIEW_REQUIRED
+        await self._repository.acknowledge_admission_start_bridge(
+            event_id=claim.event_id,
+            claim_owner=claim.claim_owner,
+            workflow_run_id=existing.workflow_run_id,
+            occurred_at=now,
+            duplicate_confirmed=True,
+        )
+        return RelayDeliveryResult.DUPLICATE_CONFIRMED
+
     async def _failure(
         self,
-        claim: ClaimedWorkflowStart,
+        claim: ClaimedAutonomousCampaignStartBridgeV1,
         failure: AutonomousCampaignStartBridgeFailure,
         last_error: str,
         now: datetime,

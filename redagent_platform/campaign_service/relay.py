@@ -32,6 +32,7 @@ class RelayDeliveryResult(str, Enum):
     RECONCILIATION_REQUIRED = "reconciliation_required"
     MANUAL_REVIEW_REQUIRED = "manual_review_required"
     AUTHORITY_DENIED = "authority_denied"
+    ABSENCE_CONFIRMED = "absence_confirmed"
 
 
 class WorkflowAlreadyStarted(RuntimeError):
@@ -44,6 +45,12 @@ class WorkflowStartUnavailable(RuntimeError):
 
 class WorkflowStartUnknown(RuntimeError):
     """The start RPC may have committed but no authoritative response was observed."""
+
+    pass
+
+
+class WorkflowNotFound(RuntimeError):
+    """The authoritative Workflow service proved the deterministic identity absent."""
 
     pass
 

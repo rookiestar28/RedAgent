@@ -59,7 +59,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-9bf47b59-4a4e1e4a-b9e5d073-304be803-1669388b-81055bed-a2bbd8e9-5f6b8830",
-      "line": 186,
+      "line": 193,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/relay.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -860,16 +860,25 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-c101e397-30a27dd7-0fcaaf48-5cebe193-0ce455da-214b3fb0-25758ad8-aea182cb",
-      "line": 147,
+      "line": 151,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/admission_start_relay.py",
       "rationale": "An unqueryable duplicate start bridge is durably charged for reconciliation so the relay cannot retry a potentially effectful start blindly."
     },
     {
+      "classification": "legitimate_cleanup",
+      "exception": "Exception",
+      "fingerprint": "ast-v1-037160d7-117712cb-c543f04a-347265f0-4863242b-4fc97f25-ba1652f4-fe5fff6d",
+      "line": 199,
+      "occurrence": 1,
+      "path": "redagent_platform/campaign_service/admission_start_relay.py",
+      "rationale": "An unavailable reconciliation-only query keeps the possibly started identity charged and durably retryable without falling back to a second start."
+    },
+    {
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-2e660ef5-3cc77760-bea855ff-8c2b47b7-b8723a9c-136d8444-26ac6d17-46dc68be",
-      "line": 61,
+      "line": 63,
       "occurrence": 1,
       "path": "redagent_platform/orchestration/admission_start_gateway.py",
       "rationale": "The Temporal start boundary translates client failures into the charged unknown-start result because a successful remote start cannot be disproved after an RPC exception."
@@ -878,7 +887,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-5bb86670-0b148f44-98fcbee2-94e2d24a-a6353a33-f4f00629-7618b22b-4d4276be",
-      "line": 79,
+      "line": 87,
       "occurrence": 1,
       "path": "redagent_platform/orchestration/admission_start_gateway.py",
       "rationale": "The Temporal query boundary translates client failures into an explicit unavailable result so duplicate-start reconciliation remains fail closed."

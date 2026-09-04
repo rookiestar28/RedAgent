@@ -6,12 +6,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from temporalio.service import RPCError, RPCStatusCode
 
 from redagent_platform.campaign_service.admission_start_contracts import (
     ADMISSION_START_BRIDGE_SCHEMA_VERSION,
     AutonomousCampaignStartBridgeSnapshotV1,
     AutonomousCampaignStartBridgeState,
     AutonomousCampaignStartBridgeWorkflowInputV1,
+    ClaimedAutonomousCampaignStartBridgeV1,
     admission_start_bridge_request_sha256,
     deterministic_admission_start_bridge_workflow_id,
 )
@@ -22,12 +24,12 @@ from redagent_platform.campaign_service.admission_start_relay import (
 from redagent_platform.campaign_service.relay import (
     RelayDeliveryResult,
     WorkflowAlreadyStarted,
+    WorkflowNotFound,
     WorkflowQueryReceipt,
     WorkflowStartReceipt,
     WorkflowStartUnknown,
     WorkflowStartUnavailable,
 )
-from redagent_platform.campaign_service.repository import ClaimedWorkflowStart
 from redagent_platform.orchestration.admission_start_gateway import (
     AutonomousCampaignStartBridgeTemporalGateway,
     workflow_input_from_admission_start_payload,
@@ -54,16 +56,21 @@ def _request() -> AutonomousCampaignStartBridgeWorkflowInputV1:
     )
 
 
-def _claim(request: AutonomousCampaignStartBridgeWorkflowInputV1 | None = None) -> ClaimedWorkflowStart:
+def _claim(
+    request: AutonomousCampaignStartBridgeWorkflowInputV1 | None = None,
+    *,
+    reconciliation_only: bool = False,
+) -> ClaimedAutonomousCampaignStartBridgeV1:
     selected = request or _request()
-    return ClaimedWorkflowStart(
+    return ClaimedAutonomousCampaignStartBridgeV1(
         event_id="outbox-r173-1",
-        campaign_id=selected.execution_run_id,
+        start_id="start-r173-1",
         aggregate_sequence=1,
         attempt_count=1,
         claim_owner="r173-relay-1",
         claim_expires_at=NOW + timedelta(seconds=30),
         payload=asdict(selected),
+        reconciliation_only=reconciliation_only,
     )
 
 
@@ -257,6 +264,77 @@ def test_start_bridge_unqueryable_duplicate_is_unknown_not_a_blind_retry() -> No
     )
 
 
+def test_unknown_reconciliation_queries_matching_identity_without_second_start() -> None:
+    repository = _Repository()
+    gateway = _Gateway()
+
+    outcome = asyncio.run(
+        AutonomousCampaignStartBridgeRelay(
+            repository=repository,
+            gateway=gateway,
+        ).deliver(_claim(reconciliation_only=True), now=NOW)
+    )
+
+    assert outcome is RelayDeliveryResult.DUPLICATE_CONFIRMED
+    assert gateway.starts == []
+    assert repository.preflights == []
+    assert repository.acknowledged[0]["workflow_run_id"] == "temporal-run-existing"
+    assert repository.acknowledged[0]["duplicate_confirmed"] is True
+
+
+def test_unknown_reconciliation_releases_only_authoritative_absence() -> None:
+    repository = _Repository()
+    gateway = _Gateway(query_failure=WorkflowNotFound("workflow_not_found"))
+
+    outcome = asyncio.run(
+        AutonomousCampaignStartBridgeRelay(
+            repository=repository,
+            gateway=gateway,
+        ).deliver(_claim(reconciliation_only=True), now=NOW)
+    )
+
+    assert outcome is RelayDeliveryResult.ABSENCE_CONFIRMED
+    assert gateway.starts == []
+    assert (
+        repository.failures[0]["failure"]
+        is AutonomousCampaignStartBridgeFailure.ABSENT_CONFIRMED
+    )
+
+
+def test_unknown_reconciliation_keeps_unavailable_or_mismatched_start_charged() -> None:
+    unavailable_repository = _Repository()
+    unavailable_gateway = _Gateway(
+        query_failure=WorkflowStartUnavailable("query_unavailable")
+    )
+    unavailable = asyncio.run(
+        AutonomousCampaignStartBridgeRelay(
+            repository=unavailable_repository,
+            gateway=unavailable_gateway,
+        ).deliver(_claim(reconciliation_only=True), now=NOW)
+    )
+    assert unavailable is RelayDeliveryResult.RECONCILIATION_REQUIRED
+    assert unavailable_gateway.starts == []
+    assert (
+        unavailable_repository.failures[0]["failure"]
+        is AutonomousCampaignStartBridgeFailure.UNKNOWN_START
+    )
+
+    mismatch_repository = _Repository()
+    mismatch_gateway = _Gateway(query_request_sha256="d" * 64)
+    mismatch = asyncio.run(
+        AutonomousCampaignStartBridgeRelay(
+            repository=mismatch_repository,
+            gateway=mismatch_gateway,
+        ).deliver(_claim(reconciliation_only=True), now=NOW)
+    )
+    assert mismatch is RelayDeliveryResult.MANUAL_REVIEW_REQUIRED
+    assert mismatch_gateway.starts == []
+    assert (
+        mismatch_repository.failures[0]["failure"]
+        is AutonomousCampaignStartBridgeFailure.BINDING_MISMATCH
+    )
+
+
 def test_temporal_handle_without_run_id_is_unknown_not_a_before_io_retry() -> None:
     class Client:
         async def start_workflow(self, *args, **kwargs):
@@ -279,6 +357,33 @@ def test_temporal_handle_without_run_id_is_unknown_not_a_before_io_retry() -> No
                 ),
                 request_sha256=admission_start_bridge_request_sha256(request),
                 payload=asdict(request),
+            )
+        )
+
+
+def test_start_bridge_gateway_classifies_only_exact_temporal_not_found_as_absent() -> None:
+    class Handle:
+        async def query(self, name: str):
+            assert name == "status"
+            raise RPCError("missing", RPCStatusCode.NOT_FOUND, b"")
+
+    class Client:
+        def get_workflow_handle(self, workflow_id: str):
+            assert workflow_id.startswith("redagent-autonomous-start-")
+            return Handle()
+
+    gateway = AutonomousCampaignStartBridgeTemporalGateway(
+        Client(),
+        task_queue="redagent-r173-test",
+    )
+    request = _request()
+    with pytest.raises(WorkflowNotFound, match="start_bridge_temporal_workflow_not_found"):
+        asyncio.run(
+            gateway.query(
+                deterministic_admission_start_bridge_workflow_id(
+                    request.tenant_id,
+                    request.execution_run_id,
+                )
             )
         )
 

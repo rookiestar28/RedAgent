@@ -52,6 +52,7 @@ __all__ = (
     "admission_start_bridge_request_sha256",
     "deterministic_admission_start_bridge_workflow_id",
     "AutonomousCampaignAdmissionStartState",
+    "ClaimedAutonomousCampaignStartBridgeV1",
     "AutonomousCampaignApprovalBundleV1",
     "AutonomousCampaignAdmissionContextV1",
     "AutonomousCampaignAdmissionContextProvider",
@@ -75,6 +76,39 @@ class AutonomousCampaignAdmissionStartState(str, Enum):
     RECONCILIATION_REQUIRED = "reconciliation_required"
     MANUAL_REVIEW_REQUIRED = "manual_review_required"
     FAILED_BEFORE_IO = "failed_before_io"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ClaimedAutonomousCampaignStartBridgeV1:
+    """Tenant-bound relay claim with an explicit query-only recovery mode."""
+
+    event_id: str
+    start_id: str
+    aggregate_sequence: int
+    attempt_count: int
+    claim_owner: str
+    claim_expires_at: datetime
+    payload: dict[str, object]
+    reconciliation_only: bool
+
+    def __post_init__(self) -> None:
+        _identifier("start_bridge_claim_event_id", self.event_id, 64)
+        _identifier("start_bridge_claim_start_id", self.start_id, 64)
+        _identifier("start_bridge_claim_owner", self.claim_owner, 100)
+        if type(self.aggregate_sequence) is not int or self.aggregate_sequence < 1:
+            raise ValueError("start_bridge_claim_sequence_invalid")
+        if type(self.attempt_count) is not int or not 1 <= self.attempt_count <= 10:
+            raise ValueError("start_bridge_claim_attempt_invalid")
+        if (
+            not isinstance(self.claim_expires_at, datetime)
+            or self.claim_expires_at.tzinfo is None
+            or self.claim_expires_at.utcoffset() is None
+        ):
+            raise ValueError("start_bridge_claim_expiry_timezone_required")
+        if not isinstance(self.payload, dict):
+            raise ValueError("start_bridge_claim_payload_invalid")
+        if type(self.reconciliation_only) is not bool:
+            raise ValueError("start_bridge_claim_reconciliation_mode_invalid")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

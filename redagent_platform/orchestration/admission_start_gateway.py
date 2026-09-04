@@ -6,6 +6,7 @@ from typing import Any
 
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
+from temporalio.service import RPCError, RPCStatusCode
 
 from redagent_platform.orchestration.admission_start_contracts import (
     ADMISSION_START_BRIDGE_SCHEMA_VERSION,
@@ -17,6 +18,7 @@ from redagent_platform.orchestration.admission_start_contracts import (
 )
 from redagent_platform.campaign_service.relay import (
     WorkflowAlreadyStarted,
+    WorkflowNotFound,
     WorkflowQueryReceipt,
     WorkflowStartReceipt,
     WorkflowStartUnknown,
@@ -76,6 +78,12 @@ class AutonomousCampaignStartBridgeTemporalGateway:
             raw_snapshot = await handle.query("status")
             snapshot = _snapshot_from_query(raw_snapshot)
             description = await handle.describe()
+        except RPCError as exc:
+            if exc.status is RPCStatusCode.NOT_FOUND:
+                # CRITICAL: only the SDK's exact NOT_FOUND status proves absence; all
+                # other query failures remain charged unknown outcomes.
+                raise WorkflowNotFound("start_bridge_temporal_workflow_not_found") from exc
+            raise WorkflowStartUnavailable("start_bridge_temporal_query_unavailable") from exc
         except Exception as exc:
             raise WorkflowStartUnavailable("start_bridge_temporal_query_unavailable") from exc
         return WorkflowQueryReceipt(

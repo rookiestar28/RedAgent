@@ -13,12 +13,14 @@ from redagent_platform.campaign_service.admission_start_relay import (
     AutonomousCampaignStartBridgeFailure,
     AutonomousCampaignStartBridgeRelay,
 )
+from redagent_platform.campaign_service.admission_start_contracts import (
+    ClaimedAutonomousCampaignStartBridgeV1,
+)
 from redagent_platform.campaign_service.admission_start_relay_store import (
     PostgresAutonomousCampaignStartBridgeRelayRepository,
 )
 from redagent_platform.campaign_service.relay import WorkflowStartGateway
 from redagent_platform.campaign_service.relay_runtime import RelayTenantSource
-from redagent_platform.campaign_service.repository import ClaimedWorkflowStart
 
 
 class ClaimingAutonomousCampaignStartBridgeRepository(Protocol):
@@ -29,7 +31,7 @@ class ClaimingAutonomousCampaignStartBridgeRepository(Protocol):
         now: datetime,
         lease_seconds: int,
         limit: int,
-    ) -> list[ClaimedWorkflowStart]: ...
+    ) -> list[ClaimedAutonomousCampaignStartBridgeV1]: ...
 
     async def confirm_admission_start_bridge_ready(
         self,
