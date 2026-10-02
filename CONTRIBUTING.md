@@ -1,6 +1,6 @@
 # Contributing
 
-Use the repository-local Python environment and Node.js 18 or newer. Before submitting a change, run:
+Use the repository-local Python environment and Node.js 20.9+ on 20.x, 22.x, or 24+. Before submitting a change, run:
 
 ```powershell
 powershell -File scripts/run_full_tests_windows.ps1

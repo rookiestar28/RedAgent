@@ -1684,7 +1684,7 @@ def test_node_preflight_is_bounded_and_fails_closed_on_timeout(
 
     monkeypatch.setattr(run_validation_gate.subprocess, "run", timed_out)
 
-    with pytest.raises(RuntimeError, match="Node.js 18\\+"):
+    with pytest.raises(RuntimeError, match="Node.js 20.9"):
         run_validation_gate._node_version()
 
     assert observed["command"] == ("node", "-v")

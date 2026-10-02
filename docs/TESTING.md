@@ -1,6 +1,6 @@
 # Public Validation Procedure
 
-Use the repository-local Python environment and Node.js 18 or newer. The Windows full gate is the canonical forced-G2 runner for a complete local acceptance pass:
+Use the repository-local Python environment and Node.js 20.9+ on 20.x, 22.x, or 24+. The Windows full gate is the canonical forced-G2 runner for a complete local acceptance pass:
 
 ```powershell
 powershell -File scripts/run_full_tests_windows.ps1

@@ -7,7 +7,7 @@ Roadmap owner: compat_092
 
 - Windows 10 22H2 or Windows 11 23H2+ with WSL 2.1.5+ and Docker Desktop using Linux containers, or a supported Linux/WSL environment with Docker Engine and Compose v2.
 - Minimum 8 GB host RAM; 16 GB recommended for this and later RedAgent services.
-- Python 3.11+, Node 18+, Docker 24+, Compose 2.20+.
+- Python 3.11+, Node 20.9+ on 20.x, 22.x, or 24+, Docker 24+, Compose 2.20+.
 - The compat_092 lock supports `linux/amd64` only. Other architectures fail before start until separately locked and tested.
 
 Official prerequisites: https://docs.docker.com/desktop/setup/install/windows-install/ and https://docs.docker.com/desktop/features/wsl/

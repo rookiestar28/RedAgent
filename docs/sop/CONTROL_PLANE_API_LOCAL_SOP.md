@@ -6,7 +6,7 @@ Safety boundary: local synthetic metadata only; no assessment target, scanner, r
 
 ## Preconditions
 
-- Use the repository-local `.venv` and Node 18+ where the full gate is required.
+- Use the repository-local `.venv` and Node 20.9+ on 20.x, 22.x, or 24+ where the full gate is required.
 - Docker Desktop must be available with the compat_092 digest-pinned PostgreSQL and Keycloak images.
 - The compat_093 server is intentionally loopback-only until compat_094 installs production OIDC/session enforcement. Do not proxy or expose it to another host.
 - The deterministic test issuer accepts synthetic headers only when the operator explicitly supplies `--enable-test-issuer`. It is disabled by default.

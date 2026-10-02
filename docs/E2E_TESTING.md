@@ -1,6 +1,6 @@
 # Frontend E2E Testing
 
-Run Playwright only after confirming Node.js 18 or newer and installing the locked frontend dependencies:
+Run Playwright only after confirming Node.js 20.9+ on 20.x, 22.x, or 24+ and installing the locked frontend dependencies:
 
 ```powershell
 node -v

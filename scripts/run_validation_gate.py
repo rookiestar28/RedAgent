@@ -501,14 +501,16 @@ def _node_version(
             timeout=timeout_seconds,
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise RuntimeError("Node.js 18+ is required; install it before G1/G2 validation") from exc
+        raise RuntimeError("Node.js 20.9+ on 20.x, 22.x or 24+ is required; install it before G1/G2 validation") from exc
     version = completed.stdout.strip()
-    try:
-        major = int(version.removeprefix("v").split(".", maxsplit=1)[0])
-    except ValueError as exc:
-        raise RuntimeError(f"cannot parse Node.js version: {version}") from exc
-    if major < 18:
-        raise RuntimeError(f"Node.js 18+ is required; found {version}")
+    match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", version)
+    if match is None:
+        raise RuntimeError(f"cannot parse Node.js version: {version}")
+    major, minor, _patch = (int(value) for value in match.groups())
+    # CRITICAL: patched Vitest engines exclude Node18/21/23; ESLint requires 20.9 on Node20.
+    # Match package engines before any install instead of accepting every newer major.
+    if not ((major == 20 and minor >= 9) or major == 22 or major >= 24):
+        raise RuntimeError(f"Node.js 20.9+ on 20.x, 22.x or 24+ is required; found {version}")
     return version
 
 

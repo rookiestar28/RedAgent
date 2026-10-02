@@ -22,7 +22,7 @@ Operators must:
 
 - read `CONTRIBUTING.md`;
 - read `docs/TESTING.md` and `docs/E2E_TESTING.md`;
-- use the project-local Python environment and Node 18+ test path;
+- use the project-local Python environment and Node 20.9+ on 20.x, 22.x, or 24+ test path;
 - keep Kali WSL2 as a separate lab node, not the primary project root;
 - run full-gate validation before accepted non-documentation work; and
 - record evidence under `.local/validation/` for accepted implementation work.

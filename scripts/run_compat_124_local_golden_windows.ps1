@@ -18,13 +18,12 @@ if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $databaseSecret -PathType Leaf)) {
     throw "r124_database_url_file_required"
 }
-$nodeVersion = (& node -v).Trim()
-if ($LASTEXITCODE -ne 0 -or $nodeVersion -notmatch '^v(?<major>\d+)\.') {
-    throw "r124_node_version_unavailable"
+# IMPORTANT: share the Full Gate policy; a local floor check admits incompatible Node lines.
+$nodeOutput = @(& $python -c "from scripts.run_validation_gate import _node_version; print(_node_version())")
+if ($LASTEXITCODE -ne 0 -or $nodeOutput.Count -ne 1) {
+    throw "r124_supported_node_runtime_required"
 }
-if ([int]$Matches.major -lt 18) {
-    throw "r124_node_18_or_newer_required"
-}
+$nodeVersion = $nodeOutput[0].Trim()
 
 $referenceRoot = Join-Path $workspace "reference"
 if (Test-Path -LiteralPath $referenceRoot) {

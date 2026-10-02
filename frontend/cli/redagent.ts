@@ -1,3 +1,4 @@
+// IMPORTANT: CLI config must include Node types explicitly; test globals do not define this runtime.
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
