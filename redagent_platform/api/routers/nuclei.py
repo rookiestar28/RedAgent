@@ -61,9 +61,7 @@ def _public_nuclei_profile(row: dict[str, object]) -> dict[str, object]:
         "request_rate_per_second", "concurrency_limit", "timeout_seconds",
         "response_bytes_limit", "result_limit", "profile_state",
     )} | {
-        "engine_version": "3.11.1",
-        "image_digest": "sha256:92781786bc926d2a809c1239953bdeabb31151492b87fd54a9f834835c8217ad",
-        "bundle_id": "r105-http-header-bundle", "bundle_revision": 2,
+        **{key: row[key] for key in ("engine_version", "image_digest", "bundle_id", "bundle_revision")},
         "risk_class": "low", "allowed_protocols": ["http"],
         "allowed_methods": ["GET"], "allowed_paths": ["/nuclei/missing-header"],
     }
@@ -93,17 +91,17 @@ def _public_nuclei_run(row: dict[str, object], plan_id: str) -> dict[str, object
 def _load_nuclei_bundle(now: datetime):
     workspace = Path(__file__).resolve().parents[3]
     return verify_current_nuclei_bundle_promotion(
-        manifest_bytes=(workspace / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
+        manifest_bytes=(workspace / "bundles/r105-nuclei/bundle-manifest-v3.json").read_bytes(),
         signature_bundle_bytes=(
-            workspace / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json"
+            workspace / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json"
         ).read_bytes(),
         public_key_bytes=(
-            workspace / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub"
+            workspace / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.pub"
         ).read_bytes(),
         template_bytes=(workspace / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml").read_bytes(),
         certificate_bytes=(workspace / "config/trust/r105-nuclei-user.crt").read_bytes(),
         qualification_bytes=(
-            workspace / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+            workspace / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
         ).read_bytes(),
         now=now,
     )
@@ -192,7 +190,9 @@ def register_nuclei_routes(app: APIRouter, dependencies: ApiDependencies) -> Non
                 promotions = metadata.tables["nuclei_bundle_promotions"]
                 promotion = (await session.execute(select(promotions.c.id).where(
                     promotions.c.tenant_id == guard.security.tenant_id,
-                    promotions.c.promotion_id == "r105-bundle-promotion-v2",
+                    promotions.c.promotion_id == f"r105-bundle-promotion-v{promoted.revision}",
+                    # CRITICAL: a stored label alone cannot substitute the current signed bundle.
+                    promotions.c.promotion_sha256 == promoted.bundle_sha256,
                     promotions.c.promotion_state == "active-local-lab",
                 ))).one_or_none()
                 if attestation is None:

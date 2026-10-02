@@ -1,0 +1,18 @@
+{
+  "artifact": "nuclei-engine",
+  "build_image_ids": [
+    "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
+    "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593"
+  ],
+  "compatibility_version": "20",
+  "context_sha256": "54fd974b2d553547f427440e42b167bb6005901f7726fb24fc24dc69d87948dd",
+  "image_id": "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
+  "local_tag": "redagent/r105-nuclei:3.11.1-r105.3",
+  "runtime_qualified": false,
+  "schema": "redagent.owned-artifact-build/v3",
+  "source_date_epoch": 1787529600,
+  "sources": {
+    "containers/r105-nuclei/Dockerfile-v3": "45ba4f8a72ed94f8652b30f35b820a870d2b21077291bc82eec0875262587631",
+    "containers/r105-nuclei/packages-v3.txt": "9b6ff2e8aac56f03b8567267ca2931e945a98fb6c4987b0af8c667a2e92f08fc"
+  }
+}

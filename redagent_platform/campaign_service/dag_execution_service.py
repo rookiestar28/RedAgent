@@ -43,7 +43,7 @@ from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _DAG_CAPABILITY_KEYS = frozenset(
-    {"zap-controlled-runtime@2", "nuclei-trusted-runtime@2"}
+    {"zap-controlled-runtime@3", "nuclei-trusted-runtime@3"}
 )
 
 

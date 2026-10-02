@@ -107,23 +107,23 @@ def closed_execution_registry() -> Mapping[str, ClosedExecutionBinding]:
         ),
         ClosedExecutionBinding(
             capability_id="nuclei-trusted-runtime",
-            capability_revision=2,
+            capability_revision=3,
             adapter_id="nuclei-service",
-            adapter_version="3.11.1-r105.2",
+            adapter_version="3.11.1-r105.3",
             profile_id="nuclei-http-header-v1",
             profile_revision=1,
             profile_sha256=canonical_nuclei_profile_sha256(nuclei_profile),
             bundle_id="r105-http-header-bundle",
-            bundle_revision=2,
+            bundle_revision=3,
             bundle_sha256=CURRENT_R105_HTTP_HEADER_BUNDLE_SHA256,
             approval_tier=1,
             requires_secret=False,
         ),
         ClosedExecutionBinding(
             capability_id="zap-controlled-runtime",
-            capability_revision=2,
+            capability_revision=3,
             adapter_id="zap-service",
-            adapter_version="2.17.0-r104.2",
+            adapter_version="2.17.0-r104.3",
             profile_id="zap-passive-v1",
             profile_revision=1,
             profile_sha256=canonical_zap_profile_sha256(zap_profile),
@@ -178,8 +178,8 @@ def evaluate_strategy_loop_readiness(
             )
     all_capability_ids = tuple(closed_execution_registry())
     expected_two = (
-        "nuclei-trusted-runtime@2",
-        "zap-controlled-runtime@2",
+        "nuclei-trusted-runtime@3",
+        "zap-controlled-runtime@3",
     )
     expected_three = ("artifact-posture@1", *expected_two)
     expected = expected_three if mode is StrategyLoopMode.THREE_CAPABILITY else expected_two

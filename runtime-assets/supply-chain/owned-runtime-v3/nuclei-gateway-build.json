@@ -1,0 +1,22 @@
+{
+  "artifact": "nuclei-gateway",
+  "build_image_ids": [
+    "sha256:bd7dbb9139b78e447968dc6a06b8c646c71936fe07b962da52b1c35503abdc8a",
+    "sha256:bd7dbb9139b78e447968dc6a06b8c646c71936fe07b962da52b1c35503abdc8a"
+  ],
+  "compatibility_version": "20",
+  "context_sha256": "38128d23a52917df299739a2d9504680c18e31353cfac756e0b0740cbb7adcd5",
+  "image_id": "sha256:bd7dbb9139b78e447968dc6a06b8c646c71936fe07b962da52b1c35503abdc8a",
+  "local_tag": "redagent/r105-gateway:1.0.2",
+  "runtime_qualified": false,
+  "schema": "redagent.owned-artifact-build/v3",
+  "source_date_epoch": 1787529600,
+  "sources": {
+    ".tmp/runtime-requalification-v3/packages/libcrypto3-3.5.9-r0.apk": "3f5825ced5fde1c66a5376a3f6076b3c08538ad52d9ef23f069857e212d9175a",
+    ".tmp/runtime-requalification-v3/packages/libssl3-3.5.9-r0.apk": "6801c740b9760b5b08da8db6367ebc18b2cc4dbaf371f7148429538b8bb04e23",
+    "config/owned-helper-dependencies-v3.json": "194b19647edd5cbfe18d156e37e480b1ea0b7f0021626d9473176f5af31b0dee",
+    "containers/r105-gateway/Dockerfile-v3": "ec9c0970c87ec4a9330a98ecf6c2be9abe75713c665d52b627fbc8571375ded3",
+    "containers/r105-gateway/gateway_server.py": "1554ba860102ce2e94736f52ca740396e989e28b32bd1ccd04794cfee50e8393",
+    "containers/r105-gateway/packages-v3.txt": "4f9454057fa247b9e74cae900d6b45ed7938248b98c3e22625e14c3c7da102aa"
+  }
+}

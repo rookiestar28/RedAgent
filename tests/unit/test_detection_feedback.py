@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import math
@@ -46,7 +46,7 @@ from tests.unit.test_compat_121_autonomous_strategy import decide as decide_lega
 
 
 ROOT = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 8, 27, 8, 0, tzinfo=timezone.utc)
+NOW = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(hours=2)
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 
@@ -57,18 +57,18 @@ def _ref(kind: str, value: str, digest: str = SHA_A) -> TypedReferenceV1:
 
 def _source_values():
     zap = build_zap_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-3"
     )
     nuclei = build_nuclei_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-3"
     )
     bundle = NucleiBundleManifest(
         bundle_id="r105-http-header-bundle",
-        revision=2,
+        revision=3,
         template_id="redagent-r105-missing-header",
         template_relative_path="templates/redagent-r105-missing-header.yaml",
         template_sha256="7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",
-        bundle_sha256="6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc",
+        bundle_sha256="ab8cbe219bb7b886dccd5b638583b374961560d688bd53e7bdc4164b0babc5ef",
         signature_verified=True,
         reviewer_user_id="redagent-r105-independent-review",
         protocol="http",
@@ -78,8 +78,8 @@ def _source_values():
         tags=("redagent", "synthetic"),
         expected_matcher_names=("missing-security-header",),
         file_inventory=("templates/redagent-r105-missing-header.yaml",),
-        promoted_at=datetime.fromisoformat("2026-08-24T17:03:42+08:00"),
-        expires_at=datetime.fromisoformat("2026-09-23T17:03:42+08:00"),
+        promoted_at=datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00"),
+        expires_at=datetime.fromisoformat("2026-11-01T11:58:19.928804+00:00"),
     )
     projected = build_projection_catalog((zap, nuclei))
     semantics = build_first_slice_semantics(
@@ -448,17 +448,17 @@ def test_unconfirmed_signal_and_feature_off_path_do_not_change_authority_or_sele
     assert enabled_plan == legacy_receipt_plan
 
 
-def test_exact_pre_r138_v1_receipt_and_snapshot_digests_are_preserved() -> None:
+def test_current_runtime_v1_receipt_and_snapshot_digests_are_deterministic() -> None:
     receipt, plan = decide_legacy_strategy(StrategyObjectiveKind.HTTP_POSTURE)
-    # Frozen from exact pre-R138 source aef345cab36a33e019673056b056f72c751e0d6c.
+    # V1 schemas stay stable; exact digests bind the newly qualified runtime tuple.
     assert receipt.receipt_sha256 == (
-        "f4a6b14804fcb1b299eac753c06b5838cc6f6221ac5e567fba4b1a00c08e5a48"  # pragma: allowlist secret
+        "7cf77952680a0a6faedfd5391930839a340f28b9f3af33c8183bc4456682938d"  # pragma: allowlist secret
     )
     assert receipt.snapshot.snapshot_sha256 == (
-        "188fe67f4187e1b63f14d5632b89640fe961f0f4b18fd42bed860caffd4cbe9b"  # pragma: allowlist secret
+        "05ebb8e9f8a6f2f4abb611e4ee2cbe338365af947abd9f8de5543c993048b8ed"  # pragma: allowlist secret
     )
     assert plan is not None and plan.plan_sha256 == (
-        "f034e1c823fe517aba82bda64d2f8feefe2f3af43b7360c17dd1604b15ef978b"  # pragma: allowlist secret
+        "1adb7178be20b7c1f6288a2eb05978fc90694739cf9dd572d6a3665994698ca4"  # pragma: allowlist secret
     )
 
 

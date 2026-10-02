@@ -262,7 +262,7 @@ class PostgresCampaignActivityStateOwner:
             await _validate_common_reconcile(session, common, command)
             action, effect = await _current_action_and_effect(session, common)
         capability_id = _required_text(action, "capability_id")
-        capability_revision = 2
+        capability_revision = binding_from_campaign_context(common.context_payload, capability_id).capability_revision
         binding = binding_from_campaign_context(common.context_payload, capability_id)
         node_id, effect_id, invocation_id, effect_record_id = _stable_effect_ids(
             common, capability_id
@@ -434,7 +434,7 @@ class PostgresCampaignActivityStateOwner:
                 intent = _effect_intent_payload(
                     common,
                     capability_id=capability_id,
-                    capability_revision=2,
+                    capability_revision=3,
                     node_id=node_id,
                     effect_id=effect_id,
                     invocation_id=invocation_id,
@@ -1181,7 +1181,7 @@ def _effect_capability_id(effect) -> str:
     if not isinstance(value, str) or "@" not in value:
         raise CampaignRecordConflict("campaign_effect_capability_invalid")
     capability_id, revision = value.rsplit("@", 1)
-    if revision != "2":
+    if revision != "3":
         raise CampaignRecordConflict("campaign_effect_capability_revision_invalid")
     return capability_id
 

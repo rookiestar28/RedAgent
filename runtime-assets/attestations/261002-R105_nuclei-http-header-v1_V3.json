@@ -1,0 +1,47 @@
+{
+  "bundle_sha256": "ab271a7b17cba2fd10e45a90703ad2ea010b415e8bddda77ae8272b14e3a06d9",
+  "cancel": {
+    "native_stop_acknowledged": true,
+    "sensitive_files_remaining": 0
+  },
+  "candidate_engine_image_id": "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
+  "candidate_runtime_lock_sha256": "09db574eb041844c2d9b6c514870d40fa51792fe0d01f82b2a516a7564ce5a15",
+  "cleanup": {
+    "cleanup_complete": true,
+    "container_count": 2,
+    "home_count": 0,
+    "key_count": 0,
+    "network_count": 2,
+    "residual_resource_count": 0,
+    "schema": "redagent.r105-cleanup/v1"
+  },
+  "cleanup_residual_resource_count": 0,
+  "contact_proof": "observed-internal-networks-and-closed-gateway",
+  "direct_target_route": false,
+  "engine_image_id": "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
+  "external_target_contacts": 0,
+  "finding": {
+    "affected_resource": "/nuclei/missing-header",
+    "fingerprint_sha256": "ea7a73090000839cdd2482aee7e50f62f0767cdb9392f5dfd8605dc1da0b6614",
+    "matcher_name": "missing-security-header",
+    "severity": "low",
+    "template_id": "redagent-r105-missing-header"
+  },
+  "forced_termination": false,
+  "gateway_quota_denied": true,
+  "native_stop_acknowledged": true,
+  "native_stop_attempted": true,
+  "network_isolation_verified": true,
+  "ok": true,
+  "owned_fixture_finding_count": 1,
+  "passed": true,
+  "payload_tamper_denied": true,
+  "plan_sha256": "cfbfa25e7090ca3387457fbb802a70eeb1f67f3916f6bb91213b02e36c99a8df",
+  "production_qualified": false,
+  "profile_id": "nuclei-http-header-v1",
+  "qualified_at": "2026-10-02T11:56:36.081778+00:00",
+  "qualifier_source_sha256": "ab188824fe8e78f7d7b1350b270aef97422fb7010c6814e2837e8d43dc0d5e75",
+  "runtime_lock_sha256": "09db574eb041844c2d9b6c514870d40fa51792fe0d01f82b2a516a7564ce5a15",
+  "schema": "redagent.r105-qualification/v1",
+  "unsigned_template_denied": true
+}

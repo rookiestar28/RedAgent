@@ -100,7 +100,7 @@ def _confirmed_primary():
         "effect_id": "effect-primary",
         "effect_state": "confirmed",
         "external_receipt_id": "execution-primary",
-        "effect_intent_payload": {"capability_id": "zap-controlled-runtime@2"},
+        "effect_intent_payload": {"capability_id": "zap-controlled-runtime@3"},
     }
 
 

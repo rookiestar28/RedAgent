@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -34,7 +34,7 @@ from redagent_platform.zap_service.provisioning import register_zap_capability
 
 
 ROOT = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 8, 24, 10, 0, tzinfo=timezone.utc)
+NOW = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(minutes=1)
 IMAGE = "sha256:3cd55809bfea0393bc67862eec614091faa873cfb219d28465122f04ae8d266b"
 
 
@@ -232,7 +232,7 @@ async def _bootstrap_job_and_runner(
         runner_class_record_id=runner_class_id, environment="local-conformance",
         network_plane="r104-owned-gateway", spiffe_id=f"spiffe://redagent.test/runner/{runner_id}",
         certificate_fingerprint="b" * 64, certificate_serial=f"serial-{suffix}",
-        adapter_allowlist=["zap-service:2.17.0-r104.2"], image_allowlist=[IMAGE],
+        adapter_allowlist=["zap-service:2.17.0-r104.3"], image_allowlist=[IMAGE],
         required_policy_revision="r099-v1", generation=1, attestation_sha256="c" * 64,
         registration_state="active", registered_at=NOW,
         expires_at=NOW + timedelta(minutes=10), revoked_at=None, last_seen_at=NOW, **owned,

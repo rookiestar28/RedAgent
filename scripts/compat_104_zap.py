@@ -28,13 +28,13 @@ from redagent_platform.zap_service.contracts import (
 from redagent_platform.zap_service.normalization import normalize_alerts
 
 
-LOCK_FILE = ROOT / "config" / "r104-zap-runtime-v2.json"
+LOCK_FILE = ROOT / "config" / "r104-zap-runtime-v3.json"
 RUNTIME = ROOT / ".local" / "redagent" / "r104-zap"
 TARGET_SOURCE = ROOT / "containers" / "r104-target" / "fixture_server.py"
 GATEWAY_SOURCE = ROOT / "containers" / "r104-gateway" / "gateway_server.py"
-TARGET_DOCKERFILE = ROOT / "containers" / "r104-target" / "Dockerfile"
-GATEWAY_DOCKERFILE = ROOT / "containers" / "r104-gateway" / "Dockerfile"
-ZAP_DOCKERFILE = ROOT / "containers" / "r104-zap" / "Dockerfile"
+TARGET_DOCKERFILE = ROOT / "containers" / "r104-target" / "Dockerfile-v3"
+GATEWAY_DOCKERFILE = ROOT / "containers" / "r104-gateway" / "Dockerfile-v3"
+ZAP_DOCKERFILE = ROOT / "containers" / "r104-zap" / "Dockerfile-v3"
 # CRITICAL: resolve the current public controller filename, not its retired private alias.
 # The old path fails source validation before any owned runtime can start.
 CONTROLLER = ROOT / "scripts" / "compat_104_zap_controller.py"
@@ -64,7 +64,7 @@ def lock() -> dict[str, object]:
         raise R104Error("r104_runtime_lock_invalid") from exc
     if not isinstance(value, dict):
         raise R104Error("r104_runtime_lock_invalid")
-    # IMPORTANT: keep the accepted controller surface while selecting only v2 authority.
+    # IMPORTANT: keep the accepted controller surface while selecting only current v3 authority.
     aliases = {
         "zap_local_tag": value.get("engine_local_tag"),
         "zap_runtime_image_id": value.get("engine_image_id"),
@@ -85,7 +85,7 @@ def validate() -> dict[str, object]:
         "zap_dockerfile_sha256": _sha(ZAP_DOCKERFILE),
         "controller_sha256": _sha(CONTROLLER),
     }
-    if value.get("schema") != "redagent.r104-runtime-lock/v2" or value.get("platform") != "linux/amd64":
+    if value.get("schema") != "redagent.r104-runtime-lock/v3" or value.get("platform") != "linux/amd64":
         raise R104Error("r104_runtime_lock_identity_invalid")
     if value.get("runtime_update_allowed") is not False or value.get("external_target_allowed") is not False:
         raise R104Error("r104_runtime_lock_safety_invalid")
@@ -128,17 +128,14 @@ def pull() -> dict[str, object]:
 def build() -> dict[str, object]:
     validate()
     value = lock()
-    result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/compat_104_requalify.py"), "build",
-         "--confirm-r104-local-lab"],
-        cwd=ROOT, text=True, capture_output=True, timeout=3600, check=False,
-    )
-    if result.returncode:
-        raise R104Error("r104_revision_two_build_failed")
+    # CRITICAL: startup never rebuilds from mutable package repositories.
+    # Activate only the frozen public six-artifact tuple after all static checks.
+    from scripts.owned_runtime_requalification import activate
+    activate()
     built = {
         "zap": docker("image", "inspect", str(value["zap_local_tag"]), "--format", "{{.Id}}").stdout.strip(),
         "target": docker("image", "inspect", str(value["target_local_tag"]), "--format", "{{.Id}}").stdout.strip(),
-        "gateway": docker("image", "inspect", str(value["gateway_local_tag"]), "--format", "{{.Id}}").stdout.strip(),
+        "gateway": docker("image", "inspect", str(value["gateway_image_id"]), "--format", "{{.Id}}").stdout.strip(),
     }
     for kind, observed in built.items():
         expected = value["zap_runtime_image_id"] if kind == "zap" else value[f"{kind}_image_id"]
@@ -152,6 +149,14 @@ def build() -> dict[str, object]:
     return {"ok": True, "action": "build", "images": built}
 
 
+def _assert_current_images(value: dict[str, object]) -> None:
+    for kind in ("engine", "target", "gateway"):
+        actual = docker("image", "inspect", str(value[f"{kind}_local_tag"]),
+                        "--format", "{{.Id}}").stdout.strip()
+        if actual != value[f"{kind}_image_id"]:
+            raise R104Error("r104_owned_image_identity_mismatch")
+
+
 def start() -> dict[str, object]:
     validate()
     value = lock()
@@ -159,6 +164,7 @@ def start() -> dict[str, object]:
         if docker("image", "inspect", tag, check=False).returncode:
             build()
             break
+    _assert_current_images(value)
     _ensure_network(ZAP_NET)
     _ensure_network(TARGET_NET)
     RUNTIME.mkdir(parents=True, exist_ok=True)
@@ -173,7 +179,7 @@ def start() -> dict[str, object]:
             "--memory", "128m", "--cpus", "0.5", "--user", "65532:65532",
             "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=1m",
             "--mount", f"type=bind,src={auth_file.resolve()},dst=/run/redagent/r104-auth,readonly",
-            str(value["target_local_tag"]),
+            str(value["target_image_id"]),
         )
         docker("start", TARGET)
     _wait_target()
@@ -242,7 +248,9 @@ def compile_profile(profile_id: CertifiedProfileId) -> dict[str, object]:
 def run(profile_id: CertifiedProfileId) -> dict[str, object]:
     compiled = compile_profile(profile_id)
     value = lock()
-    reference = str(value["zap_digest_reference"])
+    # CRITICAL: launch immutable IDs after tag validation; a concurrent retag must
+    # never select another engine or helper between inspect and container creation.
+    reference = str(value["zap_runtime_image_id"])
     if docker("image", "inspect", reference, check=False).returncode:
         raise R104Error("r104_zap_image_missing_run_build_first")
     observed_image_id = docker("image", "inspect", reference, "--format", "{{.Id}}").stdout.strip()
@@ -325,9 +333,28 @@ def cancel() -> dict[str, object]:
     return {"ok": True, "action": "cancel", **receipt}
 
 
+def _qualification_boundary() -> dict[str, object]:
+    observed = status()
+    value = lock()
+    expected = {ZAP: value["engine_image_id"], GATEWAY: value["gateway_image_id"],
+                TARGET: value["target_image_id"]}
+    # CRITICAL: compile-time topology can precede the worker. Observe the running tuple
+    # before accepting zero external contact; absent workers or non-internal routes deny.
+    if (observed["no_direct_zap_target_route"] is not True
+            or any(not item.get("running") or item.get("published_ports")
+                   for item in observed["resources"].values())
+            or any(not item.get("exists") or not item.get("internal")
+                   for item in observed["networks"].values())
+            or any(observed["resources"][name].get("image_id") != image
+                   for name, image in expected.items())):
+        raise R104Error("r104_qualification_isolation_invalid")
+    return observed
+
+
 def qualify(profile_id: CertifiedProfileId) -> dict[str, object]:
     executed = run(profile_id)
     try:
+        boundary = _qualification_boundary()
         deadline = time.monotonic() + certified_profiles()[profile_id].timeout_seconds
         latest: dict[str, object] = {}
         while time.monotonic() < deadline:
@@ -360,6 +387,9 @@ def qualify(profile_id: CertifiedProfileId) -> dict[str, object]:
             "alert_receipt": json.loads(alerts.stdout), "normalized_alert_count": len(normalized),
             "discarded_uncertified_alert_count": len(raw_alerts) - len(selected),
             "external_target_contacts": 0,
+            "network_isolation_verified": True,
+            "contact_proof": "observed-internal-networks-and-closed-gateway",
+            "topology": boundary,
         }
         _write_json(RUNTIME / f"qualification-{profile_id.value}.json", receipt)
     except BaseException:
@@ -418,7 +448,7 @@ def _start_gateway(profile_id: CertifiedProfileId) -> None:
         "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=1m",
         "--mount", f"type=bind,src={policy_path.resolve()},dst=/run/redagent/gateway-policy.json,readonly",
         "--mount", f"type=bind,src={(RUNTIME / 'r104-auth').resolve()},dst=/run/redagent/r104-auth,readonly",
-        str(value["gateway_local_tag"]),
+        str(value["gateway_image_id"]),
     )
     docker("network", "connect", "--alias", GATEWAY, TARGET_NET, GATEWAY)
     docker("start", GATEWAY)
@@ -473,6 +503,7 @@ def _inspect(name: str) -> dict[str, object]:
     if value.get("Config", {}).get("Labels", {}).get("redagent.owner") != "r104":
         raise R104Error("r104_resource_ownership_mismatch")
     return {"exists": True, "running": bool(value.get("State", {}).get("Running")),
+            "image_id": value.get("Image"),
             "networks": sorted(value.get("NetworkSettings", {}).get("Networks", {})),
             "published_ports": bool(value.get("HostConfig", {}).get("PortBindings"))}
 

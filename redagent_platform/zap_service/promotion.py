@@ -11,6 +11,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
+from redagent_platform.zap_service.authority import CURRENT_ZAP_PUBLIC_KEY_SHA256
+from redagent_platform.runner_service.runtime_qualification import verify_owned_profile_qualification
 from redagent_platform.runner_service.contracts import ArtifactVerificationReceipt
 from redagent_platform.zap_service.contracts import (
     CURRENT_ZAP_CRITICAL_REPORT_SHA256,
@@ -36,7 +38,9 @@ def verify_current_zap_promotion(
     qualification_bytes: bytes,
     now: datetime,
 ) -> tuple[ArtifactVerificationReceipt, str]:
-    """Verify only the additive compat_104 revision-2 authority and its source receipts."""
+    """Verify only the additive compat_104 revision-3 authority and its source receipts."""
+    if hashlib.sha256(public_key_bytes).hexdigest() != CURRENT_ZAP_PUBLIC_KEY_SHA256:
+        raise ZapPromotionError("zap_promotion_anchor_invalid")
     promotion = _verified_zap_document(
         document_bytes=promotion_bytes,
         bundle_bytes=bundle_bytes,
@@ -73,12 +77,12 @@ def verify_current_zap_promotion(
         "gateway_dockerfile_sha256": lock.get("gateway_dockerfile_sha256"),
     }
     if (
-        promotion.get("schema") != "redagent.r104-artifact-promotion/v2"
+        promotion.get("schema") != "redagent.r104-artifact-promotion/v3"
         or promotion.get("production_qualified") is not False
         or promotion.get("runtime_lock", {}).get("sha256") != lock_sha256
         or promotion.get("runtime_lock", {}).get("path")
-        != "config/r104-zap-runtime-v2.json"
-        or lock.get("schema") != "redagent.r104-runtime-lock/v2"
+        != "config/r104-zap-runtime-v3.json"
+        or lock.get("schema") != "redagent.r104-runtime-lock/v3"
         or lock.get("engine_image_id")
         != CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"]
         or lock.get("sbom_sha256") != CURRENT_ZAP_SBOM_SHA256
@@ -100,7 +104,7 @@ def verify_current_zap_promotion(
         or review.get("result") != "accepted_no_critical"
         or qualification.get("receipt_sha256") != qualification_sha256
         or qualification_receipt.get("schema")
-        != "redagent.r104-runtime-qualification/v2"
+        != "redagent.r104-runtime-qualification/v3"
         or qualification_receipt.get("runtime_lock_sha256") != lock_sha256
         or qualification_receipt.get("engine_image_id") != lock.get("engine_image_id")
         or qualification_receipt.get("all_profiles_passed") is not True
@@ -120,16 +124,20 @@ def verify_current_zap_promotion(
         or expires_at > created_at + timedelta(days=30)
     ):
         raise ZapPromotionError("zap_current_promotion_expired")
+    try:
+        verify_owned_profile_qualification(qualification_receipt, profiles=frozenset(expected_profiles), issued_at=created_at)
+    except ValueError as exc:
+        raise ZapPromotionError("zap_current_qualification_invalid") from exc
     digest = hashlib.sha256(promotion_bytes).hexdigest()
     return ArtifactVerificationReceipt(
-        receipt_id="artifact-r104-zap-2170-r104-2",
+        receipt_id="artifact-r104-zap-2170-r104-3",
         image_digest=artifact["image_digest"],
         signature_verified=True,
-        signer_identity="redagent-r104-local-promotion-key-v2",
+        signer_identity="redagent-r104-local-promotion-key-v3",
         provenance_sha256=digest,
         sbom_sha256=CURRENT_ZAP_SBOM_SHA256,
         vulnerability_review="accepted_no_critical",
-        verifier="redagent-r104-promotion-v2",
+        verifier="redagent-r104-promotion-v3",
         verified_at=created_at,
         expires_at=expires_at,
     ), hashlib.sha256(bundle_bytes).hexdigest()

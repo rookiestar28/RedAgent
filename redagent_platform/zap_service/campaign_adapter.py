@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 import json
 from typing import Protocol
@@ -17,11 +17,16 @@ from redagent_platform.runner_service.campaign_result import (
     AdapterResultMaterialV1,
     AdapterResultWriter,
     NormalizedAdapterFindingV1,
+    report_safe_payload_matches,
 )
 from redagent_platform.zap_service.contracts import (
     ZAP_ADDON_INVENTORY_COUNT,
     ZAP_ADDON_INVENTORY_SHA256,
 )
+
+
+# CRITICAL: fixed silent mode prevents unsolicited update/news requests.
+ZAP_FIXED_ARGV = ("/zap/zap.sh", "-cmd", "-silent", "-autorun", "/run/redagent/r123-zap-passive.yaml")
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +68,7 @@ class ZapCampaignTransport(Protocol):
 
 class ZapCampaignAdapter:
     adapter_id = "zap-service"
-    adapter_version = "2.17.0-r104.2"
+    adapter_version = "2.17.0-r104.3"
 
     def __init__(self, transport: ZapCampaignTransport, result_writer: AdapterResultWriter) -> None:
         self._transport = transport
@@ -76,12 +81,7 @@ class ZapCampaignAdapter:
             effect_id=request.effect_id,
             profile_id="zap-passive-v1",
             allowed_paths=("/passive/missing-header",),
-            argv=(
-                "/zap/zap.sh",
-                "-cmd",
-                "-autorun",
-                "/run/redagent/r123-zap-passive.yaml",
-            ),
+            argv=ZAP_FIXED_ARGV,
             envelope_sha256=request.envelope_sha256,
             manifest_v2_sha256=request.manifest_v2_sha256,
         )
@@ -143,7 +143,7 @@ class ZapCampaignAdapter:
 
 
 def _validate_request(request: CampaignAdapterRequest) -> None:
-    expected = closed_execution_registry()["zap-controlled-runtime@2"]
+    expected = closed_execution_registry()["zap-controlled-runtime@3"]
     if request.capability_key != expected.capability_key:
         raise ValueError("r123_zap_capability_mismatch")
     if (request.adapter_id, request.adapter_version) != (
@@ -204,13 +204,8 @@ def _validate_runtime(
             isinstance(item, NormalizedAdapterFindingV1)
             for item in receipt.normalized_findings
         )
-        or receipt.report_safe_payload
-        != {
-            "schema": "redagent.r123-result/v1",
-            "adapter_id": "zap-service",
-            "output_complete": True,
-            "findings": [asdict(item) for item in receipt.normalized_findings],
-        }
+        or not report_safe_payload_matches(receipt.report_safe_payload,
+            adapter_id="zap-service", findings=receipt.normalized_findings)
     ):
         # CRITICAL: evidence bytes and imported findings must describe the same result.
         raise ValueError("r123_zap_report_safe_payload_invalid")

@@ -38,7 +38,7 @@ def test_r100_capability_manifest_projects_closed_r104_runtime() -> None:
     )
     assert manifest.capability_id == "zap-controlled-runtime"
     assert manifest.adapter_id == "zap-service"
-    assert manifest.adapter_version == "2.17.0-r104.2"
+    assert manifest.adapter_version == "2.17.0-r104.3"
     assert manifest.network_mode is NetworkMode.TARGET_ALLOWLIST
     assert manifest.credential_class is CredentialClass.HTTP_HEADER
     assert set(manifest.supported_modes) == {profile.value for profile in CertifiedProfileId}

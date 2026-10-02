@@ -1,0 +1,10 @@
+{
+  "mediaType": "application/vnd.dev.sigstore.bundle.v0.3+json",
+  "messageSignature": {
+    "messageDigest": {
+      "algorithm": "SHA2_256",
+      "digest": "oAtaAUReyZhi2lBtivtEusQ43Ql5hDc+ccxSnJuOphs="
+    },
+    "signature": "MEQCIAGX+6FFYrfS4W8XBHHaC4g0OqRUwXb6KWzC7KlInQhYAiAwttigPiNDQSJS3xsgeDJADUgRP6tZ3eepd6HsRPo2RA=="
+  }
+}

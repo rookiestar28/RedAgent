@@ -94,9 +94,9 @@ async def _scenario() -> None:
     ))
     unique = uuid4().hex[:12]
 
-    zap = await dispatcher.dispatch(_request("zap-controlled-runtime@2", suffix=f"zap-{unique}"))
+    zap = await dispatcher.dispatch(_request("zap-controlled-runtime@3", suffix=f"zap-{unique}"))
     nuclei = await dispatcher.dispatch(
-        _request("nuclei-trusted-runtime@2", suffix=f"nuclei-{unique}")
+        _request("nuclei-trusted-runtime@3", suffix=f"nuclei-{unique}")
     )
 
     assert zap.state == nuclei.state == "confirmed"

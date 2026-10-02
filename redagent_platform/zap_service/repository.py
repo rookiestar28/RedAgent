@@ -204,7 +204,7 @@ class ZapRepository:
             registrations.c.registration_state == "active",
             registrations.c.expires_at > occurred_at,
         ).order_by(registrations.c.generation.desc()).limit(1))).mappings().one_or_none()
-        if runner is None or "zap-service:2.17.0-r104.2" not in runner["adapter_allowlist"]:
+        if runner is None or "zap-service:2.17.0-r104.3" not in runner["adapter_allowlist"]:
             raise ZapRepositoryConflict("zap_runner_registration_required")
         table = metadata.tables["zap_runs"]
         identity = {
@@ -487,7 +487,7 @@ class ZapRepository:
         # CRITICAL: project only runners already bound to the pinned ZAP adapter; UI visibility grants no authority.
         compatible_runners = [
             dict(row) for row in registrations
-            if "zap-service:2.17.0-r104.2" in row["adapter_allowlist"]
+            if "zap-service:2.17.0-r104.3" in row["adapter_allowlist"]
         ]
         return {"profiles": [dict(row) for row in profiles], "plans": [dict(row) for row in plans],
                 "runs": [dict(row) for row in runs], "cleanups": [dict(row) for row in cleanups],

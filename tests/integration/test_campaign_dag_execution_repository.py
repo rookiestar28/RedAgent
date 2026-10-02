@@ -137,8 +137,8 @@ class _LifecycleOwner:
     def __init__(self, lifecycle: CampaignAuthorityLifecycleV2) -> None:
         self.lifecycle = lifecycle
 
-    async def read_current_lifecycle(self, *, tenant_id, authority_sha256):
-        del tenant_id, authority_sha256
+    async def read_current_lifecycle(self, *, tenant_id, authority_sha256, now):
+        del tenant_id, authority_sha256, now
         return self.lifecycle
 
 
@@ -953,7 +953,7 @@ def _authority_snapshot(
 def _planning_inputs(
     *, tenant: str, engagement: str, include_finding_observation: bool = False
 ):
-    binding = closed_execution_registry()["zap-controlled-runtime@2"]
+    binding = closed_execution_registry()["zap-controlled-runtime@3"]
     capability = CapabilityIdentityV1(
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
@@ -1164,7 +1164,7 @@ async def _install_binding_context(
 ) -> None:
     bindings: list[dict[str, object]] = []
     for index, registry_key in enumerate(
-        ("zap-controlled-runtime@2", "nuclei-trusted-runtime@2"), start=1
+        ("zap-controlled-runtime@3", "nuclei-trusted-runtime@3"), start=1
     ):
         closed = closed_execution_registry()[registry_key]
         binding = CapabilityBindingKeyV1(

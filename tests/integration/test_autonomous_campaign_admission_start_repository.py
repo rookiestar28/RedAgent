@@ -405,7 +405,7 @@ def _load_migration() -> ModuleType:
     return module
 
 
-async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, capability_key="zap-controlled-runtime@2", capability_manifest_sha256="1" * 64, now=NOW, validity_seconds=60, policy_revision="policy-a") -> _Prepared:
+async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, capability_key="zap-controlled-runtime@3", capability_manifest_sha256="1" * 64, now=NOW, validity_seconds=60, policy_revision="policy-a") -> _Prepared:
     NOW = now
     engine, sessions = _database()
     suffix = uuid4().hex
@@ -487,6 +487,9 @@ async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, c
         engagement_id=engagement,
         target_ids=(target,),
         capability_ids=(binding.capability_id,),
+        # Fixture authority lifetime and its signed duration bound must agree before
+        # construction; each owned operator retains the separate fixed 60-second limit.
+        bounds=replace(authority().bounds, max_duration_seconds=max(60, validity_seconds)),
         valid_from=NOW,
         expires_at=NOW + timedelta(seconds=validity_seconds),
         policy_revision=policy_revision,

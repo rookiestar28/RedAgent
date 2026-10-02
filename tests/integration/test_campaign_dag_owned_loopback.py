@@ -339,7 +339,7 @@ def _closed_dispatcher(
 
 
 def _binding() -> CapabilityBindingKeyV1:
-    closed = closed_execution_registry()["zap-controlled-runtime@2"]
+    closed = closed_execution_registry()["zap-controlled-runtime@3"]
     return CapabilityBindingKeyV1(
         schema_version="redagent.r119-capability-binding/v1",
         capability_id=closed.capability_id,

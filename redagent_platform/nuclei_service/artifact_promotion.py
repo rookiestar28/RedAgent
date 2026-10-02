@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import json
 
@@ -11,6 +11,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 
+from redagent_platform.nuclei_service.authority import CURRENT_NUCLEI_ARTIFACT_PUBLIC_KEY_SHA256
+from redagent_platform.runner_service.runtime_qualification import verify_owned_profile_qualification
 from redagent_platform.nuclei_service.contracts import (
     CURRENT_NUCLEI_CRITICAL_REPORT_SHA256,
     CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM,
@@ -37,6 +39,8 @@ def verify_current_nuclei_artifact_promotion(
     qualification_bytes: bytes,
     now: datetime,
 ) -> tuple[ArtifactVerificationReceipt, str]:
+    if hashlib.sha256(public_key_bytes).hexdigest() != CURRENT_NUCLEI_ARTIFACT_PUBLIC_KEY_SHA256:
+        raise NucleiArtifactPromotionError("nuclei_artifact_anchor_invalid")
     if now.tzinfo is None or now.utcoffset() is None:
         raise NucleiArtifactPromotionError("nuclei_artifact_time_invalid")
     digest = hashlib.sha256(promotion_bytes).digest()
@@ -84,12 +88,12 @@ def verify_current_nuclei_artifact_promotion(
         "gateway_dockerfile_sha256": lock.get("gateway_dockerfile_sha256"),
     }
     if (
-        promotion.get("schema") != "redagent.r105-artifact-promotion/v2"
+        promotion.get("schema") != "redagent.r105-artifact-promotion/v3"
         or promotion.get("production_qualified") is not False
         or promotion.get("runtime_lock", {}).get("sha256") != lock_sha256
         or promotion.get("runtime_lock", {}).get("path")
-        != "config/r105-nuclei-runtime-v2.json"
-        or lock.get("schema") != "redagent.r105-runtime-lock/v2"
+        != "config/r105-nuclei-runtime-v3.json"
+        or lock.get("schema") != "redagent.r105-runtime-lock/v3"
         or lock.get("nuclei_version") != CURRENT_NUCLEI_VERSION
         or lock.get("engine_image_id")
         != CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"]
@@ -112,7 +116,7 @@ def verify_current_nuclei_artifact_promotion(
         or review.get("upstream_direct_execution_rejected") is not True
         or qualification.get("receipt_sha256") != qualification_sha256
         or qualification_receipt.get("schema")
-        != "redagent.r105-runtime-qualification/v2"
+        != "redagent.r105-runtime-qualification/v3"
         or qualification_receipt.get("runtime_lock_sha256") != lock_sha256
         or qualification_receipt.get("engine_image_id") != lock.get("engine_image_id")
         or qualification_receipt.get("signed_bundle_verified") is not True
@@ -131,17 +135,22 @@ def verify_current_nuclei_artifact_promotion(
         created_at.tzinfo is None
         or expires_at.tzinfo is None
         or not created_at <= now < expires_at
+        or expires_at > created_at + timedelta(days=30)
     ):
         raise NucleiArtifactPromotionError("nuclei_current_artifact_expired")
+    try:
+        verify_owned_profile_qualification(qualification_receipt, profiles=frozenset({"nuclei-http-header-v1"}), issued_at=created_at)
+    except ValueError as exc:
+        raise NucleiArtifactPromotionError("nuclei_current_qualification_invalid") from exc
     return ArtifactVerificationReceipt(
-        receipt_id="artifact-r105-nuclei-3111-r105-2",
+        receipt_id="artifact-r105-nuclei-3111-r105-3",
         image_digest=artifact["image_digest"],
         signature_verified=True,
-        signer_identity="redagent-r105-engine-promotion-key-v2",
+        signer_identity="redagent-r105-engine-promotion-key-v3",
         provenance_sha256=digest.hex(),
         sbom_sha256=CURRENT_NUCLEI_SBOM_SHA256,
         vulnerability_review="accepted_no_critical",
-        verifier="redagent-r105-artifact-promotion-v2",
+        verifier="redagent-r105-artifact-promotion-v3",
         verified_at=created_at,
         expires_at=expires_at,
     ), hashlib.sha256(signature_bundle_bytes).hexdigest()

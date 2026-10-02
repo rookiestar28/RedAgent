@@ -81,8 +81,8 @@ _FIXTURE_ID = "owned-loopback-http-first-slice"
 _LAB_BUNDLE_ID = "r123-owned-loopback-http-first-slice"
 _MAX_MEMBERSHIP_AGE = timedelta(minutes=5)
 _EXPECTED_ADAPTERS = frozenset({
-    "zap-service:2.17.0-r104.2",
-    "nuclei-service:3.11.1-r105.2",
+    "zap-service:2.17.0-r104.3",
+    "nuclei-service:3.11.1-r105.3",
 })
 _EXPECTED_ARTIFACT_ADAPTERS = frozenset({
     *_EXPECTED_ADAPTERS,
@@ -129,17 +129,17 @@ def _verify_current_zap(root: Path, *, now: datetime):
     attestations = root / "runtime-assets" / "attestations"
     return verify_current_zap_promotion(
         promotion_bytes=(
-            attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json"
+            attestations / "261002-R104_ZAP_ARTIFACT_PROMOTION_V3.json"
         ).read_bytes(),
         bundle_bytes=(
-            attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.sigstore.json"
+            attestations / "261002-R104_ZAP_ARTIFACT_PROMOTION_V3.sigstore.json"
         ).read_bytes(),
         public_key_bytes=(
-            attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.pub"
+            attestations / "261002-R104_ZAP_ARTIFACT_PROMOTION_V3.pub"
         ).read_bytes(),
-        runtime_lock_bytes=(root / "config/r104-zap-runtime-v2.json").read_bytes(),
+        runtime_lock_bytes=(root / "config/r104-zap-runtime-v3.json").read_bytes(),
         qualification_bytes=(
-            attestations / "260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
+            attestations / "261002-R104_ZAP_RUNTIME_QUALIFICATION_V3.json"
         ).read_bytes(),
         now=now,
     )
@@ -148,29 +148,29 @@ def _verify_current_zap(root: Path, *, now: datetime):
 def _verify_current_nuclei(root: Path, *, now: datetime):
     attestations = root / "runtime-assets" / "attestations"
     qualification = (
-        attestations / "260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+        attestations / "261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
     ).read_bytes()
     artifact, signature_sha256 = verify_current_nuclei_artifact_promotion(
         promotion_bytes=(
-            attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json"
+            attestations / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.json"
         ).read_bytes(),
         signature_bundle_bytes=(
-            attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json"
+            attestations / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.sigstore.json"
         ).read_bytes(),
         public_key_bytes=(
-            attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub"
+            attestations / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.pub"
         ).read_bytes(),
-        runtime_lock_bytes=(root / "config/r105-nuclei-runtime-v2.json").read_bytes(),
+        runtime_lock_bytes=(root / "config/r105-nuclei-runtime-v3.json").read_bytes(),
         qualification_bytes=qualification,
         now=now,
     )
     bundle = verify_current_nuclei_bundle_promotion(
-        manifest_bytes=(root / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
+        manifest_bytes=(root / "bundles/r105-nuclei/bundle-manifest-v3.json").read_bytes(),
         signature_bundle_bytes=(
-            attestations / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json"
+            attestations / "261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json"
         ).read_bytes(),
         public_key_bytes=(
-            attestations / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub"
+            attestations / "261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.pub"
         ).read_bytes(),
         template_bytes=(
             root / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml"

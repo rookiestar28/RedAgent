@@ -29,9 +29,9 @@ def test_controller_uses_exact_owned_resources_and_hardened_worker_boundary() ->
     assert "SOURCE_DATE_EPOCH=1787529600" in requalification_source
 
 
-def test_controller_uses_v2_candidate_authority_normalizes_then_erases_raw_output() -> None:
+def test_controller_uses_v3_candidate_authority_normalizes_then_erases_raw_output() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
-    assert "redagent.r105-runtime-lock/v2" in source
+    assert "redagent.r105-runtime-lock/v3" in source
     assert "_candidate_bundle" in source
     assert "candidate_sha256" in source
     assert "compile_nuclei_plan" in source

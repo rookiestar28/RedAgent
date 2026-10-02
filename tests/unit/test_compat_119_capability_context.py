@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -48,7 +48,7 @@ from redagent_platform.zap_service.repository import profile_values as zap_profi
 
 
 ROOT = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 8, 24, 10, 30, tzinfo=timezone.utc)
+NOW = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(hours=2)
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SHA_C = "c" * 64
@@ -56,18 +56,18 @@ SHA_C = "c" * 64
 
 def source_contracts():
     zap = build_zap_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-3"
     )
     nuclei = build_nuclei_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-3"
     )
     bundle = NucleiBundleManifest(
         bundle_id="r105-http-header-bundle",
-        revision=2,
+        revision=3,
         template_id="redagent-r105-missing-header",
         template_relative_path="templates/redagent-r105-missing-header.yaml",
         template_sha256="7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",
-        bundle_sha256="6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc",
+        bundle_sha256="ab8cbe219bb7b886dccd5b638583b374961560d688bd53e7bdc4164b0babc5ef",
         signature_verified=True,
         reviewer_user_id="redagent-r105-independent-review",
         protocol="http",
@@ -77,8 +77,8 @@ def source_contracts():
         tags=("redagent", "synthetic"),
         expected_matcher_names=("missing-security-header",),
         file_inventory=("templates/redagent-r105-missing-header.yaml",),
-        promoted_at=datetime.fromisoformat("2026-08-24T17:03:42+08:00"),
-        expires_at=datetime.fromisoformat("2026-09-23T17:03:42+08:00"),
+        promoted_at=datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00"),
+        expires_at=datetime.fromisoformat("2026-11-01T11:58:19.928804+00:00"),
     )
     return zap, nuclei, bundle
 
@@ -124,7 +124,7 @@ def evidence(
         evidence=ref("evidence", evidence_id, evidence_sha256),
         job=ref("job", "job-1", SHA_C),
         producer_adapter_id="zap-service",
-        producer_revision="2.17.0-r104.2",
+        producer_revision="2.17.0-r104.3",
         producer_schema_id="zap-alert-v1",
         observation_kind=observation_kind,
         source_definition_id="10021",
@@ -173,7 +173,7 @@ def observation(
             else None
         ),
         source_adapter_id="zap-service",
-        producer_revision="2.17.0-r104.2",
+        producer_revision="2.17.0-r104.3",
         producer_schema_id="zap-alert-v1",
         trust=TrustLevel.VERIFIED,
         confidence=Confidence.HIGH,
@@ -214,7 +214,7 @@ def finding(
         issue=ref("managed-issue", "issue-1", SHA_C),
         evidence=evidence_ref or ref("evidence", "evidence-1", SHA_B),
         source_adapter_id="zap-service",
-        producer_revision="2.17.0-r104.2",
+        producer_revision="2.17.0-r104.3",
         source_schema_id="zap-alert-v1",
         observation_kind=ObservationKind.SECURITY_HEADER_MISSING,
         source_definition_id="10021",
@@ -244,7 +244,7 @@ def nuclei_fact_set(
     evidence_fact = replace(
         evidence(binding_key_sha256=binding_key_sha256, resource=resource),
         producer_adapter_id="nuclei-service",
-        producer_revision="3.11.1-r105.2",
+        producer_revision="3.11.1-r105.3",
         producer_schema_id="nuclei-result-v1",
         source_definition_id=source_definition_id,
         source_matcher_id=source_matcher_id,
@@ -256,7 +256,7 @@ def nuclei_fact_set(
         object=resource,
         evidence=evidence_fact.evidence,
         source_adapter_id="nuclei-service",
-        producer_revision="3.11.1-r105.2",
+        producer_revision="3.11.1-r105.3",
         producer_schema_id="nuclei-result-v1",
         value_code=resource_id,
     )
@@ -267,7 +267,7 @@ def nuclei_fact_set(
             evidence_ref=evidence_fact.evidence,
         ),
         source_adapter_id="nuclei-service",
-        producer_revision="3.11.1-r105.2",
+        producer_revision="3.11.1-r105.3",
         source_schema_id="nuclei-result-v1",
         source_definition_id=source_definition_id,
         source_matcher_id=source_matcher_id,
@@ -306,7 +306,7 @@ def observation_fact_set(
     if capability_id == "zap-controlled-runtime":
         adapter_id, producer_revision, source_path = (
             "zap-service",
-            "2.17.0-r104.2",
+            "2.17.0-r104.3",
             "/passive/missing-header",
         )
         schema_id = (
@@ -319,7 +319,7 @@ def observation_fact_set(
     else:
         adapter_id, producer_revision, source_path = (
             "nuclei-service",
-            "3.11.1-r105.2",
+            "3.11.1-r105.3",
             "/nuclei/missing-header",
         )
         schema_id = (
@@ -402,15 +402,15 @@ def build_snapshot(**overrides):
 
 def test_existing_owner_hashes_remain_stable_and_projection_is_canonical() -> None:
     zap, nuclei, _ = source_contracts()
-    assert canonical_capability_sha256(zap) == "24c1c1a0f18a3bbf473f34107f1636c911e0711b6873988ceaaa4601b0f8c6c3"
-    assert canonical_capability_sha256(nuclei) == "f4a1d955aa81f19b9afe0bf6d55daa6cc78d0533c994875214f859e97b34cd82"
+    assert canonical_capability_sha256(zap) == "5e14f84e9141cf1be60936e6533cf6ca2eb8df5503db637cbc8e935680baced6"
+    assert canonical_capability_sha256(nuclei) == "06c8887db37a3ed262c329da098f9b9fece20c6b9c96fc1c16c10a4b2ae6bbf7"
     assert canonical_zap_profile_sha256(zap_profiles()[CertifiedProfileId.PASSIVE]) == "0efb350685643918582cf5905413ed867ace8e994867b764778e7f6e21dce4f2"
     assert canonical_nuclei_profile_sha256(nuclei_profiles()[NucleiProfileId.HTTP_HEADER]) == "e3650cd3d57b7a73092fb7845ed1aa8aaafc50e46061c7a2d65952890a1016f0"
     tools = build_projection_catalog((zap, nuclei))
     projection_hashes = {tool.source_capability_id: canonical_projected_tool_sha256(tool) for tool in tools}
     assert projection_hashes == {
-        "zap-controlled-runtime": "bafa1c3b2bfe105407a0452408d3cf6e0dce343d331f50f6011ea087aac3eb6d",  # pragma: allowlist secret
-        "nuclei-trusted-runtime": "08ff0dc9305bd11903104c09e4c18a5d7589c951a8e6c424bf4c73047b1a81b2",  # pragma: allowlist secret
+        "zap-controlled-runtime": "75df7ca789086692237d7df2a9c437ae09077fa1465b112f6d2d1691e32491b8",  # pragma: allowlist secret
+        "nuclei-trusted-runtime": "c9f633f7542f0e36f564480acf49e63f2034985563b84c545c853cc192c9bb07",  # pragma: allowlist secret
     }
     assert zap_profile_values(zap_profiles()[CertifiedProfileId.PASSIVE])["profile_sha256"] == "0efb350685643918582cf5905413ed867ace8e994867b764778e7f6e21dce4f2"
     assert nuclei_profile_values(nuclei_profiles()[NucleiProfileId.HTTP_HEADER])["profile_sha256"] == "e3650cd3d57b7a73092fb7845ed1aa8aaafc50e46061c7a2d65952890a1016f0"

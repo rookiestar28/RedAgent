@@ -407,7 +407,7 @@ class RunnerRepository:
                 select(jobs).where(
                     jobs.c.tenant_id == self.tenant_id,
                     jobs.c.id == manifest.job_id,
-                )
+                ).with_for_update()
             )
         ).mappings().one_or_none()
         if job is None or (
@@ -415,6 +415,10 @@ class RunnerRepository:
             or job["roe_version_id"] != manifest.roe_version_id
         ):
             raise RunnerRepositoryConflict("runner_manifest_job_mismatch")
+        # CRITICAL: one job has one immutable v2 identity for read-only reconciliation.
+        # Lock and bind it in the same transaction as issuance; a different hash never overwrites it.
+        if job["manifest_v2_sha256"] not in (None, signed.manifest_sha256):
+            raise RunnerRepositoryConflict("runner_manifest_job_v2_binding_mismatch")
         await self._assert_containment_inactive(
             job_id=manifest.job_id,
             capability_id=manifest_v2.capability_id,
@@ -429,9 +433,15 @@ class RunnerRepository:
                 )
             )
         ).mappings().one_or_none()
+        if existing is not None and existing["manifest_sha256"] != signed.manifest_sha256:
+            raise RunnerRepositoryConflict("runner_manifest_idempotency_mismatch")
+        if job["manifest_v2_sha256"] is None:
+            await self.session.execute(update(jobs).where(
+                jobs.c.tenant_id == self.tenant_id, jobs.c.id == manifest.job_id,
+                jobs.c.version == job["version"],
+            ).values(manifest_v2_sha256=signed.manifest_sha256,
+                     version=jobs.c.version + 1, updated_at=occurred_at))
         if existing is not None:
-            if existing["manifest_sha256"] != signed.manifest_sha256:
-                raise RunnerRepositoryConflict("runner_manifest_idempotency_mismatch")
             return dict(existing)
         row = {
             "id": f"runner-manifest-{uuid4().hex}",

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 import hashlib
+import json
 import re
 from typing import Protocol
 
@@ -82,6 +83,36 @@ class NormalizedAdapterFindingV1:
                 or any(not _ID.fullmatch(value) for value in values)
             ):
                 raise ValueError(f"r123_normalized_{name}_invalid")
+
+
+def parse_normalized_adapter_finding(value: object) -> NormalizedAdapterFindingV1:
+    if not isinstance(value, dict):
+        raise ValueError("r123_normalized_finding_object_invalid")
+    parsed = dict(value)
+    # CRITICAL: JSON turns tuple IDs into arrays; restore only actual string arrays.
+    # Treating strings or mappings as iterables can fabricate a finding during lookup.
+    for name in ("taxonomy_ids", "control_ids"):
+        items = parsed.get(name)
+        if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
+            raise ValueError(f"r123_normalized_{name}_invalid")
+        parsed[name] = tuple(items)
+    try:
+        return NormalizedAdapterFindingV1(**parsed)
+    except TypeError as exc:
+        raise ValueError("r123_normalized_finding_fields_invalid") from exc
+
+
+def report_safe_payload_matches(payload: object, *, adapter_id: str, findings: tuple[NormalizedAdapterFindingV1, ...]) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    expected = {"schema": "redagent.r123-result/v1", "adapter_id": adapter_id,
+                "output_complete": True, "findings": [asdict(item) for item in findings]}
+    try:
+        # CRITICAL: compare exact JSON values; persisted arrays and in-memory tuples
+        # share a wire representation, while changed evidence fields must still fail.
+        return json.dumps(payload, sort_keys=True, allow_nan=False) == json.dumps(expected, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError):
+        return False
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

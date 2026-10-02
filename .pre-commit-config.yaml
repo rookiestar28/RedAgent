@@ -38,6 +38,24 @@ repos:
           # including JSON locks and Python test fixtures.
           - "--exclude-lines"
           - '(?i)(?:sha256|digest)[^\n:=]*[:=][^0-9a-f]*(?:sha256:)?[0-9a-f]{64}'
+          # SPDX/Trivy identifiers and checksums are public package integrity metadata.
+          - "--exclude-lines"
+          - '^\s*"(?:checksumValue|packageVerificationCodeValue)":\s*"[0-9a-f]{40}(?:[0-9a-f]{24})?",?\s*$'
+          - "--exclude-lines"
+          - '^\s*"UID":\s*"[0-9a-f]{1,16}",?\s*$'
+          - "--exclude-lines"
+          - '^\s*"(?:SPDXID|relatedSpdxElement|spdxElementId)":\s*"SPDXRef-(?:OperatingSystem|ContainerImage)-[0-9a-f]{16}",?\s*$'
+          # Closed source-file hash maps retain their exact public path and SHA-256 value.
+          - "--exclude-lines"
+          - '^\s*"(?:containers/[^"\\]+|config/(?:owned-helper-dependencies-v3|r10[45]-[a-z]+-runtime(?:-v2)?)\.json|bundles/r105-nuclei/bundle-manifest(?:-v2)?\.json|runtime-assets/attestations/[^"\\]+|\.tmp/runtime-requalification-v3/packages/lib(?:crypto3|ssl3)-3\.5\.9-r0\.apk)":\s*"[0-9a-f]{64}",?\s*$'
+          - "--exclude-lines"
+          - '^\s*"(?:run\.crashoverride\.commit-id|org\.opencontainers\.image\.revision)":\s*"[0-9a-f]{40}",?\s*$'
+          # Exact public upstream JRE archive checksum in frozen image build history.
+          - "--exclude-lines"
+          - "ESUM='22d4d5579902d134dede626d0fdfb95891abc7578e13dea9cb23775498c4cf51'"
+          # Fixed upstream locale paths are package inventory, not Microsoft credentials.
+          - "--exclude-lines"
+          - '^\s*"usr/share/X11/locale/microsoft-cp(?:1251|1255|1256)/(?:XI18N_OBJS|XLC_LOCALE)",?\s*$'
           # ECDSA promotion signatures are public verification evidence, not signing keys.
           - "--exclude-lines"
           - '^\s*"signature_base64":\s*"[A-Za-z0-9+/=]+",?\s*$'

@@ -31,7 +31,7 @@ def binding(**overrides: object) -> CapabilityBindingKeyV1:
         "capability_revision": 1,
         "execution_manifest_sha256": SHA_A,
         "adapter_id": "nuclei-service",
-        "adapter_version": "3.11.1-r105.2",
+        "adapter_version": "3.11.1-r105.3",
         "profile_id": "nuclei-http-header-v1",
         "profile_revision": 1,
         "profile_sha256": SHA_B,
@@ -52,7 +52,7 @@ def v2(**overrides: object) -> JobManifestDraftV2:
     values: dict[str, object] = {
         "v1": draft(
             adapter_id="nuclei-service",
-            adapter_version="3.11.1-r105.2",
+            adapter_version="3.11.1-r105.3",
             capability_digest=SHA_A,
             secret_reference_ids=(),
         ),

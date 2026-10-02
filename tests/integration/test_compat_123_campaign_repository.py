@@ -323,7 +323,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                     node_id="node-zap",
                     invocation_id=invocation_id,
                     effect_intent_sha256="a" * 64,
-                    effect_intent_payload={"capability_id": "zap-controlled-runtime@2"},
+                    effect_intent_payload={"capability_id": "zap-controlled-runtime@3"},
                     envelope_sha256="8" * 64,
                 ),
                 occurred_at=NOW + timedelta(seconds=2),
@@ -428,14 +428,14 @@ async def _atomic_start_and_relay_scenario() -> None:
         binding = CapabilityBindingKeyV1(
             schema_version="redagent.r119-capability-binding/v1",
             capability_id="zap-controlled-runtime",
-            capability_revision=2,
+            capability_revision=3,
             execution_manifest_sha256=canonical_capability_sha256(capability),
             adapter_id="zap-service",
-            adapter_version="2.17.0-r104.2",
+            adapter_version="2.17.0-r104.3",
             profile_id="zap-passive-v1",
             profile_revision=1,
             profile_sha256=closed_execution_registry()[
-                "zap-controlled-runtime@2"
+                "zap-controlled-runtime@3"
             ].profile_sha256,
             bundle_id=None,
             bundle_revision=None,
@@ -886,7 +886,7 @@ async def _atomic_start_and_relay_scenario() -> None:
                 NodeTerminalLineageV1(
                     node_id="node-zap",
                     capability_id="zap-controlled-runtime",
-                    capability_revision=2,
+                    capability_revision=3,
                     effect_id=effect_id,
                         effect_receipt_sha256=receipt_sha256,
                     execution_receipt_id=f"adapter-receipt-{suffix}",
@@ -1511,7 +1511,7 @@ async def _bootstrap_terminal_owner_rows(
                 spiffe_id=f"spiffe://redagent.test/runner/{suffix}",
                 certificate_fingerprint="a" * 64,
                 certificate_serial=f"serial-{suffix}",
-                adapter_allowlist=["zap-service@2.17.0-r104.2"],
+                adapter_allowlist=["zap-service@2.17.0-r104.3"],
                 image_allowlist=["sha256:" + "b" * 64],
                 required_policy_revision="r123-v1",
                 generation=1,
@@ -1537,7 +1537,7 @@ async def _bootstrap_terminal_owner_rows(
                 signature_sha256="3" * 64,
                 signing_key_id="r123-test-key",
                 capability_id="zap-controlled-runtime",
-                capability_revision=2,
+                capability_revision=3,
                 capability_sha256="4" * 64,
                 image_digest="sha256:" + "b" * 64,
                 artifact_receipt_id=f"artifact-receipt-{suffix}",
@@ -1691,7 +1691,7 @@ async def _bootstrap_manifest_issuer_authority(
                 spiffe_id="spiffe://redagent.test/runner/r123",
                 certificate_fingerprint="a" * 64,
                 certificate_serial=f"issuer-{suffix}",
-                adapter_allowlist=["zap-service:2.17.0-r104.2"],
+                adapter_allowlist=["zap-service:2.17.0-r104.3"],
                 image_allowlist=[capability.image_digest],
                 required_policy_revision="policy-r123-v1",
                 generation=1,
@@ -2153,11 +2153,11 @@ async def _activity_reconciliation_material_scenario() -> None:
 
 
 def _activity_binding(capability_id: str) -> CapabilityBindingKeyV1:
-    closed = closed_execution_registry()[f"{capability_id}@2"]
+    closed = closed_execution_registry()[f"{capability_id}@3"]
     return CapabilityBindingKeyV1(
         schema_version="redagent.r119-capability-binding/v1",
         capability_id=capability_id,
-        capability_revision=2,
+        capability_revision=3,
         execution_manifest_sha256=("a" if capability_id.startswith("zap") else "b") * 64,
         adapter_id=closed.adapter_id,
         adapter_version=closed.adapter_version,
@@ -2294,7 +2294,7 @@ async def _status_projection_scenario() -> None:
                     node_id="node-zap",
                     invocation_id=f"invocation-status-{suffix}",
                     effect_intent_sha256="a" * 64,
-                    effect_intent_payload={"capability_id": "zap-controlled-runtime@2"},
+                    effect_intent_payload={"capability_id": "zap-controlled-runtime@3"},
                     envelope_sha256="8" * 64,
                 ),
                 occurred_at=NOW + timedelta(seconds=1),
@@ -2305,7 +2305,7 @@ async def _status_projection_scenario() -> None:
             campaign_id=campaign_id,
         )
         assert projected.aggregate_sequence == 2
-        assert projected.effects[0].capability_id == "zap-controlled-runtime@2"
+        assert projected.effects[0].capability_id == "zap-controlled-runtime@3"
         assert projected.effects[0].state == "reserved"
         assert projected.effects[0].reconciliation_state == "none"
         assert projected.effects[0].evidence_count == 0

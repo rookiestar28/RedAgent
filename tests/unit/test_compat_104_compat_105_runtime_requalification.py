@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -63,20 +63,20 @@ def test_revision_one_authority_files_remain_byte_stable() -> None:
     )
 
 
-def test_revision_two_authority_paths_are_additive_and_explicit() -> None:
-    assert CURRENT_ZAP_RUNTIME_LOCK == ROOT / "config/r104-zap-runtime-v2.json"
+def test_current_revision_three_authority_paths_are_additive_and_explicit() -> None:
+    assert CURRENT_ZAP_RUNTIME_LOCK == ROOT / "config/r104-zap-runtime-v3.json"
     assert CURRENT_ZAP_ARTIFACT_PROMOTION.document == (
-        ROOT / "runtime-assets/attestations/260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json"
+        ROOT / "runtime-assets/attestations/261002-R104_ZAP_ARTIFACT_PROMOTION_V3.json"
     )
-    assert CURRENT_NUCLEI_RUNTIME_LOCK == ROOT / "config/r105-nuclei-runtime-v2.json"
+    assert CURRENT_NUCLEI_RUNTIME_LOCK == ROOT / "config/r105-nuclei-runtime-v3.json"
     assert CURRENT_NUCLEI_ARTIFACT_PROMOTION.document == (
-        ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json"
+        ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.json"
     )
     assert CURRENT_NUCLEI_BUNDLE_MANIFEST == (
-        ROOT / "bundles/r105-nuclei/bundle-manifest-v2.json"
+        ROOT / "bundles/r105-nuclei/bundle-manifest-v3.json"
     )
     assert CURRENT_NUCLEI_BUNDLE_PROMOTION.signature == (
-        ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json"
+        ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json"
     )
 
 
@@ -95,15 +95,15 @@ def test_revision_two_locks_bind_reproducible_build_contract() -> None:
             assert value[key].startswith("sha256:") and len(value[key]) == 71
 
 
-def test_revision_two_capability_identity_is_additive() -> None:
+def test_current_revision_three_capability_identity_is_additive() -> None:
     zap = build_zap_capability_manifest(
         platform="linux/amd64", artifact_receipt_id="artifact-r104-v2"
     )
     nuclei = build_nuclei_capability_manifest(
         platform="linux/amd64", artifact_receipt_id="artifact-r105-v2"
     )
-    assert (zap.revision, zap.adapter_version) == (2, "2.17.0-r104.2")
-    assert (nuclei.revision, nuclei.adapter_version) == (2, "3.11.1-r105.2")
+    assert (zap.revision, zap.adapter_version) == (3, "2.17.0-r104.3")
+    assert (nuclei.revision, nuclei.adapter_version) == (3, "3.11.1-r105.3")
 
 
 def test_revision_two_build_controllers_are_closed_and_reproducible() -> None:
@@ -143,15 +143,15 @@ def test_zap_engine_removes_nondeterministic_fontconfig_cache() -> None:
     assert "rm -rf /var/cache/fontconfig/*" in source
 
 
-def test_revision_two_signed_promotions_bind_locks_qualification_and_bundle() -> None:
-    now = datetime(2026, 8, 24, 9, 30, tzinfo=timezone.utc)
+def test_current_revision_three_signed_promotions_bind_locks_qualification_and_bundle() -> None:
+    now = datetime.fromisoformat(json.loads(CURRENT_ZAP_ARTIFACT_PROMOTION.document.read_bytes())["created_at"]) + timedelta(minutes=1)
     zap, _ = verify_current_zap_promotion(
         promotion_bytes=CURRENT_ZAP_ARTIFACT_PROMOTION.document.read_bytes(),
         bundle_bytes=CURRENT_ZAP_ARTIFACT_PROMOTION.signature.read_bytes(),
         public_key_bytes=CURRENT_ZAP_ARTIFACT_PROMOTION.public_key.read_bytes(),
         runtime_lock_bytes=CURRENT_ZAP_RUNTIME_LOCK.read_bytes(),
         qualification_bytes=(
-            ROOT / "runtime-assets/attestations/260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
+            ROOT / "runtime-assets/attestations/261002-R104_ZAP_RUNTIME_QUALIFICATION_V3.json"
         ).read_bytes(),
         now=now,
     )
@@ -161,7 +161,7 @@ def test_revision_two_signed_promotions_bind_locks_qualification_and_bundle() ->
         public_key_bytes=CURRENT_NUCLEI_ARTIFACT_PROMOTION.public_key.read_bytes(),
         runtime_lock_bytes=CURRENT_NUCLEI_RUNTIME_LOCK.read_bytes(),
         qualification_bytes=(
-            ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+            ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
         ).read_bytes(),
         now=now,
     )
@@ -174,16 +174,16 @@ def test_revision_two_signed_promotions_bind_locks_qualification_and_bundle() ->
         ).read_bytes(),
         certificate_bytes=(ROOT / "config/trust/r105-nuclei-user.crt").read_bytes(),
         qualification_bytes=(
-            ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+            ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
         ).read_bytes(),
         now=now,
     )
-    assert zap.receipt_id == "artifact-r104-zap-2170-r104-2"
-    assert nuclei.receipt_id == "artifact-r105-nuclei-3111-r105-2"
-    assert bundle.revision == 2
+    assert zap.receipt_id == "artifact-r104-zap-2170-r104-3"
+    assert nuclei.receipt_id == "artifact-r105-nuclei-3111-r105-3"
+    assert bundle.revision == 3
 
 
-def test_revision_two_promotion_documents_claim_every_locked_helper_and_source() -> None:
+def test_current_revision_three_promotion_documents_claim_every_locked_helper_and_source() -> None:
     for promotion_path, lock_path in (
         (CURRENT_ZAP_ARTIFACT_PROMOTION.document, CURRENT_ZAP_RUNTIME_LOCK),
         (CURRENT_NUCLEI_ARTIFACT_PROMOTION.document, CURRENT_NUCLEI_RUNTIME_LOCK),
@@ -247,24 +247,32 @@ def _signed_test_promotion(document: dict[str, object]) -> tuple[bytes, bytes, b
         ("owned_helpers", "gateway_dockerfile_sha256", "0" * 64),
     ),
 )
-def test_revision_two_promotion_denies_validly_signed_lock_identity_drift(
+def test_current_revision_three_promotion_denies_validly_signed_lock_identity_drift(
     family: str,
     section: str,
     field: str,
     replacement: str,
+    monkeypatch,
 ) -> None:
-    now = datetime(2026, 8, 24, 9, 30, tzinfo=timezone.utc)
+    now = datetime.fromisoformat(json.loads(CURRENT_ZAP_ARTIFACT_PROMOTION.document.read_bytes())["created_at"]) + timedelta(minutes=1)
     if family == "zap":
         authority = CURRENT_ZAP_ARTIFACT_PROMOTION
         lock = CURRENT_ZAP_RUNTIME_LOCK
-        qualification = ROOT / "runtime-assets/attestations/260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
+        qualification = ROOT / "runtime-assets/attestations/261002-R104_ZAP_RUNTIME_QUALIFICATION_V3.json"
     else:
         authority = CURRENT_NUCLEI_ARTIFACT_PROMOTION
         lock = CURRENT_NUCLEI_RUNTIME_LOCK
-        qualification = ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+        qualification = ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
     document = json.loads(authority.document.read_text(encoding="utf-8"))
     document[section][field] = replacement
     payload, bundle, public_key = _signed_test_promotion(document)
+    if family == "zap":
+        from redagent_platform.zap_service import promotion as verifier_module
+        anchor = "CURRENT_ZAP_PUBLIC_KEY_SHA256"
+    else:
+        from redagent_platform.nuclei_service import artifact_promotion as verifier_module
+        anchor = "CURRENT_NUCLEI_ARTIFACT_PUBLIC_KEY_SHA256"
+    monkeypatch.setattr(verifier_module, anchor, hashlib.sha256(public_key).hexdigest())
 
     if family == "zap":
         with pytest.raises(ZapPromotionError, match="zap_current_promotion_claim_invalid"):
@@ -291,10 +299,10 @@ def test_revision_two_promotion_denies_validly_signed_lock_identity_drift(
             )
 
 
-def test_revision_two_promotions_deny_tamper_and_expiry() -> None:
-    now = datetime(2026, 8, 24, 9, 30, tzinfo=timezone.utc)
+def test_current_revision_three_promotions_deny_tamper_and_expiry() -> None:
+    now = datetime.fromisoformat(json.loads(CURRENT_ZAP_ARTIFACT_PROMOTION.document.read_bytes())["created_at"]) + timedelta(minutes=1)
     qualification = (
-        ROOT / "runtime-assets/attestations/260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
+        ROOT / "runtime-assets/attestations/261002-R104_ZAP_RUNTIME_QUALIFICATION_V3.json"
     ).read_bytes()
     with pytest.raises(ZapPromotionError, match="zap_promotion_digest_mismatch"):
         verify_current_zap_promotion(
@@ -314,7 +322,7 @@ def test_revision_two_promotions_deny_tamper_and_expiry() -> None:
             public_key_bytes=CURRENT_NUCLEI_ARTIFACT_PROMOTION.public_key.read_bytes(),
             runtime_lock_bytes=CURRENT_NUCLEI_RUNTIME_LOCK.read_bytes(),
             qualification_bytes=(
-                ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+                ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
             ).read_bytes(),
             now=now,
         )
@@ -328,7 +336,7 @@ def test_revision_two_promotions_deny_tamper_and_expiry() -> None:
             ).read_bytes(),
             certificate_bytes=(ROOT / "config/trust/r105-nuclei-user.crt").read_bytes(),
             qualification_bytes=(
-                ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+                ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
             ).read_bytes(),
-            now=datetime(2026, 9, 23, 9, 4, tzinfo=timezone.utc),
+            now=datetime.fromisoformat(json.loads(CURRENT_NUCLEI_BUNDLE_MANIFEST.read_bytes())["expires_at"]) + timedelta(seconds=1),
         )

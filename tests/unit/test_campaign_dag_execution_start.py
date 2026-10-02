@@ -40,7 +40,7 @@ from tests.unit.test_campaign_planning_contracts import (
 )
 
 
-def _admitted_inputs(capability_key: str = "zap-controlled-runtime@2"):
+def _admitted_inputs(capability_key: str = "zap-controlled-runtime@3"):
     binding = closed_execution_registry()[capability_key]
     capability = CapabilityIdentityV1(
         capability_id=binding.capability_id,
@@ -135,7 +135,7 @@ class Store:
 
 
 def _request(**changes):
-    capability_key = changes.pop("_capability_key", "zap-controlled-runtime@2")
+    capability_key = changes.pop("_capability_key", "zap-controlled-runtime@3")
     current_domain, revision, certificate, receipt = _admitted_inputs(capability_key)
     values = {
         "tenant_id": "tenant-a",

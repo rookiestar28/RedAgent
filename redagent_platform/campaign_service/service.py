@@ -1175,7 +1175,9 @@ class CampaignEffectCoordinator:
                 runner_id=current.runner_id,
                 workload_identity=current.workload_identity,
                 request_sha256=request_sha256,
-                started_at=pre_io_at,
+                # CRITICAL: confirmation binds the persisted dispatch timestamp exactly;
+                # the later fresh authority check must not rewrite that durable identity.
+                started_at=now,
                 completed_at=completed_at,
                 adapter_accepted=True,
                 external_status="confirmed",

@@ -1,0 +1,20 @@
+{
+  "archive_sha256": "0c18d395f61100c9618f077202091b705fac26eb5c44eb126c53917779ab6be6",
+  "artifact": "nuclei-gateway",
+  "critical_report_sha256": "0ac7d527a0be0cc12a5d56d7acb03ef7fb44eb00ed4ba3d2048897244e2102cb",
+  "critical_vulnerability_count": 0,
+  "database_metadata": {
+    "DownloadedAt": "2026-10-02T11:06:59.953062Z",
+    "NextUpdate": "2026-10-03T06:55:51.690179148Z",
+    "UpdatedAt": "2026-10-02T06:55:51.690179759Z",
+    "Version": 2
+  },
+  "image_config_digest": "sha256:3616dbdf96bd48804fa16e9ce11a9f199101b677a961322e1adb8c930f880530",
+  "image_id": "sha256:bd7dbb9139b78e447968dc6a06b8c646c71936fe07b962da52b1c35503abdc8a",
+  "sbom_package_count": 32,
+  "sbom_sha256": "83c556833145dbfdf4c98204520559b3afca0fbf30365870508049cd1cac9826",
+  "scan_at": "2026-10-02T11:31:46.667819+00:00",
+  "scanner": "trivy-0.74.0",
+  "scanner_executable_sha256": "4c532e1f28f53282dc364671e87381cd77760fa9cafab143f576449c2207cdd5",
+  "schema": "redagent.owned-artifact-supply-chain/v3"
+}

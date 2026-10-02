@@ -1,0 +1,18 @@
+{
+  "artifact": "zap-engine",
+  "build_image_ids": [
+    "sha256:98745eb0d8f07d3efa4f94cf5e7173188ae6c356c3582ffa9479e35a37506f9e",
+    "sha256:98745eb0d8f07d3efa4f94cf5e7173188ae6c356c3582ffa9479e35a37506f9e"
+  ],
+  "compatibility_version": "20",
+  "context_sha256": "3c7ac68fde7b9e272228e5bfe839f9a937446459200a098e3a8432f66263346b",
+  "image_id": "sha256:98745eb0d8f07d3efa4f94cf5e7173188ae6c356c3582ffa9479e35a37506f9e",
+  "local_tag": "redagent/r104-zap:2.17.0-r104.3",
+  "runtime_qualified": false,
+  "schema": "redagent.owned-artifact-build/v3",
+  "source_date_epoch": 1787529600,
+  "sources": {
+    "containers/r104-zap/Dockerfile-v3": "50885ae1bc7f63c932fa660221b07e3c3628e3e9851538cb18cd84a411fe0d17",
+    "containers/r104-zap/packages-v3.txt": "3d223244a03e62bed0d8b44e7dfb3fbf83b11c6f23d53f68c8568a36d0f7e42e"
+  }
+}

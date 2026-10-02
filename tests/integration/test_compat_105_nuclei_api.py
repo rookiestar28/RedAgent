@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import hashlib
 import os
 from pathlib import Path
@@ -25,7 +25,7 @@ from redagent_platform.policy_service.fakes import DeterministicFakePolicyProvid
 
 
 ROOT = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 8, 24, 10, 0, tzinfo=timezone.utc)
+NOW = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(minutes=1)
 
 
 def test_nuclei_profiles_compile_dashboard_permissions_and_closed_input(
@@ -46,20 +46,20 @@ async def _scenario() -> None:
     decision_id = f"decision-r105-{suffix}"
     attestation_sha = "a" * 64
     promoted = verify_current_nuclei_bundle_promotion(
-        manifest_bytes=(ROOT / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
-        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json").read_bytes(),
-        public_key_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub").read_bytes(),
+        manifest_bytes=(ROOT / "bundles/r105-nuclei/bundle-manifest-v3.json").read_bytes(),
+        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json").read_bytes(),
+        public_key_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.pub").read_bytes(),
         template_bytes=(ROOT / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml").read_bytes(),
         certificate_bytes=(ROOT / "config/trust/r105-nuclei-user.crt").read_bytes(),
-        qualification_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json").read_bytes(),
+        qualification_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json").read_bytes(),
         now=NOW,
     )
     artifact_receipt, artifact_signature_sha = verify_current_nuclei_artifact_promotion(
-        promotion_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json").read_bytes(),
-        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json").read_bytes(),
-        public_key_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub").read_bytes(),
-        runtime_lock_bytes=(ROOT / "config/r105-nuclei-runtime-v2.json").read_bytes(),
-        qualification_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json").read_bytes(),
+        promotion_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.json").read_bytes(),
+        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.sigstore.json").read_bytes(),
+        public_key_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.pub").read_bytes(),
+        runtime_lock_bytes=(ROOT / "config/r105-nuclei-runtime-v3.json").read_bytes(),
+        qualification_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json").read_bytes(),
         now=NOW,
     )
     target = NucleiTargetBinding(
@@ -93,7 +93,7 @@ async def _scenario() -> None:
             await repository.ensure_certified_foundation(
                 bundle=promoted, artifact_signature_sha256=artifact_signature_sha,
                 artifact_provenance_sha256=artifact_receipt.provenance_sha256,
-                bundle_signature_sha256=hashlib.sha256((ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json").read_bytes()).hexdigest(),
+                bundle_signature_sha256=hashlib.sha256((ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json").read_bytes()).hexdigest(),
                 occurred_at=NOW)
             await repository.register_target_attestation(
                 attestation_id=f"attestation-r105-{suffix}", target=target,
@@ -116,7 +116,7 @@ async def _scenario() -> None:
             assert [row["profile_id"] for row in profiles.json()["data"]] == ["nuclei-http-header-v1"]
             payload = {
                 "plan_id": f"plan-r105-{suffix}", "profile_id": "nuclei-http-header-v1",
-                "bundle_id": "r105-http-header-bundle", "bundle_revision": 2,
+                "bundle_id": "r105-http-header-bundle", "bundle_revision": 3,
                 "target_id": "r105-owned-http-fixture", "target_attestation_sha256": attestation_sha,
                 "policy_decision_id": decision_id, "policy_revision": "r099-v1",
                 "roe_version_id": roe_id,
@@ -131,6 +131,8 @@ async def _scenario() -> None:
                 **base, "X-RedAgent-Test-Permissions": "audit:read"})
             assert dashboard.status_code == 200, dashboard.text
             assert dashboard.json()["data"]["plans"][0]["plan_id"] == payload["plan_id"]
+            assert dashboard.json()["data"]["profiles"][0]["bundle_revision"] == 3
+            assert dashboard.json()["data"]["profiles"][0]["image_digest"] == profiles.json()["data"][0]["image_digest"]
             denied = await client.get("/api/v1/nuclei/profiles", headers={
                 **base, "X-RedAgent-Test-Permissions": "audit:read"})
             assert denied.status_code == 403

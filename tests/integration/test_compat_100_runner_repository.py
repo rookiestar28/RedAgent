@@ -155,6 +155,10 @@ async def _scenario() -> None:
                 idempotency_key=f"issue-r123-v2-{suffix}",
                 occurred_at=NOW,
             )
+            bound_jobs = metadata.tables["jobs"]
+            assert await session.scalar(select(bound_jobs.c.manifest_v2_sha256).where(
+                bound_jobs.c.tenant_id == tenant, bound_jobs.c.id == signed_v2.manifest.v1.job_id,
+            )) == signed_v2.manifest_sha256
             replayed_v2 = await repository.issue_manifest_v2(
                 signed_v2,
                 runner_registration_id=str(registered["id"]),
@@ -163,6 +167,17 @@ async def _scenario() -> None:
                 occurred_at=NOW,
             )
             assert replayed_v2["id"] == issued_v2["id"]
+            changed_v2 = sign_job_manifest_v2(
+                replace(v2_draft, v1=replace(v2_draft.v1, nonce=f"different-v2-{suffix}")),
+                key, key_id="r123-local-signing-v1",
+            )
+            with pytest.raises(RunnerRepositoryConflict, match="runner_manifest_job_v2_binding_mismatch"):
+                await repository.issue_manifest_v2(changed_v2,
+                    runner_registration_id=str(registered["id"]), binding=v2_binding,
+                    idempotency_key=f"different-v2-{suffix}", occurred_at=NOW)
+            assert await session.scalar(select(bound_jobs.c.manifest_v2_sha256).where(
+                bound_jobs.c.tenant_id == tenant, bound_jobs.c.id == signed_v2.manifest.v1.job_id,
+            )) == signed_v2.manifest_sha256
             assert issued_v2["manifest_document"]["manifest_contract_version"] == (
                 "redagent.r123-job-manifest/v2"
             )

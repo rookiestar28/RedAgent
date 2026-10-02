@@ -41,7 +41,7 @@ def validate_owned_execution_input(payload: Mapping[str, object]) -> None:
         capability = operator.get("capability")
         if not isinstance(capability, dict) or (
             capability.get("capability_id") not in {"zap-controlled-runtime", "nuclei-trusted-runtime"}
-            or capability.get("capability_revision") != 2
+            or capability.get("capability_revision") != 3
         ):
             raise OwnedExecutionDenied("owned_execution_capability_denied")
         # CRITICAL: a larger signed budget cannot broaden this certified sequential slice.

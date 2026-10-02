@@ -134,7 +134,7 @@ it("derives signed compilation and queue bindings with generated identities", as
   expect(await screen.findByText(/Compiled signed r105-http-header-bundle plan/)).toBeVisible();
   expect(payloads[0]?.body.plan_id).toMatch(/^nuclei-plan-[0-9a-f-]+$/);
   expect(payloads[0]?.body).toMatchObject({ profile_id: "nuclei-http-header-v1", bundle_id: "r105-http-header-bundle",
-    bundle_revision: 2, target_id: "r105-owned-http-fixture", target_attestation_sha256: "c".repeat(64),
+    bundle_revision: 3, target_id: "r105-owned-http-fixture", target_attestation_sha256: "c".repeat(64),
     policy_decision_id: "decision-r105", policy_revision: "r099-v1", roe_version_id: "roe-r105" });
   expect(payloads[0]?.roe).toBe("roe-r105");
   const planId = String(payloads[0]?.body.plan_id);
@@ -177,7 +177,7 @@ function profile() {
   return {
     profile_id: "nuclei-http-header-v1", profile_revision: 2, engine_version: "3.11.1",
     image_digest: `sha256:${"a".repeat(64)}`, bundle_id: "r105-http-header-bundle",
-    bundle_revision: 2, profile_sha256: "b".repeat(64), risk_class: "low",
+    bundle_revision: 3, profile_sha256: "b".repeat(64), risk_class: "low",
     allowed_protocols: ["http"], allowed_methods: ["GET"],
     allowed_paths: ["/nuclei/missing-header"], request_limit: 20,
     request_rate_per_second: 2, concurrency_limit: 1, timeout_seconds: 60,

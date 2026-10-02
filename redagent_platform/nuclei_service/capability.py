@@ -21,8 +21,8 @@ def build_nuclei_capability_manifest(*, platform: str, artifact_receipt_id: str)
         raise ValueError("nuclei_platform_unsupported")
     return ExecutionCapabilityManifest(
         schema_version=CONTRACT_SCHEMA_VERSION,
-        capability_id="nuclei-trusted-runtime", revision=2,
-        adapter_id="nuclei-service", adapter_version="3.11.1-r105.2",
+        capability_id="nuclei-trusted-runtime", revision=3,
+        adapter_id="nuclei-service", adapter_version="3.11.1-r105.3",
         image_digest=digest, input_schema_id="nuclei-certified-profile-v1",
         supported_modes=tuple(profile.value for profile in certified_profiles()),
         phases=("preflight", "prepare", "execute", "monitor", "cancel", "collect", "normalize", "cleanup"),

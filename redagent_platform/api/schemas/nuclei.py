@@ -19,7 +19,7 @@ class NucleiCompileRequest(StrictModel):
     plan_id: str = Field(min_length=1, max_length=100, pattern=OPAQUE_ID)
     profile_id: NucleiProfileIdValue
     bundle_id: Literal["r105-http-header-bundle"]
-    bundle_revision: Literal[2]
+    bundle_revision: Literal[3]
     target_id: Literal["r105-owned-http-fixture"]
     target_attestation_sha256: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     policy_decision_id: str = Field(min_length=1, max_length=100, pattern=OPAQUE_ID)

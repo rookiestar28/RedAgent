@@ -19,6 +19,9 @@ from redagent_platform.nuclei_service.artifact_promotion import (
     verify_current_nuclei_artifact_promotion,
 )
 from redagent_platform.nuclei_service.contracts import (
+    CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM,
+    CURRENT_R105_TARGET_IMAGE_ID,
+    CURRENT_R105_GATEWAY_IMAGE_ID,
     NucleiProfileId,
     NucleiTargetBinding,
     TARGET_NETWORK,
@@ -32,10 +35,10 @@ from redagent_platform.nuclei_service.campaign_adapter import (
     NucleiFixedInvocation,
     NucleiRuntimeReceipt,
 )
-from redagent_platform.runner_service.campaign_result import NormalizedAdapterFindingV1
+from redagent_platform.runner_service.campaign_result import NormalizedAdapterFindingV1, parse_normalized_adapter_finding
 
 
-_IMAGE = "redagent/r105-nuclei:3.11.1-r105.2"
+_IMAGE = "redagent/r105-nuclei:3.11.1-r105.3"
 _OWNER = "redagent.owner=r123-nuclei"
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 NUCLEI_EXECUTION_TIMEOUT_SECONDS = 60
@@ -85,6 +88,7 @@ def build_nuclei_worker_command(
         or network != resources.worker_network
     ):
         raise ValueError("r123_nuclei_transport_binding_invalid")
+    # CRITICAL: launch the signed immutable ID; a mutable tag may drift after preflight.
     return (
         "docker",
         "run",
@@ -119,7 +123,7 @@ def build_nuclei_worker_command(
         f"type=bind,source={results},target=/work/results.jsonl",
         "-e",
         "NUCLEI_USER_CERTIFICATE=/run/redagent/nuclei-user.crt",
-        _IMAGE,
+        CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"],
         *invocation.argv,
     )
 
@@ -222,7 +226,7 @@ class NucleiDockerTransport:
                     invocation.invocation_id,
                 ),
                 "--network-alias", "redagent-r105-target",
-                "redagent/r105-target:1.0.1",
+                CURRENT_R105_TARGET_IMAGE_ID,
             )
             _raise_if_cancelled(cancelled, "nuclei")
             target_ip = self._container_ip(resources.target, resources.target_network)
@@ -251,7 +255,7 @@ class NucleiDockerTransport:
                 "redagent-r105-gateway",
                 "--mount",
                 f"type=bind,source={policy_path.resolve()},target=/run/redagent/gateway-policy.json,readonly",
-                "redagent/r105-gateway:1.0.1",
+                CURRENT_R105_GATEWAY_IMAGE_ID,
             ]
             self._docker(*gateway)
             self._docker(
@@ -286,7 +290,7 @@ class NucleiDockerTransport:
                     tool_version="3.11.1",
                     rule_id=item.template_id,
                     rule_version="r105",
-                    database_version="r105-http-header-bundle:2",
+                    database_version="r105-http-header-bundle:3",
                     title=item.title,
                     resource_identity=f"owned-loopback:{item.affected_resource}",
                     location=item.affected_resource,
@@ -372,24 +376,24 @@ class NucleiDockerTransport:
     ):
         attestations = self._workspace / "runtime-assets" / "attestations"
         qualification = (
-            attestations / "260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+            attestations / "261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
         ).read_bytes()
         artifact, _ = verify_current_nuclei_artifact_promotion(
-            promotion_bytes=(attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json").read_bytes(),
+            promotion_bytes=(attestations / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.json").read_bytes(),
             signature_bundle_bytes=(
-                attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json"
+                attestations / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.sigstore.json"
             ).read_bytes(),
-            public_key_bytes=(attestations / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub").read_bytes(),
-            runtime_lock_bytes=(self._workspace / "config/r105-nuclei-runtime-v2.json").read_bytes(),
+            public_key_bytes=(attestations / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.pub").read_bytes(),
+            runtime_lock_bytes=(self._workspace / "config/r105-nuclei-runtime-v3.json").read_bytes(),
             qualification_bytes=qualification,
             now=now,
         )
         bundle = verify_current_nuclei_bundle_promotion(
-            manifest_bytes=(self._workspace / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
+            manifest_bytes=(self._workspace / "bundles/r105-nuclei/bundle-manifest-v3.json").read_bytes(),
             signature_bundle_bytes=(
-                attestations / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json"
+                attestations / "261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json"
             ).read_bytes(),
-            public_key_bytes=(attestations / "260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub").read_bytes(),
+            public_key_bytes=(attestations / "261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.pub").read_bytes(),
             template_bytes=(self._workspace / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml").read_bytes(),
             certificate_bytes=(self._workspace / "config/trust/r105-nuclei-user.crt").read_bytes(),
             qualification_bytes=qualification,
@@ -428,10 +432,14 @@ class NucleiDockerTransport:
         value = self._lock()
         # CRITICAL: runtime-lock identity is not current engine/bundle promotion authority.
         self._verify_promotions(value, now=now)
+        target_tag = value["target_local_tag"]
+        gateway_tag = value["gateway_local_tag"]
+        if not isinstance(target_tag, str) or not isinstance(gateway_tag, str):
+            raise RuntimeError("r123_nuclei_runtime_lock_invalid")
         expected = {
             _IMAGE: value["local_image_id"],
-            "redagent/r105-target:1.0.1": value["target_image_id"],
-            "redagent/r105-gateway:1.0.1": value["gateway_image_id"],
+            target_tag: value["target_image_id"],
+            gateway_tag: value["gateway_image_id"],
         }
         for image, image_id in expected.items():
             if self._docker("image", "inspect", image, "--format", "{{.Id}}").stdout.strip() != image_id:
@@ -441,9 +449,9 @@ class NucleiDockerTransport:
         return value
 
     def _lock(self) -> dict[str, object]:
-        value = json.loads((self._workspace / "config/r105-nuclei-runtime-v2.json").read_text(encoding="utf-8"))
+        value = json.loads((self._workspace / "config/r105-nuclei-runtime-v3.json").read_text(encoding="utf-8"))
         if (
-            value.get("schema") != "redagent.r105-runtime-lock/v2"
+            value.get("schema") != "redagent.r105-runtime-lock/v3"
             or value.get("runtime_update_allowed") is not False
             or value.get("community_templates_allowed") is not False
             or value.get("external_target_allowed") is not False
@@ -554,7 +562,7 @@ class NucleiDockerTransport:
             raise ValueError("r123_nuclei_receipt_binding_mismatch")
         value["evidence_ids"] = tuple(value["evidence_ids"])
         value["normalized_findings"] = tuple(
-            NormalizedAdapterFindingV1(**item)
+            parse_normalized_adapter_finding(item)
             for item in value.get("normalized_findings", ())
         )
         if value.get("observed_at") is not None:

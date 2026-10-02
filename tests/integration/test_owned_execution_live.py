@@ -13,6 +13,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
+import subprocess
 from uuid import uuid4
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -56,6 +58,57 @@ ROOT = Path(__file__).resolve().parents[2]
 LIVE = os.environ.get("REDAGENT_OWNED_EXECUTION_LIVE_TEST") == "owned-loopback-v1"
 
 
+class _ObservedDispatcher:
+    def __init__(self, delegate):
+        self.delegate = delegate
+        self.failures = []
+
+    async def dispatch(self, request):
+        try:
+            return await self.delegate.dispatch(request)
+        except Exception as exc:
+            # Keep the original safe guard code when the coordinator persists generic ambiguity.
+            pending = [exc]
+            visited = set()
+            while pending and len(visited) < 8:
+                error = pending.pop()
+                if id(error) in visited:
+                    continue
+                visited.add(id(error))
+                reason = str(error)
+                self.failures.append((type(error).__name__, reason if re.fullmatch(r"[A-Za-z][A-Za-z0-9_.:-]{0,199}", reason) else "opaque_failure"))
+                pending.extend(item for item in (error.__cause__, error.__context__) if item is not None)
+            raise
+
+    async def lookup(self, request):
+        return await self.delegate.lookup(request)
+
+
+class _ObservedResultBoundary:
+    """Delegate canonical owners unchanged and expose only their safe guard codes."""
+    def __init__(self, delegate, failures):
+        self.delegate = delegate
+        self.failures = failures
+
+    def __getattr__(self, name):
+        return getattr(self.delegate, name)
+
+    async def _observe(self, phase, command, **kwargs):
+        try:
+            return await getattr(self.delegate, phase)(command, **kwargs)
+        except Exception as exc:
+            reason = str(exc)
+            self.failures.append({"phase": phase, "type": type(exc).__name__,
+                "code": reason if re.fullmatch(r"[A-Za-z][A-Za-z0-9_.:-]{0,199}", reason) else "opaque_failure"})
+            raise
+
+    async def finalize(self, command, receipt, **kwargs):
+        return await self._observe("finalize", command, receipt=receipt, **kwargs)
+
+    async def confirm(self, command, **kwargs):
+        return await self._observe("confirm", command, **kwargs)
+
+
 @pytest.mark.skipif(not LIVE, reason="requires explicit owned-loopback composition authority")
 def test_real_owned_execution_from_approved_application_to_durable_evidence():
     with opa_conformance.opa_fixture_lease():
@@ -70,7 +123,7 @@ async def _both_capabilities():
     client = await Client.connect("127.0.0.1:62001")
     async with httpx.AsyncClient(timeout=5) as http:
         provider = OpaPolicyDecisionProvider(http, endpoint=opa_conformance.opa_endpoint(), token_source=lambda: opa_conformance.APP_TOKEN)
-        for capability_key in ("zap-controlled-runtime@2", "nuclei-trusted-runtime@2"):
+        for capability_key in ("zap-controlled-runtime@3", "nuclei-trusted-runtime@3"):
             await _scenario(client, provider, capability_key)
 
 
@@ -110,15 +163,19 @@ async def _scenario(client, policy_provider, capability_key):
             expires_at=admitted.admission_receipt.expires_at)
         resolver = CampaignContextResolver(_AuthorityProvider(snapshot))
         backend = LocalAppendOnlyBackend(ROOT / ".tmp/owned-execution-evidence" / suffix, profile="synthetic-local")
-        dispatcher = build_runner_owned_campaign_dispatcher(ROOT, prepared.sessions,
+        dispatcher = _ObservedDispatcher(build_runner_owned_campaign_dispatcher(ROOT, prepared.sessions,
             runner_identity_owner=PostgresRunnerIdentityOwner(prepared.sessions),
             evidence_service=EvidenceService(prepared.sessions, backend), actor_user_id=prepared.command.actor_user_id,
-            kms_reference="kms:redagent:synthetic-local", owned_execution=True)
+            kms_reference="kms:redagent:synthetic-local", owned_execution=True))
         activities = build_dag_execution_temporal_activities(sessions=prepared.sessions, resolver=resolver,
             lifecycle=PostgresDagLifecycleOwner(prepared.sessions), policy=DagPolicyDecisionAdapter(policy_provider),
             dispatcher=dispatcher, containment=PostgresActivityContainmentOwner(prepared.sessions),
             signing_key=Ed25519PrivateKey.generate(), signing_key_id="owned-test-key", owned_execution_enabled=True,
             actor_user_id=prepared.command.actor_user_id)
+        owner_failures = []
+        coordinator = activities._application._coordinator
+        coordinator._result_owner = _ObservedResultBoundary(coordinator._result_owner, owner_failures)
+        coordinator._store = _ObservedResultBoundary(coordinator._store, owner_failures)
         queue = f"owned-execution-{suffix}"
         async with Worker(client, task_queue=queue, workflows=[AutonomousCampaignStartBridgeWorkflow, CampaignDagExecutionWorkflow],
                           activities=[activities.reconcile, activities.dispatch, activities.contain]):
@@ -131,7 +188,7 @@ async def _scenario(client, policy_provider, capability_key):
             await DagWorkflowRelay(repository=relay, gateway=DagExecutionTemporalStartGateway(client, task_queue=queue)).deliver(claim, now=datetime.now(timezone.utc))
             handle = client.get_workflow_handle(deterministic_dag_workflow_id(prepared.tenant, admitted.execution_run_id), result_type=DagExecutionSnapshotV1)
             result = await asyncio.wait_for(handle.result(), timeout=180)
-            assert result.state is DagRunState.COMPLETED, result
+            assert result.state is DagRunState.COMPLETED, json.dumps({"state": result.state.value, "execution_run_id": result.execution_run_id, "failures": dispatcher.failures, "owner_failures": owner_failures})
             history = await handle.fetch_history()
         await Replayer(workflows=[CampaignDagExecutionWorkflow]).replay_workflow(history)
         current = await prepared.repository.read(tenant_id=prepared.tenant, campaign_id=prepared.campaign)
@@ -154,6 +211,34 @@ async def _scenario(client, policy_provider, capability_key):
                 stored = _stored_from_artifact(dict(row))
                 verification = backend.verify_exact(stored)
                 assert verification.ok, verification.reason
+            proof = {
+                "schema": "redagent.owned-execution-composition-proof/v1",
+                "authority_kind": "explicit-synthetic-authority-with-real-local-owners",
+                "normal_api_ui_qualified": False,
+                "source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+                "source_tree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=ROOT, text=True).strip(),
+                "tracked_candidate_dirty": bool(subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, text=True).strip()),
+                "capability_key": capability_key,
+                "execution_run_id": admitted.execution_run_id,
+                "tenant_id": prepared.tenant,
+                "campaign_id": prepared.campaign,
+                "workflow_id": handle.id,
+                "workflow_run_id": history.events[0].workflow_execution_started_event_attributes.original_execution_run_id,
+                "workflow_state": result.state.value,
+                "campaign_state": current.lifecycle_state.value,
+                "temporal_replay": "PASS",
+                "history_sha256": hashlib.sha256(history.to_json().encode()).hexdigest(),
+                "effect_id": effect["effect_id"],
+                "dispatch_attempt": effect["dispatch_attempt"],
+                "dispatch_generation": effect["dispatch_generation"],
+                "effect_receipt": effect["effect_receipt_payload"],
+                "artifacts": [{"id": row["id"], "sha256": row["content_sha256"],
+                               "size_bytes": row["size_bytes"], "backend_verification": "PASS"} for row in rows],
+            }
+            proof_root = ROOT / ".tmp/owned-execution-proofs"
+            proof_root.mkdir(parents=True, exist_ok=True)
+            (proof_root / f"{admitted.execution_run_id}.json").write_text(
+                json.dumps(proof, sort_keys=True, indent=2, default=str) + "\n", encoding="utf-8")
     finally:
         await prepared.engine.dispose()
 

@@ -53,7 +53,7 @@ class CampaignStatusOwner:
             workflow_delivery_state="delivered",
             workflow_reconciliation_state="none",
             effects=(CampaignEffectStatusV1(
-                capability_id="zap-controlled-runtime@2",
+                capability_id="zap-controlled-runtime@3",
                 state="confirmed",
                 reconciliation_state="confirmed",
                 evidence_count=1,
@@ -178,7 +178,7 @@ def test_r123_campaign_status_is_tenant_scoped_and_contains_no_runtime_dispatch_
     data = response.json()["data"]
     assert data["status"] == "workflow_started"
     assert data["effects"] == [{
-        "capability_id": "zap-controlled-runtime@2",
+        "capability_id": "zap-controlled-runtime@3",
         "state": "confirmed",
         "reconciliation_state": "confirmed",
         "evidence_count": 1,

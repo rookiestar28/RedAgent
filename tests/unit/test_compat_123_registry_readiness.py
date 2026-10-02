@@ -46,15 +46,15 @@ def test_closed_registry_contains_only_exact_noninterchangeable_first_slice_bind
 
     assert tuple(registry) == (
         "artifact-posture@1",
-        "nuclei-trusted-runtime@2",
-        "zap-controlled-runtime@2",
+        "nuclei-trusted-runtime@3",
+        "zap-controlled-runtime@3",
     )
     artifact = registry["artifact-posture@1"]
-    zap = registry["zap-controlled-runtime@2"]
-    nuclei = registry["nuclei-trusted-runtime@2"]
+    zap = registry["zap-controlled-runtime@3"]
+    nuclei = registry["nuclei-trusted-runtime@3"]
     assert (zap.adapter_id, zap.adapter_version, zap.profile_id, zap.profile_revision) == (
         "zap-service",
-        "2.17.0-r104.2",
+        "2.17.0-r104.3",
         "zap-passive-v1",
         1,
     )
@@ -81,11 +81,11 @@ def test_closed_registry_contains_only_exact_noninterchangeable_first_slice_bind
         nuclei.bundle_revision,
     ) == (
         "nuclei-service",
-        "3.11.1-r105.2",
+        "3.11.1-r105.3",
         "nuclei-http-header-v1",
         1,
         "r105-http-header-bundle",
-        2,
+        3,
     )
     with pytest.raises(KeyError):
         registry["zap-active-runtime@1"]
@@ -139,8 +139,8 @@ def test_enabled_mode_requires_and_reports_exact_two_capability_registry() -> No
     assert result.execution_enabled is True
     assert result.reason == "strategy_loop_two_capability_ready"
     assert result.capability_ids == (
-        "nuclei-trusted-runtime@2",
-        "zap-controlled-runtime@2",
+        "nuclei-trusted-runtime@3",
+        "zap-controlled-runtime@3",
     )
 
 
@@ -160,6 +160,6 @@ def test_three_capability_mode_requires_artifact_and_reports_exact_registry() ->
     assert ready.reason == "strategy_loop_three_capability_ready"
     assert ready.capability_ids == (
         "artifact-posture@1",
-        "nuclei-trusted-runtime@2",
-        "zap-controlled-runtime@2",
+        "nuclei-trusted-runtime@3",
+        "zap-controlled-runtime@3",
     )

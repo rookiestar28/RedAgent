@@ -24,19 +24,18 @@ class PostgresDagLifecycleOwner:
         self._sessions = sessions
 
     async def read_current_lifecycle(
-        self, *, tenant_id: str, authority_sha256: str
+        self, *, tenant_id: str, authority_sha256: str, now: datetime
     ) -> CampaignAuthorityLifecycleV2 | None:
         _required("dag_lifecycle_tenant", tenant_id, 64)
         _digest("dag_lifecycle_authority", authority_sha256)
+        # CRITICAL: use the gate's application clock for observation and expiry;
+        # database clock skew otherwise makes a freshly read lifecycle look future-dated.
+        _aware(now)
         async with self._sessions() as session, session.begin():
             await session.execute(
                 text("SELECT set_config('redagent.tenant_id', :tenant_id, true)"),
                 {"tenant_id": tenant_id},
             )
-            now = await session.scalar(select(func.now()))
-            if not isinstance(now, datetime):
-                raise ValueError("dag_lifecycle_database_clock_invalid")
-            _aware(now)
             runs = metadata.tables["campaign_execution_runs"]
             receipts = metadata.tables["plan_admission_receipts"]
             reservations = metadata.tables["campaign_budget_reservations"]

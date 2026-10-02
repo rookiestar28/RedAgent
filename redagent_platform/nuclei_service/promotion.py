@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import json
 
@@ -13,6 +13,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 import yaml
 
+from redagent_platform.nuclei_service.authority import CURRENT_NUCLEI_BUNDLE_PUBLIC_KEY_SHA256
+from redagent_platform.runner_service.runtime_qualification import verify_owned_profile_qualification
 from redagent_platform.nuclei_service.contracts import (
     CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM,
     CURRENT_NUCLEI_VERSION,
@@ -37,6 +39,8 @@ def verify_current_nuclei_bundle_promotion(
     qualification_bytes: bytes,
     now: datetime,
 ) -> NucleiBundleManifest:
+    if hashlib.sha256(public_key_bytes).hexdigest() != CURRENT_NUCLEI_BUNDLE_PUBLIC_KEY_SHA256:
+        raise NucleiPromotionError("nuclei_promotion_anchor_invalid")
     if now.tzinfo is None or now.utcoffset() is None:
         raise NucleiPromotionError("nuclei_promotion_time_invalid")
     digest = hashlib.sha256(manifest_bytes).digest()
@@ -86,9 +90,9 @@ def verify_current_nuclei_bundle_promotion(
     except (ValueError, x509.ExtensionNotFound, yaml.YAMLError) as exc:
         raise NucleiPromotionError("nuclei_promotion_template_or_certificate_invalid") from exc
     if (
-        manifest.get("schema") != "redagent.r105-template-bundle/v2"
+        manifest.get("schema") != "redagent.r105-template-bundle/v3"
         or manifest.get("bundle_id") != "r105-http-header-bundle"
-        or manifest.get("bundle_revision") != 2
+        or manifest.get("bundle_revision") != 3
         or manifest.get("deprecated") is not False
         or manifest.get("production_qualified") is not False
         or engine
@@ -115,9 +119,12 @@ def verify_current_nuclei_bundle_promotion(
         or review.get("author") == review.get("reviewer")
         or review.get("separation_of_duties") is not True
         or review.get("result") != "approved-local-lab-only"
+        or review.get("scope") != "unchanged-template-source-only"
+        or review.get("source_manifest_sha256") != "6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc"
+        or review.get("template_sha256") != template_sha
         or qualification.get("receipt_sha256") != qualification_sha
         or qualification_receipt.get("schema")
-        != "redagent.r105-runtime-qualification/v2"
+        != "redagent.r105-runtime-qualification/v3"
         or qualification_receipt.get("candidate_bundle_sha256")
         != qualification.get("candidate_bundle_sha256")
         or qualification_receipt.get("owned_fixture_finding_count") != 1
@@ -135,8 +142,13 @@ def verify_current_nuclei_bundle_promotion(
         promoted_at.tzinfo is None
         or expires_at.tzinfo is None
         or not promoted_at <= now < expires_at
+        or expires_at > promoted_at + timedelta(days=30)
     ):
         raise NucleiPromotionError("nuclei_current_promotion_expired")
+    try:
+        verify_owned_profile_qualification(qualification_receipt, profiles=frozenset({"nuclei-http-header-v1"}), issued_at=promoted_at)
+    except ValueError as exc:
+        raise NucleiPromotionError("nuclei_current_qualification_invalid") from exc
     return NucleiBundleManifest(
         bundle_id=manifest["bundle_id"],
         revision=manifest["bundle_revision"],

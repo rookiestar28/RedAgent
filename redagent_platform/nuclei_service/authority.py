@@ -16,15 +16,21 @@ class SignedAuthorityPaths:
     public_key: Path
 
 
-CURRENT_NUCLEI_RUNTIME_LOCK = ROOT / "config/r105-nuclei-runtime-v2.json"
+CURRENT_NUCLEI_RUNTIME_LOCK = ROOT / "config/r105-nuclei-runtime-v3.json"
 CURRENT_NUCLEI_ARTIFACT_PROMOTION = SignedAuthorityPaths(
-    document=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json",
-    signature=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json",
-    public_key=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub",
+    document=ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.json",
+    signature=ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.sigstore.json",
+    public_key=ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.pub",
 )
-CURRENT_NUCLEI_BUNDLE_MANIFEST = ROOT / "bundles/r105-nuclei/bundle-manifest-v2.json"
+CURRENT_NUCLEI_BUNDLE_MANIFEST = ROOT / "bundles/r105-nuclei/bundle-manifest-v3.json"
 CURRENT_NUCLEI_BUNDLE_PROMOTION = SignedAuthorityPaths(
     document=CURRENT_NUCLEI_BUNDLE_MANIFEST,
-    signature=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json",
-    public_key=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub",
+    signature=ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json",
+    public_key=ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.pub",
 )
+
+# CRITICAL: signer rotation is an explicit code change, never trust a mutable key file.
+CURRENT_NUCLEI_ARTIFACT_PUBLIC_KEY_SHA256 = "799e977d575224dabd5d30d8b12b722404278afc3064274cc691f97616371696"
+
+# CRITICAL: signer rotation is an explicit code change, never trust a mutable key file.
+CURRENT_NUCLEI_BUNDLE_PUBLIC_KEY_SHA256 = "e460597a7b755b933310c2cfd2a3000c32c2295c27553ba992339117de2d122c"

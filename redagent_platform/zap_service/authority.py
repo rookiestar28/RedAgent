@@ -16,9 +16,12 @@ class SignedAuthorityPaths:
     public_key: Path
 
 
-CURRENT_ZAP_RUNTIME_LOCK = ROOT / "config/r104-zap-runtime-v2.json"
+CURRENT_ZAP_RUNTIME_LOCK = ROOT / "config/r104-zap-runtime-v3.json"
 CURRENT_ZAP_ARTIFACT_PROMOTION = SignedAuthorityPaths(
-    document=ROOT / "runtime-assets/attestations/260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json",
-    signature=ROOT / "runtime-assets/attestations/260824-R104_ZAP_ARTIFACT_PROMOTION_V2.sigstore.json",
-    public_key=ROOT / "runtime-assets/attestations/260824-R104_ZAP_ARTIFACT_PROMOTION_V2.pub",
+    document=ROOT / "runtime-assets/attestations/261002-R104_ZAP_ARTIFACT_PROMOTION_V3.json",
+    signature=ROOT / "runtime-assets/attestations/261002-R104_ZAP_ARTIFACT_PROMOTION_V3.sigstore.json",
+    public_key=ROOT / "runtime-assets/attestations/261002-R104_ZAP_ARTIFACT_PROMOTION_V3.pub",
 )
+
+# CRITICAL: signer rotation is an explicit code change, never trust a mutable key file.
+CURRENT_ZAP_PUBLIC_KEY_SHA256 = "e6fd1ad228ffb398ebcfbff78a265f6e6c2ba784aa58d596ca43a9ad341e2df8"

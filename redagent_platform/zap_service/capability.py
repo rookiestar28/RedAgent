@@ -21,8 +21,8 @@ def build_zap_capability_manifest(*, platform: str, artifact_receipt_id: str) ->
         raise ValueError("zap_platform_unsupported")
     return ExecutionCapabilityManifest(
         schema_version=CONTRACT_SCHEMA_VERSION,
-        capability_id="zap-controlled-runtime", revision=2,
-        adapter_id="zap-service", adapter_version="2.17.0-r104.2",
+        capability_id="zap-controlled-runtime", revision=3,
+        adapter_id="zap-service", adapter_version="2.17.0-r104.3",
         image_digest=digest, input_schema_id="zap-certified-profile-v1",
         supported_modes=tuple(profile.value for profile in certified_profiles()),
         phases=("preflight", "prepare", "execute", "monitor", "cancel", "collect", "normalize", "cleanup"),

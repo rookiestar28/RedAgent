@@ -50,7 +50,18 @@ class DagExecutionTemporalActivities:
         task = asyncio.create_task(
             self._application.execute(request, now=_activity_now())
         )
+        heartbeat_task = (
+            asyncio.create_task(_dispatch_heartbeats(request.execution_run_id))
+            if activity.in_activity()
+            else None
+        )
         try:
+            if heartbeat_task is not None:
+                completed, _ = await asyncio.wait(
+                    (task, heartbeat_task), return_when=asyncio.FIRST_COMPLETED
+                )
+                if heartbeat_task in completed:
+                    await heartbeat_task
             return await task
         except asyncio.CancelledError:
             # CRITICAL: cancellation must reach the effect coordinator before containment proceeds.
@@ -61,6 +72,15 @@ class DagExecutionTemporalActivities:
             raise _permanent("InvalidWorkflowInput", exc) from exc
         except RuntimeError as exc:
             raise _permanent("DispatchDenied", exc) from exc
+        finally:
+            # CRITICAL: keep dispatch alive below the heartbeat timeout and await its
+            # cleanup before containment; a timed-out live attempt can race recovery.
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            if heartbeat_task is not None:
+                heartbeat_task.cancel()
+                await asyncio.gather(heartbeat_task, return_exceptions=True)
 
     @activity.defn(name="redagent.campaign-dag.contain.v1")
     async def contain(
@@ -76,6 +96,14 @@ class DagExecutionTemporalActivities:
 
 def _activity_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+async def _dispatch_heartbeats(execution_run_id: str) -> None:
+    timeout = activity.info().heartbeat_timeout
+    interval = min(1.0, timeout.total_seconds() / 3) if timeout is not None else 1.0
+    while True:
+        activity.heartbeat(execution_run_id)
+        await asyncio.sleep(interval)
 
 
 def _permanent(error_type: str, exc: Exception) -> ApplicationError:

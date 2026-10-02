@@ -20,11 +20,21 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from redagent_platform.nuclei_service.authority import (
-    CURRENT_NUCLEI_ARTIFACT_PROMOTION,
-    CURRENT_NUCLEI_BUNDLE_PROMOTION,
-    CURRENT_NUCLEI_RUNTIME_LOCK,
+from redagent_platform.nuclei_service.authority import SignedAuthorityPaths
+
+# CRITICAL: this historical assembler must never inherit current v3 paths or overwrite new authority.
+LEGACY_NUCLEI_RUNTIME_LOCK = ROOT / "config/r105-nuclei-runtime-v2.json"
+LEGACY_NUCLEI_ARTIFACT_PROMOTION = SignedAuthorityPaths(
+    document=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json",
+    signature=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json",
+    public_key=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub",
 )
+LEGACY_NUCLEI_BUNDLE_PROMOTION = SignedAuthorityPaths(
+    document=ROOT / "bundles/r105-nuclei/bundle-manifest-v2.json",
+    signature=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json",
+    public_key=ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub",
+)
+
 
 
 SOURCE_DATE_EPOCH = 1787529600
@@ -82,7 +92,7 @@ def _build_once(dockerfile: Path, context: Path, tag: str, network_none: bool) -
 
 def build() -> dict[str, object]:
     validate()
-    locked = json.loads(CURRENT_NUCLEI_RUNTIME_LOCK.read_text(encoding="utf-8"))
+    locked = json.loads(LEGACY_NUCLEI_RUNTIME_LOCK.read_text(encoding="utf-8"))
     observed: dict[str, str] = {}
     for name, dockerfile, context, tag, network_none in SPECS:
         first_tag = f"{tag}-repro-a"
@@ -119,7 +129,7 @@ def build() -> dict[str, object]:
 
 
 def validate() -> dict[str, object]:
-    value = json.loads(CURRENT_NUCLEI_RUNTIME_LOCK.read_text(encoding="utf-8"))
+    value = json.loads(LEGACY_NUCLEI_RUNTIME_LOCK.read_text(encoding="utf-8"))
     if (
         value.get("schema") != "redagent.r105-runtime-lock/v2"
         or value.get("source_date_epoch") != SOURCE_DATE_EPOCH
@@ -166,16 +176,16 @@ def _sign(document: Path, private_path: Path, public_path: Path, signature_path:
 def sign() -> dict[str, object]:
     validate()
     _sign(
-        CURRENT_NUCLEI_ARTIFACT_PROMOTION.document,
+        LEGACY_NUCLEI_ARTIFACT_PROMOTION.document,
         PRIVATE_ROOT / "artifact-promotion.key",
-        CURRENT_NUCLEI_ARTIFACT_PROMOTION.public_key,
-        CURRENT_NUCLEI_ARTIFACT_PROMOTION.signature,
+        LEGACY_NUCLEI_ARTIFACT_PROMOTION.public_key,
+        LEGACY_NUCLEI_ARTIFACT_PROMOTION.signature,
     )
     _sign(
-        CURRENT_NUCLEI_BUNDLE_PROMOTION.document,
+        LEGACY_NUCLEI_BUNDLE_PROMOTION.document,
         PRIVATE_ROOT / "bundle-promotion.key",
-        CURRENT_NUCLEI_BUNDLE_PROMOTION.public_key,
-        CURRENT_NUCLEI_BUNDLE_PROMOTION.signature,
+        LEGACY_NUCLEI_BUNDLE_PROMOTION.public_key,
+        LEGACY_NUCLEI_BUNDLE_PROMOTION.signature,
     )
     return {"ok": True, "action": "sign"}
 

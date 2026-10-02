@@ -22,15 +22,15 @@ from redagent_platform.nuclei_service.contracts import (  # noqa: E402
 from redagent_platform.nuclei_service.normalization import normalize_nuclei_jsonl  # noqa: E402
 
 
-LOCK_PATH = ROOT / "config/r105-nuclei-runtime-v2.json"
+LOCK_PATH = ROOT / "config/r105-nuclei-runtime-v3.json"
 RUNTIME = ROOT / ".local/redagent/r105-runtime"
 TEMPLATE = ROOT / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml"
 CERTIFICATE = ROOT / "config/trust/r105-nuclei-user.crt"
-TARGET_DOCKERFILE = ROOT / "containers/r105-target/Dockerfile"
+TARGET_DOCKERFILE = ROOT / "containers/r105-target/Dockerfile-v3"
 TARGET_SOURCE = ROOT / "containers/r105-target/fixture_server.py"
-GATEWAY_DOCKERFILE = ROOT / "containers/r105-gateway/Dockerfile"
+GATEWAY_DOCKERFILE = ROOT / "containers/r105-gateway/Dockerfile-v3"
 GATEWAY_SOURCE = ROOT / "containers/r105-gateway/gateway_server.py"
-NUCLEI_DOCKERFILE = ROOT / "containers/r105-nuclei/Dockerfile"
+NUCLEI_DOCKERFILE = ROOT / "containers/r105-nuclei/Dockerfile-v3"
 TARGET = "redagent-r105-target"
 GATEWAY = "redagent-r105-gateway"
 WORKER = "redagent-r105-worker"
@@ -49,7 +49,7 @@ def lock() -> dict[str, object]:
     except (OSError, json.JSONDecodeError) as exc:
         raise R105Error("r105_runtime_lock_invalid") from exc
     if (
-        value.get("schema") != "redagent.r105-runtime-lock/v2"
+        value.get("schema") != "redagent.r105-runtime-lock/v3"
         or value.get("platform") != "linux/amd64"
         or value.get("runtime_update_allowed") is not False
         or value.get("community_templates_allowed") is not False
@@ -67,7 +67,7 @@ def lock() -> dict[str, object]:
     }
     if any(value.get(name) != digest for name, digest in expected.items()):
         raise R105Error("r105_runtime_source_digest_mismatch")
-    # IMPORTANT: aliases preserve the fixed controller surface without admitting v1 authority.
+    # IMPORTANT: aliases preserve the fixed controller surface without admitting historical authority.
     return {
         **value,
         "local_tag": value.get("engine_local_tag"),
@@ -78,13 +78,10 @@ def lock() -> dict[str, object]:
 
 def build() -> dict[str, object]:
     value = lock()
-    built = _run(
-        [sys.executable, str(ROOT / "scripts/compat_105_requalify.py"), "build",
-         "--confirm-r105-local-lab"],
-        capture=True,
-    )
-    if built.returncode:
-        raise R105Error("r105_revision_two_build_failed")
+    # CRITICAL: runtime startup never rebuilds with changing package repositories.
+    # Only the public frozen six-artifact tuple may acquire local tags.
+    from scripts.owned_runtime_requalification import activate
+    activate()
     expected = {
         str(value["local_tag"]): str(value["local_image_id"]),
         str(value["target_local_tag"]): str(value["target_image_id"]),
@@ -127,7 +124,7 @@ def _candidate_bundle(value: dict[str, object], *, now: datetime) -> NucleiBundl
     ):
         raise R105Error("r105_candidate_bundle_source_mismatch")
     candidate_sha256 = _canonical_sha({
-        "schema": "redagent.r105-candidate-bundle/v2",
+        "schema": "redagent.r105-candidate-bundle/v3",
         "runtime_lock_sha256": _sha(LOCK_PATH),
         "engine_image_id": value["engine_image_id"],
         "template_sha256": template_sha256,
@@ -160,6 +157,8 @@ def _candidate_bundle(value: dict[str, object], *, now: datetime) -> NucleiBundl
 def qualify() -> dict[str, object]:
     value = lock()
     now = datetime.now(timezone.utc)
+    # CRITICAL: validate tags for drift, then use immutable image IDs for every
+    # container so a retag cannot replace a qualified artifact between check and launch.
     _assert_locked_images(value)
     bundle = _candidate_bundle(value, now=now)
     cleanup()
@@ -168,7 +167,7 @@ def qualify() -> dict[str, object]:
     try:
         _run(["docker", "network", "create", "--internal", "--label", OWNER_LABEL, WORKER_NET])
         _run(["docker", "network", "create", "--internal", "--label", OWNER_LABEL, TARGET_NET])
-        _run(_container_prefix(TARGET, TARGET_NET, "128m", "0.5") + [str(value["target_local_tag"])])
+        _run(_container_prefix(TARGET, TARGET_NET, "128m", "0.5") + [str(value["target_image_id"])])
         target_ip = _container_ip(TARGET, TARGET_NET)
         target = NucleiTargetBinding(
             target_id="r105-owned-http-fixture", attestation_sha256=_canonical_sha({
@@ -186,7 +185,7 @@ def qualify() -> dict[str, object]:
         _write_json(policy_path, policy)
         gateway = _container_prefix(GATEWAY, TARGET_NET, "128m", "0.5")
         gateway.extend(["--mount", f"type=bind,source={policy_path.resolve()},target=/run/redagent/gateway-policy.json,readonly",
-                        str(value["gateway_local_tag"])])
+                        str(value["gateway_image_id"])])
         _run(gateway)
         _run(["docker", "network", "connect", WORKER_NET, GATEWAY])
         _assert_topology()
@@ -209,13 +208,13 @@ def qualify() -> dict[str, object]:
                   "--mount", f"type=bind,source={CERTIFICATE.resolve()},target=/run/redagent/nuclei-user.crt,readonly",
                   "--mount", f"type=bind,source={results_path.resolve()},target=/work/results.jsonl",
                   "-e", "NUCLEI_USER_CERTIFICATE=/run/redagent/nuclei-user.crt",
-                  str(value["local_tag"]), *compiled.argv]
+                  str(value["local_image_id"]), *compiled.argv]
         _run(worker, capture=True)
         normalized = normalize_nuclei_jsonl(results_path.read_bytes(), bundle=bundle, target=target)
         if len(normalized) != 1 or normalized[0].affected_resource != "/nuclei/missing-header":
             raise R105Error("r105_expected_finding_mismatch")
         direct = _run(["docker", "run", "--rm", "--network", WORKER_NET,
-                       "--entrypoint", "/bin/sh", str(value["local_tag"]), "-c",
+                       "--entrypoint", "/bin/sh", str(value["local_image_id"]), "-c",
                        f"getent hosts {TARGET}"], check=False, capture=True)
         if direct.returncode == 0:
             raise R105Error("r105_direct_target_route_present")
@@ -233,6 +232,8 @@ def qualify() -> dict[str, object]:
                         "affected_resource": normalized[0].affected_resource,
                         "fingerprint_sha256": normalized[0].fingerprint},
             "owned_fixture_finding_count": 1, "external_target_contacts": 0,
+            "network_isolation_verified": True,
+            "contact_proof": "observed-internal-networks-and-closed-gateway",
             "direct_target_route": False, "cleanup_residual_resource_count": 0,
             "native_stop_attempted": True,
             "native_stop_acknowledged": cancellation["native_stop_acknowledged"],
@@ -338,7 +339,7 @@ def _negative_template_checks(value: dict[str, object]) -> None:
                        "--mount", f"type=bind,source={RUNTIME.resolve()},target=/templates,readonly",
                        "--mount", f"type=bind,source={CERTIFICATE.resolve()},target=/run/redagent/nuclei-user.crt,readonly",
                        "-e", "NUCLEI_USER_CERTIFICATE=/run/redagent/nuclei-user.crt",
-                       str(value["local_tag"]), "-target", "http://127.0.0.1:1",
+                       str(value["local_image_id"]), "-target", "http://127.0.0.1:1",
                        "-templates", f"/templates/{candidate.name}", "-disable-unsigned-templates",
                        "-disable-update-check", "-no-interactsh", "-no-stdin", "-silent", "-no-color"]
             result = _run(command, check=False, capture=True)

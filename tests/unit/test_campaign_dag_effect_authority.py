@@ -168,7 +168,7 @@ class LifecycleOwner:
     def __init__(self, current=None) -> None:
         self.current = current or _lifecycle()
 
-    async def read_current_lifecycle(self, *, tenant_id, authority_sha256):
+    async def read_current_lifecycle(self, *, tenant_id, authority_sha256, now):
         return self.current
 
 
@@ -219,6 +219,8 @@ def test_gate_uses_32_closed_attributes_and_persists_only_dispatching_decision()
     "lifecycle_owner, policy, reason",
     (
         (LifecycleOwner(_lifecycle(lifecycle_epoch=2)), Policy(), "lifecycle_epoch_drift"),
+        (LifecycleOwner(_lifecycle(observed_at=NOW + timedelta(milliseconds=1))), Policy(), "lifecycle_stale"),
+        (LifecycleOwner(_lifecycle(observed_at=NOW - timedelta(minutes=2), valid_until=NOW)), Policy(), "lifecycle_stale"),
         (LifecycleOwner(), Policy(allowed=False), "boundary_denied"),
         (LifecycleOwner(), Policy(fail=True), "policy_unavailable"),
     ),
@@ -250,6 +252,24 @@ def test_gate_denies_expired_reservation_before_resolver_or_policy() -> None:
     assert decision.allowed is False
     assert decision.reason == "reservation_expired"
     assert policy.requests == []
+
+
+def test_gate_uses_one_explicit_clock_for_lifecycle_observation_and_policy() -> None:
+    class ExplicitClockOwner:
+        async def read_current_lifecycle(self, *, tenant_id, authority_sha256, now):
+            assert now == NOW
+            return _lifecycle(observed_at=now)
+
+    state = StateOwner((_material(effect_state="dispatching"),))
+    policy = Policy()
+    decision = asyncio.run(
+        DagEffectAuthorityGate(state, Resolver(), ExplicitClockOwner(), policy).recheck(
+            _command(), now=NOW
+        )
+    )
+    assert decision.allowed
+    assert state.observations[0][2] == state.commits[0][-1] == NOW
+    assert policy.requests[0].requested_at == NOW
 
 
 @pytest.mark.parametrize(

@@ -12,6 +12,7 @@ from uuid import uuid4
 from sqlalchemy import and_, insert, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
 from redagent_platform.campaign_service.lineage import (
     CampaignTerminalLineageV1,
     verify_success_lineage,
@@ -20,12 +21,39 @@ from redagent_platform.campaign_service.execution import (
     EffectReceiptV1,
     ReconciliationState,
 )
-from redagent_platform.campaign_service.registry import closed_execution_registry
+from redagent_platform.campaign_service.registry import ClosedExecutionBinding, closed_execution_registry
 from redagent_platform.persistence.models import metadata
 
 
 class CampaignRecordConflict(RuntimeError):
     pass
+
+
+def _trusted_effect_closed_binding(payload: Mapping[str, object]) -> ClosedExecutionBinding:
+    capability = payload.get("capability_id")
+    if payload.get("schema_version") == "redagent.campaign-dag-effect-intent/v1":
+        # CRITICAL: DAG IDs are bare; only their exact frozen binding supplies the revision.
+        # Never infer the latest capability from a bare ID or weaken legacy owner checks.
+        raw = payload.get("binding")
+        try:
+            if not isinstance(raw, dict):
+                raise ValueError("missing_binding")
+            binding = CapabilityBindingKeyV1(**raw)
+        except (TypeError, ValueError) as exc:
+            raise CampaignRecordConflict("effect_trusted_capability_invalid") from exc
+        closed = closed_execution_registry().get(f"{binding.capability_id}@{binding.capability_revision}")
+        if closed is None or capability != binding.capability_id or any(
+            getattr(binding, field) != getattr(closed, field)
+            for field in ("capability_id", "capability_revision", "adapter_id", "adapter_version",
+                          "profile_id", "profile_revision", "profile_sha256",
+                          "bundle_id", "bundle_revision", "bundle_sha256")
+        ):
+            raise CampaignRecordConflict("effect_trusted_capability_invalid")
+        return closed
+    closed = closed_execution_registry().get(capability) if isinstance(capability, str) else None
+    if closed is None:
+        raise CampaignRecordConflict("effect_trusted_capability_invalid")
+    return closed
 
 
 class CampaignClaimConflict(RuntimeError):
@@ -1561,12 +1589,7 @@ class CampaignRepository:
             raise CampaignRecordConflict("effect_trusted_owner_state_invalid")
         if effect["cleanup_receipt_id"] is not None and effect["cleanup_receipt_id"] != normalized_cleanup:
             raise CampaignRecordConflict("effect_trusted_cleanup_mismatch")
-        capability = effect["effect_intent_payload"].get("capability_id")
-        if not isinstance(capability, str):
-            raise CampaignRecordConflict("effect_trusted_capability_invalid")
-        closed_binding = closed_execution_registry().get(capability)
-        if closed_binding is None:
-            raise CampaignRecordConflict("effect_trusted_capability_invalid")
+        closed_binding = _trusted_effect_closed_binding(effect["effect_intent_payload"])
         capability_id = closed_binding.capability_id
         execution = (
             await self.session.execute(

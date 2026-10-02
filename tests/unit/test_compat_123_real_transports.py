@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+from redagent_platform.nuclei_service.contracts import CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM
+from redagent_platform.zap_service.contracts import CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM
 import yaml
 
 from redagent_platform.nuclei_service.campaign_adapter import (
@@ -39,7 +41,7 @@ def test_nuclei_real_transport_is_fixed_read_only_internal_and_signed_bundle_onl
         effect_id="effect-nuclei-r123",
         profile_id="nuclei-http-header-v1",
         bundle_id="r105-http-header-bundle",
-        bundle_revision=2,
+        bundle_revision=3,
         bundle_sha256="a" * 64,
         argv=NUCLEI_FIXED_ARGV,
         envelope_sha256="b" * 64,
@@ -64,6 +66,8 @@ def test_nuclei_real_transport_is_fixed_read_only_internal_and_signed_bundle_onl
     assert "no-new-privileges" in rendered
     assert "config/trust/r105-nuclei-user.crt" in rendered.replace("\\", "/")
     assert "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml" in rendered.replace("\\", "/")
+    assert CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"] in command
+    assert not any(value.startswith("redagent/r105-nuclei:") for value in command)
     assert command[-len(NUCLEI_FIXED_ARGV) :] == NUCLEI_FIXED_ARGV
     assert all(value not in command for value in ("-headless", "-code", "-list", "-update-templates"))
 
@@ -82,7 +86,7 @@ def test_zap_real_transport_is_fixed_read_only_internal_and_passive_only() -> No
         effect_id="effect-zap-r123",
         profile_id="zap-passive-v1",
         allowed_paths=("/passive/missing-header",),
-        argv=("/zap/zap.sh", "-cmd", "-autorun", "/run/redagent/r123-zap-passive.yaml"),
+        argv=("/zap/zap.sh", "-cmd", "-silent", "-autorun", "/run/redagent/r123-zap-passive.yaml"),
         envelope_sha256="b" * 64,
         manifest_v2_sha256="c" * 64,
     )
@@ -97,6 +101,8 @@ def test_zap_real_transport_is_fixed_read_only_internal_and_passive_only() -> No
     )
 
     rendered = " ".join(command)
+    assert CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"] in command
+    assert not any(value.startswith("redagent/r104-zap:") for value in command)
     assert command[:3] == ("docker", "run", "--name")
     assert f"--network {resources.worker_network}" in rendered
     assert command[3] == resources.worker
@@ -106,8 +112,12 @@ def test_zap_real_transport_is_fixed_read_only_internal_and_passive_only() -> No
     assert "config/r123-zap-passive.yaml" in rendered.replace("\\", "/")
     entrypoint = command.index("--entrypoint")
     assert command[entrypoint + 1] == invocation.argv[0]
-    assert command[-3:] == invocation.argv[1:]
+    assert command[-len(invocation.argv[1:]):] == invocation.argv[1:]
     assert "activeScan" not in rendered and "-daemon" not in command
+    with pytest.raises(ValueError, match="r123_zap_transport_binding_invalid"):
+        build_zap_worker_command(ROOT, invocation=replace(invocation,
+            argv=tuple(value for value in invocation.argv if value != "-silent")),
+            network=resources.worker_network, runtime=runtime)
     from redagent_platform.zap_service.capability import build_zap_capability_manifest
 
     manifest = build_zap_capability_manifest(platform="linux/amd64", artifact_receipt_id="artifact-test")
@@ -134,13 +144,13 @@ def test_r123_transport_timeouts_do_not_exceed_the_signed_effect_budget() -> Non
     assert zap_plan["parameters"]["responseBytesLimit"] == 1_048_576
 
 
-def test_r123_transports_run_only_current_revision_two_helper_tags() -> None:
+def test_r123_transports_launch_only_current_immutable_helper_identities() -> None:
     zap_source = (ROOT / "redagent_platform/zap_service/campaign_transport.py").read_text()
     nuclei_source = (ROOT / "redagent_platform/nuclei_service/campaign_transport.py").read_text()
-    assert "redagent/r104-target:1.0.1" in zap_source
-    assert "redagent/r104-gateway:1.0.1" in zap_source
-    assert "redagent/r105-target:1.0.1" in nuclei_source
-    assert "redagent/r105-gateway:1.0.1" in nuclei_source
+    assert "CURRENT_R104_TARGET_IMAGE_ID" in zap_source
+    assert "CURRENT_R104_GATEWAY_IMAGE_ID" in zap_source
+    assert "CURRENT_R105_TARGET_IMAGE_ID" in nuclei_source
+    assert "CURRENT_R105_GATEWAY_IMAGE_ID" in nuclei_source
     assert "target:1.0.0" not in zap_source + nuclei_source
     assert "gateway:1.0.0" not in zap_source + nuclei_source
 
@@ -228,6 +238,7 @@ def test_invocation_derived_resources_are_stable_bounded_and_non_interchangeable
                 argv=(
                     "/zap/zap.sh",
                     "-cmd",
+                    "-silent",
                     "-autorun",
                     "/run/redagent/r123-zap-passive.yaml",
                 ),
@@ -243,8 +254,8 @@ def test_invocation_derived_resources_are_stable_bounded_and_non_interchangeable
                 effect_id="effect-nuclei-expired",
                 profile_id="nuclei-http-header-v1",
                 bundle_id="r105-http-header-bundle",
-                bundle_revision=2,
-                bundle_sha256="6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc",
+                bundle_revision=3,
+                bundle_sha256="ab8cbe219bb7b886dccd5b638583b374961560d688bd53e7bdc4164b0babc5ef",
                 argv=NUCLEI_FIXED_ARGV,
                 envelope_sha256="b" * 64,
                 manifest_v2_sha256="c" * 64,

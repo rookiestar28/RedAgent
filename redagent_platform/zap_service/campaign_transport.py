@@ -16,17 +16,20 @@ import tempfile
 import threading
 
 from redagent_platform.zap_service.contracts import (
+    CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM,
+    CURRENT_R104_TARGET_IMAGE_ID,
+    CURRENT_R104_GATEWAY_IMAGE_ID,
     CertifiedProfileId,
     ZAP_ADDON_INVENTORY_COUNT,
     ZAP_ADDON_INVENTORY_SHA256,
 )
 from redagent_platform.zap_service.normalization import normalize_alerts
 from redagent_platform.zap_service.promotion import verify_current_zap_promotion
-from redagent_platform.zap_service.campaign_adapter import ZapFixedInvocation, ZapRuntimeReceipt
-from redagent_platform.runner_service.campaign_result import NormalizedAdapterFindingV1
+from redagent_platform.zap_service.campaign_adapter import ZAP_FIXED_ARGV, ZapFixedInvocation, ZapRuntimeReceipt
+from redagent_platform.runner_service.campaign_result import NormalizedAdapterFindingV1, parse_normalized_adapter_finding
 
 
-_IMAGE = "redagent/r104-zap:2.17.0-r104.2"
+_IMAGE = "redagent/r104-zap:2.17.0-r104.3"
 _OWNER = "redagent.owner=r123-zap"
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 ZAP_EXECUTION_TIMEOUT_SECONDS = 60
@@ -72,8 +75,10 @@ def build_zap_worker_command(
         invocation.profile_id != "zap-passive-v1"
         or invocation.allowed_paths != ("/passive/missing-header",)
         or network != resources.worker_network
+        or invocation.argv != ZAP_FIXED_ARGV
     ):
         raise ValueError("r123_zap_transport_binding_invalid")
+    # CRITICAL: launch the signed immutable ID; a mutable tag may drift after preflight.
     return (
         "docker",
         "run",
@@ -108,7 +113,7 @@ def build_zap_worker_command(
         f"type=bind,source={runtime_path},target=/work",
         "--entrypoint",
         invocation.argv[0],
-        _IMAGE,
+        CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"],
         *invocation.argv[1:],
     )
 
@@ -211,7 +216,7 @@ class ZapDockerTransport:
                 ),
                 "--network-alias", "redagent-r104-target",
                 "--mount", f"type=bind,source={auth.resolve()},target=/run/redagent/r104-auth,readonly",
-                "redagent/r104-target:1.0.1",
+                CURRENT_R104_TARGET_IMAGE_ID,
             )
             _raise_if_cancelled(cancelled, "zap")
             target_ip = self._container_ip(resources.target, resources.target_network)
@@ -242,7 +247,7 @@ class ZapDockerTransport:
                 "--network-alias", "redagent-r104-gateway",
                 "--mount", f"type=bind,source={policy_path.resolve()},target=/run/redagent/gateway-policy.json,readonly",
                 "--mount", f"type=bind,source={auth.resolve()},target=/run/redagent/r104-auth,readonly",
-                "redagent/r104-gateway:1.0.1",
+                CURRENT_R104_GATEWAY_IMAGE_ID,
             )
             self._docker(
                 "network", "connect", "--alias", "redagent-r104-gateway",
@@ -360,10 +365,10 @@ class ZapDockerTransport:
         *,
         now: datetime,
     ) -> dict[str, object]:
-        lock_path = self._workspace / "config/r104-zap-runtime-v2.json"
+        lock_path = self._workspace / "config/r104-zap-runtime-v3.json"
         value = json.loads(lock_path.read_text(encoding="utf-8"))
         if (
-            value.get("schema") != "redagent.r104-runtime-lock/v2"
+            value.get("schema") != "redagent.r104-runtime-lock/v3"
             or value.get("runtime_update_allowed") is not False
             or value.get("external_target_allowed") is not False
             or value.get("zap_addon_inventory_count") != ZAP_ADDON_INVENTORY_COUNT
@@ -374,14 +379,12 @@ class ZapDockerTransport:
         self._verify_promotion(value, now=now)
         for image, expected in (
             (_IMAGE, value["engine_image_id"]),
-            ("redagent/r104-target:1.0.1", value["target_image_id"]),
-            ("redagent/r104-gateway:1.0.1", value["gateway_image_id"]),
+            (value["target_local_tag"], value["target_image_id"]),
+            (value["gateway_local_tag"], value["gateway_image_id"]),
         ):
             if self._docker("image", "inspect", image, "--format", "{{.Id}}").stdout.strip() != expected:
                 raise RuntimeError("r123_zap_image_identity_mismatch")
-        if invocation.argv != (
-            "/zap/zap.sh", "-cmd", "-autorun", "/run/redagent/r123-zap-passive.yaml"
-        ):
+        if invocation.argv != ZAP_FIXED_ARGV:
             raise ValueError("r123_zap_command_forbidden")
         return value
 
@@ -389,19 +392,19 @@ class ZapDockerTransport:
         attestations = self._workspace / "runtime-assets" / "attestations"
         receipt, _ = verify_current_zap_promotion(
             promotion_bytes=(
-                attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json"
+                attestations / "261002-R104_ZAP_ARTIFACT_PROMOTION_V3.json"
             ).read_bytes(),
             bundle_bytes=(
-                attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.sigstore.json"
+                attestations / "261002-R104_ZAP_ARTIFACT_PROMOTION_V3.sigstore.json"
             ).read_bytes(),
             public_key_bytes=(
-                attestations / "260824-R104_ZAP_ARTIFACT_PROMOTION_V2.pub"
+                attestations / "261002-R104_ZAP_ARTIFACT_PROMOTION_V3.pub"
             ).read_bytes(),
             runtime_lock_bytes=(
-                self._workspace / "config/r104-zap-runtime-v2.json"
+                self._workspace / "config/r104-zap-runtime-v3.json"
             ).read_bytes(),
             qualification_bytes=(
-                attestations / "260824-R104_ZAP_RUNTIME_QUALIFICATION_V2.json"
+                attestations / "261002-R104_ZAP_RUNTIME_QUALIFICATION_V3.json"
             ).read_bytes(),
             now=now,
         )
@@ -511,7 +514,7 @@ class ZapDockerTransport:
             raise ValueError("r123_zap_receipt_binding_mismatch")
         value["evidence_ids"] = tuple(value["evidence_ids"])
         value["normalized_findings"] = tuple(
-            NormalizedAdapterFindingV1(**item)
+            parse_normalized_adapter_finding(item)
             for item in value.get("normalized_findings", ())
         )
         if value.get("observed_at") is not None:

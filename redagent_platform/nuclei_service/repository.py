@@ -50,9 +50,9 @@ class NucleiRepository:
         await self._context()
         await self._lock("nuclei-foundation:v1")
         engine = await self._immutable(
-            "nuclei_engine_artifacts", {"engine_id": "nuclei-3.11.1-r105.2"},
+            "nuclei_engine_artifacts", {"engine_id": "nuclei-3.11.1-r105.3"},
             {
-                "engine_id": "nuclei-3.11.1-r105.2", "engine_version": CURRENT_NUCLEI_VERSION,
+                "engine_id": "nuclei-3.11.1-r105.3", "engine_version": CURRENT_NUCLEI_VERSION,
                 "image_digest": CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"],
                 "signature_sha256": artifact_signature_sha256,
                 "provenance_sha256": artifact_provenance_sha256,
@@ -85,15 +85,15 @@ class NucleiRepository:
              "template_state": "certified"}, occurred_at, "template",
         )
         review = await self._immutable(
-            "nuclei_bundle_reviews", {"review_id": "r105-independent-review-v2"},
-            {"bundle_record_id": bundle_row["id"], "review_id": "r105-independent-review-v2",
+            "nuclei_bundle_reviews", {"review_id": f"r105-template-source-review-binding-v{bundle.revision}"},
+            {"bundle_record_id": bundle_row["id"], "review_id": f"r105-template-source-review-binding-v{bundle.revision}",
              "author_user_id": "redagent-r105-author", "reviewer_user_id": bundle.reviewer_user_id,
              "review_state": "approved-local-lab", "review_sha256": bundle.bundle_sha256},
             occurred_at, "review",
         )
         promotion = await self._immutable(
-            "nuclei_bundle_promotions", {"promotion_id": "r105-bundle-promotion-v2"},
-            {"bundle_record_id": bundle_row["id"], "promotion_id": "r105-bundle-promotion-v2",
+            "nuclei_bundle_promotions", {"promotion_id": f"r105-bundle-promotion-v{bundle.revision}"},
+            {"bundle_record_id": bundle_row["id"], "promotion_id": f"r105-bundle-promotion-v{bundle.revision}",
              "promotion_sha256": bundle.bundle_sha256, "signature_sha256": bundle_signature_sha256,
              "promotion_state": "active-local-lab", "promoted_at": bundle.promoted_at},
             occurred_at, "promotion",
@@ -265,7 +265,7 @@ class NucleiRepository:
         if (
             runner is None
             or runner["required_policy_revision"] != compiled_state.get("policy_revision")
-            or "nuclei-service:3.11.1-r105.2" not in runner["adapter_allowlist"]
+            or "nuclei-service:3.11.1-r105.3" not in runner["adapter_allowlist"]
             or CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"] not in runner["image_allowlist"]
         ):
             raise NucleiRepositoryConflict("nuclei_runner_registration_required")
@@ -339,7 +339,7 @@ class NucleiRepository:
                 "id": f"issue-nuclei-{uuid4().hex}", "tenant_id": self.tenant_id,
                 "fingerprint": result.fingerprint, "title": result.title, "tool": "nuclei",
                 "rule_id": f"{result.template_id}:{result.matcher_name}",
-                "tool_version": CURRENT_NUCLEI_VERSION, "database_version": "r105-http-header-bundle:2",
+                "tool_version": CURRENT_NUCLEI_VERSION, "database_version": "r105-http-header-bundle:3",
                 "severity": result.severity, "confidence": "firm", "version": 1,
                 "created_at": occurred_at, "updated_at": occurred_at,
             }
@@ -423,7 +423,6 @@ class NucleiRepository:
         await self._context()
         result: dict[str, list[dict[str, object]]] = {}
         for key, table_name, order in (
-            ("profiles", "nuclei_profile_revisions", "profile_id"),
             ("plans", "nuclei_compiled_plans", "created_at"),
             ("runs", "nuclei_runs", "created_at"),
             ("results", "nuclei_normalized_results", "created_at"),
@@ -433,6 +432,19 @@ class NucleiRepository:
             rows = (await self.session.execute(select(table).where(
                 table.c.tenant_id == self.tenant_id).order_by(getattr(table.c, order).desc()).limit(100))).mappings().all()
             result[key] = [dict(row) for row in rows]
+        profiles = metadata.tables["nuclei_profile_revisions"]
+        engines = metadata.tables["nuclei_engine_artifacts"]
+        bundles = metadata.tables["nuclei_bundle_revisions"]
+        # CRITICAL: display each immutable row's actual engine/bundle; current defaults
+        # would relabel historical qualification without renewing its authority.
+        profile_rows = (await self.session.execute(select(profiles,
+            engines.c.engine_version, engines.c.image_digest,
+            bundles.c.bundle_id, bundles.c.bundle_revision,
+        ).join(engines, (engines.c.id == profiles.c.engine_record_id) & (engines.c.tenant_id == profiles.c.tenant_id))
+         .join(bundles, (bundles.c.id == profiles.c.bundle_record_id) & (bundles.c.tenant_id == profiles.c.tenant_id))
+         .where(profiles.c.tenant_id == self.tenant_id)
+         .order_by(profiles.c.profile_id.desc()).limit(100))).mappings().all()
+        result["profiles"] = [dict(row) for row in profile_rows]
         targets = metadata.tables["nuclei_target_attestations"]
         target_rows = (await self.session.execute(select(targets).where(
             targets.c.tenant_id == self.tenant_id,
@@ -449,7 +461,7 @@ class NucleiRepository:
         # CRITICAL: option visibility is read-only; mutation handlers still revalidate every binding.
         result["target_options"] = [dict(row) for row in target_rows]
         result["runner_options"] = [dict(row) for row in runner_rows if (
-            "nuclei-service:3.11.1-r105.2" in row["adapter_allowlist"]
+            "nuclei-service:3.11.1-r105.3" in row["adapter_allowlist"]
             and CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"] in row["image_allowlist"]
         )]
         result["job_options"] = [dict(row) for row in job_rows if (
@@ -598,7 +610,7 @@ def profile_values(profile) -> dict[str, object]:
         "profile_id": profile.profile_id.value, "profile_revision": 1,
         "engine_version": CURRENT_NUCLEI_VERSION,
         "image_digest": CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"],
-        "bundle_id": "r105-http-header-bundle", "bundle_revision": 2,
+        "bundle_id": "r105-http-header-bundle", "bundle_revision": 3,
         "profile_sha256": canonical_profile_sha256(profile), "risk_class": "low",
         "allowed_protocols": list(profile.allowed_protocols),
         "allowed_methods": list(profile.allowed_methods), "allowed_paths": list(profile.allowed_paths),

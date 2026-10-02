@@ -160,7 +160,7 @@ async def _runner_identity_owner_scenario() -> None:
                 spiffe_id=spiffe_id,
                 certificate_fingerprint="a" * 64,
                 certificate_serial=f"serial-{suffix}",
-                adapter_allowlist=["zap-service:2.17.0-r104.2"],
+                adapter_allowlist=["zap-service:2.17.0-r104.3"],
                 image_allowlist=["sha256:" + "b" * 64],
                 required_policy_revision="policy-r123-v1",
                 generation=1,
@@ -605,7 +605,7 @@ async def _envelope_verifier_scenario() -> None:
 
 
 def _runtime_binding() -> CapabilityBindingKeyV1:
-    closed = closed_execution_registry()["zap-controlled-runtime@2"]
+    closed = closed_execution_registry()["zap-controlled-runtime@3"]
     return CapabilityBindingKeyV1(
         schema_version="redagent.r119-capability-binding/v1",
         capability_id=closed.capability_id,
@@ -751,7 +751,7 @@ async def _bootstrap_owned_loopback_fixture(
         await session.execute(insert(metadata.tables["lab_bundles"]).values(
             id=bundle_id,
             bundle_id="r123-owned-loopback-http-first-slice",
-            bundle_revision=2,
+            bundle_revision=3,
             fixture_digest="sha256:" + "d" * 64,
             seed_manifest_sha256="e" * 64,
             network_id="redagent-r103-lab",
@@ -891,8 +891,8 @@ async def _bootstrap_authority_dependencies(
             **owned,
         ))
         adapter_allowlist = [
-            "zap-service:2.17.0-r104.2",
-            "nuclei-service:3.11.1-r105.2",
+            "zap-service:2.17.0-r104.3",
+            "nuclei-service:3.11.1-r105.3",
         ]
         if artifact_adapter:
             adapter_allowlist.append("redagent-canonical-artifact:1.0.0-r110.1")

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 
@@ -10,6 +10,8 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from redagent_platform.artifact_pipeline.campaign_adapter import ArtifactCampaignAdapter
+from redagent_platform.artifact_pipeline.promotion import verify_current_artifact_promotion
+from redagent_platform.campaign_service import runtime as campaign_runtime
 from redagent_platform.campaign_service.registry import closed_execution_registry
 from redagent_platform.campaign_service.resolver import CanonicalAuthoritySnapshot
 from redagent_platform.campaign_service.runtime import (
@@ -162,12 +164,19 @@ def test_artifact_campaign_adapter_rejects_cross_capability_binding_and_lookup_i
         )))
 
 
-def test_artifact_campaign_planner_resolves_receipt_server_side_and_emits_three_bindings() -> None:
+def test_artifact_campaign_planner_resolves_synthetic_receipt_server_side_and_emits_three_bindings(monkeypatch) -> None:
+    scanner_now = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(minutes=1)
+    historical = verify_current_artifact_promotion(ROOT, now=NOW)
+    # Planner-contract fixture only: expired signed artifact authority is never renewed.
+    synthetic = replace(historical, receipt=replace(historical.receipt,
+        verified_at=scanner_now - timedelta(minutes=1), expires_at=scanner_now + timedelta(days=7)))
+    monkeypatch.setattr(campaign_runtime, "verify_current_artifact_promotion", lambda workspace, *, now: synthetic)
     facts_owner = LocalCampaignPlanningFactsOwner(ROOT)
     request = _start_request()
-    authority = _authority()
+    authority = replace(_authority(), observed_at=scanner_now - timedelta(seconds=1),
+        expires_at=scanner_now + timedelta(minutes=30), lease_expires_at=scanner_now + timedelta(minutes=30))
 
-    facts = asyncio.run(facts_owner.read(request, authority, now=NOW))
+    facts = asyncio.run(facts_owner.read(request, authority, now=scanner_now))
     planner = DeterministicCampaignStartPlanner(
         facts_owner,
         PolicyBoundCampaignAuthorizationOwner(
@@ -180,7 +189,7 @@ def test_artifact_campaign_planner_resolves_receipt_server_side_and_emits_three_
             request,
             authority,
             campaign_id="campaign-r129",
-            now=NOW,
+            now=scanner_now,
         )
     )
 

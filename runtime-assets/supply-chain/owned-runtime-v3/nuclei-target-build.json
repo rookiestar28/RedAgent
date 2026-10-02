@@ -1,0 +1,22 @@
+{
+  "artifact": "nuclei-target",
+  "build_image_ids": [
+    "sha256:b874d619d8e5a9269beb034f339f874a3936e082d68d86c2b69c92d77b1a33f2",
+    "sha256:b874d619d8e5a9269beb034f339f874a3936e082d68d86c2b69c92d77b1a33f2"
+  ],
+  "compatibility_version": "20",
+  "context_sha256": "2ac5a366e9451ab584e6c2f4668646830008b636e03e7faa7a5becfda3953a72",
+  "image_id": "sha256:b874d619d8e5a9269beb034f339f874a3936e082d68d86c2b69c92d77b1a33f2",
+  "local_tag": "redagent/r105-target:1.0.2",
+  "runtime_qualified": false,
+  "schema": "redagent.owned-artifact-build/v3",
+  "source_date_epoch": 1787529600,
+  "sources": {
+    ".tmp/runtime-requalification-v3/packages/libcrypto3-3.5.9-r0.apk": "3f5825ced5fde1c66a5376a3f6076b3c08538ad52d9ef23f069857e212d9175a",
+    ".tmp/runtime-requalification-v3/packages/libssl3-3.5.9-r0.apk": "6801c740b9760b5b08da8db6367ebc18b2cc4dbaf371f7148429538b8bb04e23",
+    "config/owned-helper-dependencies-v3.json": "194b19647edd5cbfe18d156e37e480b1ea0b7f0021626d9473176f5af31b0dee",
+    "containers/r105-target/Dockerfile-v3": "a941aca62977654f250d802b628cb01019de30a7f1aac4f0bd3fb80c1494e524",
+    "containers/r105-target/fixture_server.py": "d2012077f8bb7f5e5bef3c1fbd591c9777b2f19e4d45e159692ed182c0bbc6e3",
+    "containers/r105-target/packages-v3.txt": "4f9454057fa247b9e74cae900d6b45ed7938248b98c3e22625e14c3c7da102aa"
+  }
+}

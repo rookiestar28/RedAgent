@@ -69,12 +69,12 @@ export function NucleiPage({ client, context }: { readonly client: Client; reado
     const job = jobOptions.find((item) => item.job_id === data.get("job_binding"));
     const decision = policyOptions.find((item) => item.decision_id === data.get("policy_binding"));
     const target = targetOptions.find((item) => item.attestation_sha256 === data.get("target_binding"));
-    if (!profile || !job || !decision || !target || !targetEligible(target, observedAt)) return;
+    if (!profile || profile.bundle_revision !== 3 || !job || !decision || !target || !targetEligible(target, observedAt)) return;
     setActionError(null); setNotice(null);
     try {
       const plan = await client.compileNucleiPlan({
         plan_id: `nuclei-plan-${crypto.randomUUID()}`, profile_id: profile.profile_id,
-        bundle_id: "r105-http-header-bundle", bundle_revision: 2,
+        bundle_id: "r105-http-header-bundle", bundle_revision: profile.bundle_revision,
         target_id: target.target_id as "r105-owned-http-fixture",
         target_attestation_sha256: target.attestation_sha256,
         policy_decision_id: decision.decision_id, policy_revision: decision.bundle_revision,

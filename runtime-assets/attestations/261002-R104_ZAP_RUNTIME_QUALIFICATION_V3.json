@@ -1,0 +1,55 @@
+{
+  "addon_inventory_sha256": "50293fde751b211ed6432b0b5039e8bf3fec7676a738c635a9c1e6844c511e43",
+  "all_profiles_passed": true,
+  "cleanup_residual_resource_count": 0,
+  "direct_target_route": false,
+  "engine_image_id": "sha256:98745eb0d8f07d3efa4f94cf5e7173188ae6c356c3582ffa9479e35a37506f9e",
+  "external_target_contacts": 0,
+  "network_isolation_verified": true,
+  "production_qualified": false,
+  "profiles": [
+    {
+      "cleanup_residual_resource_count": 0,
+      "external_target_contacts": 0,
+      "native_stop_acknowledged": true,
+      "network_isolation_verified": true,
+      "passed": true,
+      "profile_id": "zap-passive-v1",
+      "receipt_path": "runtime-assets/attestations/261002-R104_zap-passive-v1_V3.json",
+      "receipt_sha256": "23f833bb7cca62b953f9cfc6a8444e1f91088ec3680627826ab5dd0d55a55422"
+    },
+    {
+      "cleanup_residual_resource_count": 0,
+      "external_target_contacts": 0,
+      "native_stop_acknowledged": true,
+      "network_isolation_verified": true,
+      "passed": true,
+      "profile_id": "zap-auth-crawl-v1",
+      "receipt_path": "runtime-assets/attestations/261002-R104_zap-auth-crawl-v1_V3.json",
+      "receipt_sha256": "d62a19ed3a822d8ca7b659be0150a2c227e065eff86fed6fb91665ea08091306"
+    },
+    {
+      "cleanup_residual_resource_count": 0,
+      "external_target_contacts": 0,
+      "native_stop_acknowledged": true,
+      "network_isolation_verified": true,
+      "passed": true,
+      "profile_id": "zap-client-spider-v1",
+      "receipt_path": "runtime-assets/attestations/261002-R104_zap-client-spider-v1_V3.json",
+      "receipt_sha256": "bd907e1402c24aeaa7728ac3bc755d6de7e13f618054966f50c4c4b0db95e888"
+    },
+    {
+      "cleanup_residual_resource_count": 0,
+      "external_target_contacts": 0,
+      "native_stop_acknowledged": true,
+      "network_isolation_verified": true,
+      "passed": true,
+      "profile_id": "zap-active-xss-lab-v1",
+      "receipt_path": "runtime-assets/attestations/261002-R104_zap-active-xss-lab-v1_V3.json",
+      "receipt_sha256": "e80924639937ec299036e5860eeeff106e3a5b8c0c0f8bc4c13c27bee9a98f66"
+    }
+  ],
+  "qualified_at": "2026-10-02T11:56:06.009397+00:00",
+  "runtime_lock_sha256": "c5509b73a55bf5ae96decc3f86c26eff8d7b8b1fc2081803c1d4f6677516604d",
+  "schema": "redagent.r104-runtime-qualification/v3"
+}

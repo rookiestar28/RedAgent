@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 import json
 from typing import Protocol
@@ -18,6 +18,7 @@ from redagent_platform.runner_service.campaign_result import (
     AdapterResultMaterialV1,
     AdapterResultWriter,
     NormalizedAdapterFindingV1,
+    report_safe_payload_matches,
 )
 
 
@@ -97,7 +98,7 @@ class NucleiCampaignTransport(Protocol):
 
 class NucleiCampaignAdapter:
     adapter_id = "nuclei-service"
-    adapter_version = "3.11.1-r105.2"
+    adapter_version = "3.11.1-r105.3"
 
     def __init__(self, transport: NucleiCampaignTransport, result_writer: AdapterResultWriter) -> None:
         self._transport = transport
@@ -174,7 +175,7 @@ class NucleiCampaignAdapter:
 
 
 def _validate_request(request: CampaignAdapterRequest):
-    expected = closed_execution_registry()["nuclei-trusted-runtime@2"]
+    expected = closed_execution_registry()["nuclei-trusted-runtime@3"]
     if request.capability_key != expected.capability_key:
         raise ValueError("r123_nuclei_capability_mismatch")
     if (request.adapter_id, request.adapter_version) != (
@@ -224,7 +225,7 @@ def _validate_runtime(
     ):
         # CRITICAL: the product path is owned-loopback only; never rewrite contact truth to zero.
         raise ValueError("r123_nuclei_external_contact_forbidden")
-    expected = closed_execution_registry()["nuclei-trusted-runtime@2"]
+    expected = closed_execution_registry()["nuclei-trusted-runtime@3"]
     if receipt.terminal_state == "not_applied":
         if (
             (receipt.bundle_id, receipt.bundle_revision, receipt.bundle_sha256)
@@ -248,13 +249,8 @@ def _validate_runtime(
             for item in receipt.normalized_findings
         )
         or receipt.result_count != len(receipt.normalized_findings)
-        or receipt.report_safe_payload
-        != {
-            "schema": "redagent.r123-result/v1",
-            "adapter_id": "nuclei-service",
-            "output_complete": True,
-            "findings": [asdict(item) for item in receipt.normalized_findings],
-        }
+        or not report_safe_payload_matches(receipt.report_safe_payload,
+            adapter_id="nuclei-service", findings=receipt.normalized_findings)
     ):
         # CRITICAL: evidence bytes and imported findings must describe the same result.
         raise ValueError("r123_nuclei_report_safe_payload_invalid")

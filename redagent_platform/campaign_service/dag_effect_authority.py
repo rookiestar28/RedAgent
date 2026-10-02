@@ -165,7 +165,7 @@ class DagEffectAuthorityStateOwner(Protocol):
 
 class DagLifecycleOwner(Protocol):
     async def read_current_lifecycle(
-        self, *, tenant_id: str, authority_sha256: str
+        self, *, tenant_id: str, authority_sha256: str, now: datetime
     ) -> CampaignAuthorityLifecycleV2 | None: ...
 
 
@@ -251,6 +251,7 @@ class DagEffectAuthorityGate:
         lifecycle = await self._lifecycle.read_current_lifecycle(
             tenant_id=material.tenant_id,
             authority_sha256=material.authority_sha256,
+            now=now,
         )
         if lifecycle is not None and (
             lifecycle.tenant_id == material.tenant_id

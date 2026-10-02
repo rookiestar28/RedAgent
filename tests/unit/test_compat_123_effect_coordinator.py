@@ -35,14 +35,14 @@ COMPLETED = NOW + timedelta(seconds=1)
 
 
 def _binding() -> CapabilityBindingKeyV1:
-    closed = closed_execution_registry()["nuclei-trusted-runtime@2"]
+    closed = closed_execution_registry()["nuclei-trusted-runtime@3"]
     return CapabilityBindingKeyV1(
         schema_version="redagent.r119-capability-binding/v1",
         capability_id="nuclei-trusted-runtime",
-        capability_revision=2,
+        capability_revision=3,
         execution_manifest_sha256="a" * 64,
         adapter_id="nuclei-service",
-        adapter_version="3.11.1-r105.2",
+        adapter_version="3.11.1-r105.3",
         profile_id="nuclei-http-header-v1",
         profile_revision=1,
         profile_sha256=closed.profile_sha256,
@@ -148,6 +148,30 @@ class Store:
             "state": "reconciliation_required",
             "next_retry_at": now + timedelta(seconds=5),
         }
+
+
+def test_effect_receipt_preserves_durable_dispatch_clock_after_fresh_authority_check():
+    class StrictClockStore(Store):
+        async def mark_dispatching(self, command, **kwargs):
+            self.started_at = kwargs["now"]
+            return await super().mark_dispatching(command, **kwargs)
+
+        async def confirm(self, command, **kwargs):
+            expected = self.started_at.isoformat().replace("+00:00", "Z")
+            if kwargs["receipt_payload"]["started_at"] != expected:
+                raise RuntimeError("effect_receipt_claim_conflict")
+            return await super().confirm(command, **kwargs)
+
+    authority = Authority((AuthorityRecheck(True, "allowed", "runner-r123", "spiffe://redagent/runner/r123"),) * 2)
+    store = StrictClockStore()
+    dispatcher = Dispatcher()
+    moments = iter((NOW + timedelta(milliseconds=200), COMPLETED))
+    coordinator = CampaignEffectCoordinator(authority, store, Issuer(), dispatcher, ResultOwner(), clock=lambda: next(moments))
+    receipt = asyncio.run(coordinator.dispatch(_command(), now=NOW))
+    assert receipt["started_at"] == NOW.isoformat().replace("+00:00", "Z")
+    assert authority.times == [NOW, NOW + timedelta(milliseconds=200)]
+    assert dispatcher.calls == 1
+    assert not any(event[0] == "ambiguity" for event in store.events)
 
 
 class Issuer:
@@ -311,7 +335,7 @@ def test_effect_coordinator_rechecks_authority_issues_exact_manifest_and_confirm
         "runner_id": "runner-r123",
         "workload_identity": "spiffe://redagent/runner/r123",
         "request_sha256": store.events[1][1],
-        "started_at": COMPLETED.isoformat().replace("+00:00", "Z"),
+        "started_at": NOW.isoformat().replace("+00:00", "Z"),
         "completed_at": COMPLETED.isoformat().replace("+00:00", "Z"),
         "adapter_accepted": True,
         "external_status": "confirmed",

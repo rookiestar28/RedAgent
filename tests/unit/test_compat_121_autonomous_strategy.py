@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -44,7 +44,7 @@ from redagent_platform.zap_service.capability import build_zap_capability_manife
 
 
 ROOT = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 8, 24, 10, 30, tzinfo=timezone.utc)
+NOW = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(hours=2)
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SHA_C = "c" * 64
@@ -56,18 +56,18 @@ def ref(kind: str, value: str, digest: str = SHA_A) -> TypedReferenceV1:
 
 def source_values():
     zap = build_zap_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-3"
     )
     nuclei = build_nuclei_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-3"
     )
     bundle = NucleiBundleManifest(
         bundle_id="r105-http-header-bundle",
-        revision=2,
+        revision=3,
         template_id="redagent-r105-missing-header",
         template_relative_path="templates/redagent-r105-missing-header.yaml",
         template_sha256="7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",
-        bundle_sha256="6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc",
+        bundle_sha256="ab8cbe219bb7b886dccd5b638583b374961560d688bd53e7bdc4164b0babc5ef",
         signature_verified=True,
         reviewer_user_id="redagent-r105-independent-review",
         protocol="http",
@@ -77,8 +77,8 @@ def source_values():
         tags=("redagent", "synthetic"),
         expected_matcher_names=("missing-security-header",),
         file_inventory=("templates/redagent-r105-missing-header.yaml",),
-        promoted_at=datetime.fromisoformat("2026-08-24T17:03:42+08:00"),
-        expires_at=datetime.fromisoformat("2026-09-23T17:03:42+08:00"),
+        promoted_at=datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00"),
+        expires_at=datetime.fromisoformat("2026-11-01T11:58:19.928804+00:00"),
     )
     projected = build_projection_catalog((zap, nuclei))
     semantics = build_first_slice_semantics(
@@ -196,11 +196,11 @@ def outcome_snapshot(
     capability_ref = ref("capability", capability_id, binding_sha256)
     if capability_id == "zap-controlled-runtime":
         adapter, revision, schema, path = (
-            "zap-service", "2.17.0-r104.2", "zap-progress-v1", "/passive/missing-header"
+            "zap-service", "2.17.0-r104.3", "zap-progress-v1", "/passive/missing-header"
         )
     else:
         adapter, revision, schema, path = (
-            "nuclei-service", "3.11.1-r105.2", "nuclei-cleanup-v1", "/nuclei/missing-header"
+            "nuclei-service", "3.11.1-r105.3", "nuclei-cleanup-v1", "/nuclei/missing-header"
         )
     evidence = EvidenceFactV1(
         schema_version="redagent.r119-evidence-fact/v1",
@@ -274,8 +274,8 @@ def test_closed_table_selects_zap_for_posture_and_nuclei_for_header() -> None:
     assert DECISION_TABLE_REVISION == 1
     assert posture_receipt.outcome is StrategyOutcome.SELECT
     assert posture_plan is not None
-    assert posture_receipt.receipt_sha256 == "f4a6b14804fcb1b299eac753c06b5838cc6f6221ac5e567fba4b1a00c08e5a48"
-    assert posture_plan.plan_sha256 == "f034e1c823fe517aba82bda64d2f8feefe2f3af43b7360c17dd1604b15ef978b"
+    assert posture_receipt.receipt_sha256 == "7cf77952680a0a6faedfd5391930839a340f28b9f3af33c8183bc4456682938d"
+    assert posture_plan.plan_sha256 == "1adb7178be20b7c1f6288a2eb05978fc90694739cf9dd572d6a3665994698ca4"
     assert posture_plan.primary.capability_id == "zap-controlled-runtime"
     assert posture_plan.successor is not None
     assert posture_plan.successor.condition == "fresh_inconclusive_or_insufficient_observation"
@@ -557,7 +557,7 @@ def test_trusted_header_fact_satisfies_objective_without_action() -> None:
         evidence=evidence_ref,
         job=ref("job", "job-1", SHA_C),
         producer_adapter_id="zap-service",
-        producer_revision="2.17.0-r104.2",
+        producer_revision="2.17.0-r104.3",
         producer_schema_id="zap-alert-v1",
         observation_kind=ObservationKind.SECURITY_HEADER_MISSING,
         source_definition_id="10021",
@@ -581,7 +581,7 @@ def test_trusted_header_fact_satisfies_objective_without_action() -> None:
         truth=TruthValue.TRUE,
         value_code="x-content-type-options",
         source_adapter_id="zap-service",
-        producer_revision="2.17.0-r104.2",
+        producer_revision="2.17.0-r104.3",
         producer_schema_id="zap-alert-v1",
         trust=TrustLevel.VERIFIED,
         confidence=Confidence.HIGH,

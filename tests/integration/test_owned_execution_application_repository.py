@@ -20,6 +20,8 @@ from redagent_platform.campaign_service.owned_execution_store import assert_owne
 from redagent_platform.campaign_service.dag_containment_store import PostgresDagContainmentOwner
 from redagent_platform.campaign_service.dag_manifest_lineage import PostgresDagManifestLineageOwner
 from redagent_platform.campaign_service.dag_effect_transition_store import PostgresDagEffectTransitionStore
+from redagent_platform.campaign_service.dag_lifecycle_store import PostgresDagLifecycleOwner
+from redagent_platform.campaign_service.authority_envelope import CampaignAuthorityLifecycleState
 from redagent_platform.campaign_service.dag_execution_contracts import DagContainActivityInputV1, DagStopSignalV1, DAG_EXECUTION_SCHEMA_VERSION, DagRunState
 from redagent_platform.campaign_service.relay import RelayFailure
 from redagent_platform.orchestration.dag_execution_gateway import workflow_input_from_dag_start_payload
@@ -63,6 +65,31 @@ def test_lost_activity_reply_uses_current_locked_revision_for_cleanup_attention(
 
 def test_owned_dag_manifest_lineage_creates_exact_claimed_job_in_tenant_transaction():
     asyncio.run(_manifest_lineage_scenario())
+
+
+def test_locked_lifecycle_uses_explicit_application_clock_and_retains_expiry():
+    asyncio.run(_lifecycle_clock_scenario())
+
+
+async def _lifecycle_clock_scenario():
+    prepared = await _prepare_approved_campaign(mode=AutonomousCampaignMode.OWNED_LOOPBACK_AUTO)
+    try:
+        await prepared.service.admit_and_queue(prepared.command)
+        bridge = _repository(prepared)
+        claim = (await bridge.claim_admission_start_bridges(claim_owner="clock-bridge", now=NOW + timedelta(seconds=6), lease_seconds=20, limit=1))[0]
+        await AutonomousCampaignStartBridgeRelay(repository=bridge, gateway=_Gateway()).deliver(claim, now=NOW + timedelta(seconds=7))
+        owner = PostgresDagLifecycleOwner(prepared.sessions)
+        authority_sha256 = prepared.context.signed_authority.authority.authority_sha256
+        observed = NOW + timedelta(seconds=10)
+        active = await owner.read_current_lifecycle(tenant_id=prepared.tenant, authority_sha256=authority_sha256, now=observed)
+        assert active is not None and active.state is CampaignAuthorityLifecycleState.ACTIVE
+        assert active.observed_at == observed
+        assert active.valid_until <= NOW + timedelta(seconds=60)
+        expired = await owner.read_current_lifecycle(tenant_id=prepared.tenant, authority_sha256=authority_sha256, now=NOW + timedelta(minutes=5))
+        assert expired is not None and expired.state is CampaignAuthorityLifecycleState.EXPIRED
+        assert expired.reason_code == "authority_expired"
+    finally:
+        await prepared.engine.dispose()
 
 
 async def _manifest_lineage_scenario():
@@ -186,7 +213,7 @@ async def _unknown_start_scenario():
         await prepared.engine.dispose()
 
 
-@pytest.mark.parametrize("capability_key", ["zap-controlled-runtime@2", "nuclei-trusted-runtime@2"])
+@pytest.mark.parametrize("capability_key", ["zap-controlled-runtime@3", "nuclei-trusted-runtime@3"])
 def test_approved_auto_queues_one_existing_dag_and_binds_effect_before_io(capability_key):
     asyncio.run(_scenario(capability_key))
 

@@ -43,7 +43,7 @@ def test_non_reproducible_image_cannot_replace_the_operational_tag(builder, monk
 
 @pytest.mark.parametrize("builder", (compat_104_requalify, compat_105_requalify))
 def test_exact_locked_builds_promote_only_the_three_fixed_tags(builder, monkeypatch, tmp_path):
-    lock_path = getattr(builder, "CURRENT_ZAP_RUNTIME_LOCK", None) or builder.CURRENT_NUCLEI_RUNTIME_LOCK
+    lock_path = getattr(builder, "LEGACY_ZAP_RUNTIME_LOCK", None) or builder.LEGACY_NUCLEI_RUNTIME_LOCK
     lock = json.loads(lock_path.read_text(encoding="utf-8"))
     images = iter(lock[f"{name}_image_id"] for name in ("engine", "target", "gateway") for _ in range(2))
     commands = []

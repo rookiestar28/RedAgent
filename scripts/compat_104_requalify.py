@@ -20,10 +20,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from redagent_platform.zap_service.authority import (
-    CURRENT_ZAP_ARTIFACT_PROMOTION,
-    CURRENT_ZAP_RUNTIME_LOCK,
+from redagent_platform.zap_service.authority import SignedAuthorityPaths
+
+# CRITICAL: this historical assembler must never inherit current v3 paths or overwrite new authority.
+LEGACY_ZAP_RUNTIME_LOCK = ROOT / "config/r104-zap-runtime-v2.json"
+LEGACY_ZAP_ARTIFACT_PROMOTION = SignedAuthorityPaths(
+    document=ROOT / "runtime-assets/attestations/260824-R104_ZAP_ARTIFACT_PROMOTION_V2.json",
+    signature=ROOT / "runtime-assets/attestations/260824-R104_ZAP_ARTIFACT_PROMOTION_V2.sigstore.json",
+    public_key=ROOT / "runtime-assets/attestations/260824-R104_ZAP_ARTIFACT_PROMOTION_V2.pub",
 )
+
 
 
 SOURCE_DATE_EPOCH = 1787529600
@@ -81,7 +87,7 @@ def _build_once(dockerfile: Path, context: Path, tag: str, network_none: bool) -
 
 def build() -> dict[str, object]:
     validate()
-    locked = json.loads(CURRENT_ZAP_RUNTIME_LOCK.read_text(encoding="utf-8"))
+    locked = json.loads(LEGACY_ZAP_RUNTIME_LOCK.read_text(encoding="utf-8"))
     observed: dict[str, str] = {}
     for name, dockerfile, context, tag, network_none in SPECS:
         first_tag = f"{tag}-repro-a"
@@ -118,7 +124,7 @@ def build() -> dict[str, object]:
 
 
 def validate() -> dict[str, object]:
-    value = json.loads(CURRENT_ZAP_RUNTIME_LOCK.read_text(encoding="utf-8"))
+    value = json.loads(LEGACY_ZAP_RUNTIME_LOCK.read_text(encoding="utf-8"))
     if (
         value.get("schema") != "redagent.r104-runtime-lock/v2"
         or value.get("source_date_epoch") != SOURCE_DATE_EPOCH
@@ -131,7 +137,7 @@ def validate() -> dict[str, object]:
 
 
 def _sign() -> None:
-    document = CURRENT_ZAP_ARTIFACT_PROMOTION.document.read_bytes()
+    document = LEGACY_ZAP_ARTIFACT_PROMOTION.document.read_bytes()
     PRIVATE_KEY.parent.mkdir(parents=True, exist_ok=True)
     if PRIVATE_KEY.exists():
         key = serialization.load_pem_private_key(PRIVATE_KEY.read_bytes(), password=None)
@@ -154,10 +160,10 @@ def _sign() -> None:
             "signature": base64.b64encode(signature).decode(),
         },
     }
-    CURRENT_ZAP_ARTIFACT_PROMOTION.public_key.write_bytes(key.public_key().public_bytes(
+    LEGACY_ZAP_ARTIFACT_PROMOTION.public_key.write_bytes(key.public_key().public_bytes(
         serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
     ))
-    CURRENT_ZAP_ARTIFACT_PROMOTION.signature.write_text(
+    LEGACY_ZAP_ARTIFACT_PROMOTION.signature.write_text(
         json.dumps(bundle, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8"
     )
 

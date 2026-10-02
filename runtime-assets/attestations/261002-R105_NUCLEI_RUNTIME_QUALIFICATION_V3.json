@@ -1,0 +1,27 @@
+{
+  "candidate_bundle_sha256": "ab271a7b17cba2fd10e45a90703ad2ea010b415e8bddda77ae8272b14e3a06d9",
+  "cleanup_residual_resource_count": 0,
+  "direct_target_route": false,
+  "engine_image_id": "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
+  "external_target_contacts": 0,
+  "false_positive_regression_passed": true,
+  "network_isolation_verified": true,
+  "owned_fixture_finding_count": 1,
+  "production_qualified": false,
+  "profiles": [
+    {
+      "cleanup_residual_resource_count": 0,
+      "external_target_contacts": 0,
+      "native_stop_acknowledged": true,
+      "network_isolation_verified": true,
+      "passed": true,
+      "profile_id": "nuclei-http-header-v1",
+      "receipt_path": "runtime-assets/attestations/261002-R105_nuclei-http-header-v1_V3.json",
+      "receipt_sha256": "dc6b607a39601c04ca8d2b4fa31ac2d675ca2e1565c910b8e29c9595a253242f"
+    }
+  ],
+  "qualified_at": "2026-10-02T11:56:36.081778+00:00",
+  "runtime_lock_sha256": "09db574eb041844c2d9b6c514870d40fa51792fe0d01f82b2a516a7564ce5a15",
+  "schema": "redagent.r105-runtime-qualification/v3",
+  "signed_bundle_verified": true
+}

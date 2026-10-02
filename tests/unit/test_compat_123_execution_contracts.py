@@ -50,7 +50,7 @@ def capability() -> CapabilityExecutionCeilingV1:
         capability_revision=2,
         execution_manifest_sha256=SHA_A,
         adapter_id="zap-service",
-        adapter_version="2.17.0-r104.2",
+        adapter_version="2.17.0-r104.3",
         profile_id="zap-passive-v1",
         profile_revision=1,
         profile_sha256=SHA_B,

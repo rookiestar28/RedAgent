@@ -154,8 +154,8 @@ class ClosedCampaignDispatcher:
             raise ValueError("r123_adapters_invalid")
         indexed = {(item.adapter_id, item.adapter_version): item for item in adapters}
         expected_two = {
-            ("zap-service", "2.17.0-r104.2"),
-            ("nuclei-service", "3.11.1-r105.2"),
+            ("zap-service", "2.17.0-r104.3"),
+            ("nuclei-service", "3.11.1-r105.3"),
         }
         expected_three = {
             *expected_two,
@@ -190,6 +190,8 @@ class ClosedCampaignDispatcher:
 
 
 class RunnerLifecycleOwner(Protocol):
+    def execution_deadline(self, handle: object) -> datetime: ...
+
     async def begin(
         self,
         request: CampaignAdapterRequest,
@@ -248,11 +250,29 @@ class RunnerOwnedCampaignDispatcher:
         handle = await self._lifecycle.begin(request, occurred_at=occurred_at)
         lifecycle_terminal = False
         try:
-            receipt = await self._dispatcher.dispatch(request)
+            deadline = self._lifecycle.execution_deadline(handle)
+            current = self._clock()
+            if (
+                not isinstance(deadline, datetime)
+                or deadline.tzinfo is None
+                or deadline.utcoffset() is None
+                or current.tzinfo is None
+                or current.utcoffset() is None
+                or deadline <= current
+            ):
+                raise ValueError("runner_execution_deadline_invalid_or_expired")
+            # CRITICAL: the fixed scan timeout cannot outlive the claimed authority lease.
+            # wait_for awaits cancellation cleanup before ambiguity/containment proceeds.
+            receipt = await asyncio.wait_for(
+                self._dispatcher.dispatch(request),
+                timeout=(deadline - current).total_seconds(),
+            )
             # CRITICAL: never terminalize the canonical runner lifecycle with an
             # adapter receipt that is not bound to this exact invocation/effect.
             _validate_owned_receipt(request, receipt)
             completed_at = self._clock()
+            if completed_at >= deadline:
+                raise ValueError("runner_execution_deadline_invalid_or_expired")
             owned = await self._lifecycle.complete(
                 request,
                 handle,

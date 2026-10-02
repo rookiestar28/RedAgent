@@ -69,7 +69,7 @@ class _RetestRepository:
         self.completed.append(values)
 
 
-def _request(capability_key: str = "nuclei-trusted-runtime@2") -> CampaignAdapterRequest:
+def _request(capability_key: str = "nuclei-trusted-runtime@3") -> CampaignAdapterRequest:
     binding = closed_execution_registry()[capability_key]
     suffix = "successor" if capability_key.startswith("nuclei") else "primary"
     return CampaignAdapterRequest(
@@ -103,7 +103,7 @@ def test_result_writer_rejects_actor_identifier_that_cannot_fit_evidence_owner()
 
 def test_result_material_preserves_canonical_partial_coverage_for_successor_decision() -> None:
     material = AdapterResultMaterialV1(
-        request=_request("zap-controlled-runtime@2"),
+        request=_request("zap-controlled-runtime@3"),
         report_safe_content=b'{"schema":"redagent.r123-result/v1"}',
         findings=(),
         coverage_state=CoverageState.PARTIAL,
@@ -141,7 +141,7 @@ def test_primary_result_requests_retest_through_r115_owner_for_each_imported_iss
         _advance_retests(
             session,
             repository,
-            request=_request("zap-controlled-runtime@2"),
+            request=_request("zap-controlled-runtime@3"),
             campaign_id="campaign-r123",
             execution_id="execution-primary",
             issue_ids=("issue-r123",),

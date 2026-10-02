@@ -1,0 +1,20 @@
+{
+  "archive_sha256": "7b25e0d77b8507910dd8bf7fc9f3dfa6b78d9bf25408b83c0011e192a24845d3",
+  "artifact": "zap-gateway",
+  "critical_report_sha256": "fd631d5f0d8158d59ea27096408fc78b1d4d412e3a6ac88cc3526f05c10fe478",
+  "critical_vulnerability_count": 0,
+  "database_metadata": {
+    "DownloadedAt": "2026-10-02T11:06:59.953062Z",
+    "NextUpdate": "2026-10-03T06:55:51.690179148Z",
+    "UpdatedAt": "2026-10-02T06:55:51.690179759Z",
+    "Version": 2
+  },
+  "image_config_digest": "sha256:f1588c374cc351efff703536e4b755cae259e28cde84139c22eaa1acce5c01c7",
+  "image_id": "sha256:268185dbf49a86bc601534dbe656b8819710dd478a264e21dd196d935e179a5b",
+  "sbom_package_count": 32,
+  "sbom_sha256": "ea11a137a1d7a10ce5a85f3ecb838f961a34a7dd41f65a87365fb7eb43a877cb",
+  "scan_at": "2026-10-02T11:31:42.899111+00:00",
+  "scanner": "trivy-0.74.0",
+  "scanner_executable_sha256": "4c532e1f28f53282dc364671e87381cd77760fa9cafab143f576449c2207cdd5",
+  "schema": "redagent.owned-artifact-supply-chain/v3"
+}

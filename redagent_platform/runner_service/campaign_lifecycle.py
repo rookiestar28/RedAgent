@@ -37,6 +37,7 @@ class PostgresRunnerLifecycleHandle:
     lease_id: str
     generation: int
     policy_decision_id: str
+    expires_at: datetime
     lease_token: bytearray = field(repr=False)
 
 
@@ -53,6 +54,11 @@ class PostgresRunnerLifecycleOwner:
         self._sessions = sessions
         self._identity_owner = identity_owner
         self._actor_user_id = actor_user_id
+
+    def execution_deadline(self, handle: object) -> datetime:
+        if not isinstance(handle, PostgresRunnerLifecycleHandle):
+            raise RunnerRepositoryConflict("r123_runner_handle_invalid")
+        return handle.expires_at
 
     async def begin(
         self,
@@ -95,6 +101,7 @@ class PostgresRunnerLifecycleOwner:
             generation=int(row["generation"]),
             policy_decision_id=str(row["policy_decision_id"]),
             lease_token=lease.lease_token,
+            expires_at=lease.expires_at,
         )
         async with self._sessions() as session, session.begin():
             repository = _repository(

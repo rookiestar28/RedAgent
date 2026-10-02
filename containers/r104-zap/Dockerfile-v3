@@ -1,0 +1,189 @@
+FROM ghcr.io/zaproxy/zaproxy@sha256:627781353231d056d5a6305ec1f2092f54735cc654915f533d2e8d5d9d41bcb2
+
+USER root
+
+# CRITICAL: keep the browser exact-pinned; Client Spider requires a real
+# extension-capable browser and runtime package drift invalidates certification.
+# CRITICAL: apk.log and generated fontconfig caches embed build-local state that
+# breaks locked OCI identity; Chromium regenerates caches in its runtime home.
+RUN apk add --no-cache abseil-cpp-raw-logging-internal=20250814.1-r0 \
+        abseil-cpp-strings=20250814.1-r0 \
+        abseil-cpp-strings-internal=20250814.1-r0 \
+        alsa-lib=1.2.14-r2 \
+        aom-libs=3.14.1-r0 \
+        at-spi2-core=2.58.3-r0 \
+        at-spi2-core-libs=2.58.3-r0 \
+        avahi-libs=0.8-r23 \
+        cairo=1.18.4-r0 \
+        cairo-gobject=1.18.4-r0 \
+        chromium=149.0.7827.53-r0 \
+        chromium-angle=149.0.7827.53-r0 \
+        chromium-common=149.0.7827.53-r0 \
+        cjson=1.7.19-r1 \
+        crc32c=1.1.2-r3 \
+        cups-libs=2.4.18-r0 \
+        dbus-libs=1.16.2-r1 \
+        double-conversion=3.3.1-r0 \
+        eudev-libs=3.2.14-r6 \
+        ffmpeg-libavcodec=8.0.1-r1 \
+        ffmpeg-libavformat=8.0.1-r1 \
+        ffmpeg-libavutil=8.0.1-r1 \
+        ffmpeg-libswresample=8.0.1-r1 \
+        file=5.46-r2 \
+        font-opensans=0_git20210927-r1 \
+        fribidi=1.0.16-r2 \
+        gdk-pixbuf=2.44.4-r0 \
+        glib=2.86.3-r0 \
+        glslang-libs=1.4.321.0-r0 \
+        gobject-introspection=1.86.0-r0 \
+        graphite2=1.3.14-r6 \
+        gtk+3.0=3.24.51-r0 \
+        gtk-update-icon-cache=3.24.51-r0 \
+        harfbuzz=12.2.0-r0 \
+        harfbuzz-subset=12.2.0-r0 \
+        hicolor-icon-theme=0.18-r0 \
+        hwdata-pci=0.401-r0 \
+        icu-data-full=76.1-r1 \
+        lame-libs=3.100-r5 \
+        lcms2=2.19-r0 \
+        libSvtAv1Enc=3.1.2-r0 \
+        libasyncns=0.8-r4 \
+        libatk-1.0=2.58.3-r0 \
+        libatk-bridge-2.0=2.58.3-r0 \
+        libblkid=2.41.6-r1 \
+        libbluray=1.4.0-r0 \
+        libbsd=0.12.2-r0 \
+        libcamera=0.6.0-r0 \
+        libcamera-ipa=0.6.0-r0 \
+        libdav1d=1.5.2-r0 \
+        libdrm=2.4.131-r0 \
+        libeconf=0.8.3-r0 \
+        libelf=0.194-r0 \
+        libepoxy=1.5.10-r1 \
+        libflac=1.4.3-r2 \
+        libgcc=15.2.0-r2 \
+        libgomp=15.2.0-r2 \
+        libhwy=1.3.0-r0 \
+        libice=1.1.2-r0 \
+        libjpeg-turbo=3.1.2-r0 \
+        libjxl=0.11.2-r0 \
+        libltdl=2.5.4-r2 \
+        libmagic=5.46-r2 \
+        libmd=1.1.0-r0 \
+        libmount=2.41.6-r1 \
+        libogg=1.3.6-r0 \
+        libopenmpt=0.8.6-r0 \
+        libpanelw=6.5_p20251123-r0 \
+        libpciaccess=0.18.1-r1 \
+        libpulse=17.0-r5 \
+        librist=0.2.10-r1 \
+        libsharpyuv=1.6.0-r0 \
+        libsm=1.2.6-r0 \
+        libsndfile=1.2.2-r2 \
+        libsodium=1.0.20-r1 \
+        libsrt=1.5.3-r1 \
+        libssh=0.11.4-r0 \
+        libstdc++=15.2.0-r2 \
+        libtheora=1.2.0-r0 \
+        libudfread=1.2.0-r0 \
+        libunwind=1.8.1-r0 \
+        libuuid=2.41.6-r1 \
+        libuv=1.52.1-r0 \
+        libva=2.22.0-r1 \
+        libvdpau=1.5-r4 \
+        libvorbis=1.3.7-r2 \
+        libvpl=2.15.0-r1 \
+        libvpx=1.15.2-r1 \
+        libwebp=1.6.0-r0 \
+        libwebpdemux=1.6.0-r0 \
+        libwebpmux=1.6.0-r0 \
+        libx11=1.8.12-r1 \
+        libxau=1.0.12-r0 \
+        libxcb=1.17.0-r1 \
+        libxcomposite=0.4.6-r5 \
+        libxcursor=1.2.3-r0 \
+        libxdamage=1.1.6-r5 \
+        libxdmcp=1.1.5-r1 \
+        libxext=1.3.6-r2 \
+        libxfixes=6.0.2-r0 \
+        libxft=2.3.9-r0 \
+        libxi=1.8.2-r0 \
+        libxinerama=1.1.5-r4 \
+        libxkbcommon=1.12.2-r0 \
+        libxml2=2.13.9-r1 \
+        libxmu=1.2.1-r0 \
+        libxrandr=1.5.4-r1 \
+        libxrender=0.9.12-r0 \
+        libxshmfence=1.3.3-r0 \
+        libxslt=1.1.43-r3 \
+        libxt=1.3.1-r0 \
+        libxtst=1.2.5-r0 \
+        libzmq=4.3.5-r2 \
+        lilv-libs=0.24.26-r0 \
+        llvm21-libs=21.1.2-r1 \
+        mbedtls=3.6.7-r0 \
+        mesa=25.2.7-r1 \
+        mesa-dri-gallium=25.2.7-r1 \
+        mesa-gbm=25.2.7-r1 \
+        minizip=1.3.1-r0 \
+        mpdecimal=4.0.1-r0 \
+        mpg123-libs=1.33.3-r0 \
+        nspr=4.36-r0 \
+        nss=3.123.1-r0 \
+        numactl=2.0.18-r0 \
+        openh264=2.6.0-r0 \
+        opus=1.5.2-r1 \
+        orc=0.4.41-r0 \
+        pango=1.56.4-r0 \
+        pcre2=10.49-r0 \
+        pipewire-libs=1.4.9-r5 \
+        pixman=0.46.4-r0 \
+        pkgconf=2.5.1-r0 \
+        pyc=3.12.15-r0 \
+        python3=3.12.15-r0 \
+        python3-pyc=3.12.15-r0 \
+        python3-pycache-pyc0=3.12.15-r0 \
+        rav1e-libs=0.8.1-r0 \
+        roc-toolkit-libs=0.4.0-r1 \
+        serd-libs=0.32.4-r0 \
+        shaderc=2025.3-r0 \
+        shared-mime-info=2.4-r6 \
+        simdutf=7.5.0-r1 \
+        sord-libs=0.16.18-r0 \
+        soxr=0.1.3-r7 \
+        speexdsp=1.2.1-r2 \
+        spirv-tools=1.4.321.0-r1 \
+        sratom=0.6.18-r0 \
+        tdb-libs=1.4.14-r0 \
+        tiff=4.7.1-r0 \
+        wayland-libs-client=1.24.0-r0 \
+        wayland-libs-cursor=1.24.0-r0 \
+        wayland-libs-egl=1.24.0-r0 \
+        webrtc-audio-processing-2=2.1-r1 \
+        x264-libs=0.164.3108-r1 \
+        x265-libs=4.1-r0 \
+        xdg-utils=1.2.1-r1 \
+        xkeyboard-config=2.46-r0 \
+        xprop=1.2.8-r0 \
+        xset=1.2.5-r1 \
+        xvidcore=1.3.7-r2 \
+        xz-libs=5.8.4-r0 \
+        yaml=0.2.5-r2 \
+        zix-libs=0.6.2-r0 \
+    && rm -f /var/log/apk.log \
+    && rm -rf /var/cache/fontconfig/*
+
+LABEL org.opencontainers.image.title="RedAgent R104 certified ZAP runtime" \
+      org.opencontainers.image.version="2.17.0-r104.3" \
+      org.opencontainers.image.base.digest="sha256:627781353231d056d5a6305ec1f2092f54735cc654915f533d2e8d5d9d41bcb2" \
+      io.redagent.owner="r104" \
+      io.redagent.runtime="zap-controlled-runtime-v3"
+
+# CRITICAL: compare the complete installed inventory; transitive APK drift must fail.
+COPY containers/r104-zap/packages-v3.txt /tmp/packages-v3.txt
+RUN apk info -v | LC_ALL=C sort > /tmp/observed-packages.txt \
+    && diff -u /tmp/packages-v3.txt /tmp/observed-packages.txt \
+    && rm -f /tmp/packages-v3.txt /tmp/observed-packages.txt
+
+
+USER zap

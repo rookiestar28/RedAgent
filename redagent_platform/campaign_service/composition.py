@@ -185,8 +185,8 @@ class CampaignWorkerReadinessFactsOwner:
     def _locked_images_ready(self, adapter: str) -> bool:
         try:
             name = {
-                "zap": "config/r104-zap-runtime-v2.json",
-                "nuclei": "config/r105-nuclei-runtime-v2.json",
+                "zap": "config/r104-zap-runtime-v3.json",
+                "nuclei": "config/r105-nuclei-runtime-v3.json",
             }[adapter]
             lock = json.loads((self._workspace / name).read_text(encoding="utf-8"))
             pairs = (

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import subprocess
@@ -169,7 +169,7 @@ def test_worker_readiness_requires_current_promotions_before_image_identity_prob
     current = asyncio.run(owner.read(
         tenant_id="tenant-r123",
         capability_id="zap-controlled-runtime",
-        now=datetime(2026, 8, 24, 9, 30, tzinfo=timezone.utc),
+        now=datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(minutes=1),
     ))
     assert current.zap_adapter_ready is True
     assert current.nuclei_adapter_ready is True
@@ -179,19 +179,19 @@ def test_worker_readiness_requires_current_promotions_before_image_identity_prob
     expired = asyncio.run(owner.read(
         tenant_id="tenant-r123",
         capability_id="zap-controlled-runtime",
-        now=datetime(2026, 9, 23, 9, 4, tzinfo=timezone.utc),
+        now=datetime.fromisoformat("2026-11-01T11:58:19.928804+00:00"),
     ))
     assert expired.zap_adapter_ready is False
     assert expired.nuclei_adapter_ready is False
     assert calls == []
 
 
-def test_stock_image_probe_reads_only_current_revision_two_lock_keys(monkeypatch) -> None:
+def test_stock_image_probe_reads_only_current_revision_three_lock_keys(monkeypatch) -> None:
     root = Path(__file__).resolve().parents[2]
     expected: dict[str, str] = {}
     for relative in (
-        "config/r104-zap-runtime-v2.json",
-        "config/r105-nuclei-runtime-v2.json",
+        "config/r104-zap-runtime-v3.json",
+        "config/r105-nuclei-runtime-v3.json",
     ):
         lock = json.loads((root / relative).read_text(encoding="utf-8"))
         expected.update({
@@ -217,12 +217,12 @@ def test_stock_image_probe_reads_only_current_revision_two_lock_keys(monkeypatch
     assert owner._locked_images_ready("zap") is True
     assert owner._locked_images_ready("nuclei") is True
     assert calls == [
-        "redagent/r104-zap:2.17.0-r104.2",
-        "redagent/r104-target:1.0.1",
-        "redagent/r104-gateway:1.0.1",
-        "redagent/r105-nuclei:3.11.1-r105.2",
-        "redagent/r105-target:1.0.1",
-        "redagent/r105-gateway:1.0.1",
+        "redagent/r104-zap:2.17.0-r104.3",
+        "redagent/r104-target:1.0.2",
+        "redagent/r104-gateway:1.0.2",
+        "redagent/r105-nuclei:3.11.1-r105.3",
+        "redagent/r105-target:1.0.2",
+        "redagent/r105-gateway:1.0.2",
     ]
 
 
@@ -239,7 +239,7 @@ def test_readiness_tracks_temporal_health_loss_and_recovery(tmp_path: Path) -> N
     unavailable = asyncio.run(owner.read(
         tenant_id="tenant-r123",
         capability_id="zap-controlled-runtime",
-        now=datetime(2026, 8, 24, 9, 30, tzinfo=timezone.utc),
+        now=datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(minutes=1),
     ))
     temporal.ready = True
     recovered = asyncio.run(owner.read(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 
@@ -32,25 +32,25 @@ from redagent_platform.zap_service.capability import build_zap_capability_manife
 
 
 ROOT = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc)
+NOW = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(hours=2)
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 
 
 def _facts():
     zap = build_zap_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r104-zap-2170-r104-3"
     )
     nuclei = build_nuclei_capability_manifest(
-        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-2"
+        platform="linux/amd64", artifact_receipt_id="artifact-r105-nuclei-3111-r105-3"
     )
     bundle = NucleiBundleManifest(
         bundle_id="r105-http-header-bundle",
-        revision=2,
+        revision=3,
         template_id="redagent-r105-missing-header",
         template_relative_path="templates/redagent-r105-missing-header.yaml",
         template_sha256="7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",
-        bundle_sha256="6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc",
+        bundle_sha256="ab8cbe219bb7b886dccd5b638583b374961560d688bd53e7bdc4164b0babc5ef",
         signature_verified=True,
         reviewer_user_id="redagent-r105-independent-review",
         protocol="http",
@@ -60,10 +60,14 @@ def _facts():
         tags=("redagent", "synthetic"),
         expected_matcher_names=("missing-security-header",),
         file_inventory=("templates/redagent-r105-missing-header.yaml",),
-        promoted_at=datetime.fromisoformat("2026-08-24T17:03:42+08:00"),
-        expires_at=datetime.fromisoformat("2026-09-23T17:03:42+08:00"),
+        promoted_at=datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00"),
+        expires_at=datetime.fromisoformat("2026-11-01T11:58:19.928804+00:00"),
     )
-    artifact_promotion = verify_current_artifact_promotion(ROOT, now=NOW)
+    artifact_manifest = json.loads(
+        (ROOT / "runtime-assets/attestations/260828-ARTIFACT_POSTURE_PROMOTION_V2.json").read_text(encoding="utf-8")
+    )
+    historical_clock = datetime.fromisoformat(artifact_manifest["promoted_at"]) + timedelta(minutes=1)
+    artifact_promotion = verify_current_artifact_promotion(ROOT, now=historical_clock)
     artifact = build_artifact_capability(
         artifact_receipt_id=artifact_promotion.receipt.receipt_id,
         source_digest=artifact_promotion.receipt.image_digest,
@@ -83,8 +87,10 @@ def _facts():
         artifact_capability=artifact,
         artifact_projection=projections[2],
         profile=certified_profiles()["r110-repository-snapshot-v1"],
-        promoted_at=artifact_promotion.receipt.verified_at,
-        expires_at=artifact_promotion.receipt.expires_at,
+        # This strategy-only fixture supplies a synthetic common window; the signed
+        # historical artifact authority remains expired and cannot authorize execution.
+        promoted_at=NOW - timedelta(hours=1),
+        expires_at=NOW + timedelta(days=7),
     )
     mapping = campaign_context.build_artifact_posture_target_mapping(semantics)
     authority = AuthorityContextV1(
@@ -173,7 +179,7 @@ def _decide(objective: StrategyObjectiveV1):
     )
 
 
-def test_exact_registry_and_current_receipt_select_only_zero_execution_artifact_posture() -> None:
+def test_exact_registry_and_strategy_fixture_select_only_zero_execution_artifact_posture() -> None:
     snapshot, _, projections, receipt_ref = _facts()
     receipt, plan = _decide(
         _objective(StrategyObjectiveKind.REPOSITORY_SNAPSHOT_POSTURE, receipt=receipt_ref)
@@ -184,8 +190,8 @@ def test_exact_registry_and_current_receipt_select_only_zero_execution_artifact_
     projected = next(item for item in projections if item.source_capability_id == "artifact-posture")
     assert tuple(registry) == (
         "artifact-posture@1",
-        "nuclei-trusted-runtime@2",
-        "zap-controlled-runtime@2",
+        "nuclei-trusted-runtime@3",
+        "zap-controlled-runtime@3",
     )
     assert (artifact.profile_id, artifact.approval_tier, artifact.requires_secret) == (
         "r110-repository-snapshot-v1",
@@ -259,3 +265,8 @@ def test_objective_schema_requires_current_receipt_shape_and_policy_corpus_is_fr
     corpus_body = dict(corpus)
     asserted_sha256 = corpus_body.pop("corpus_sha256")
     assert canonical_sha256(corpus_body) == asserted_sha256
+
+
+def test_strategy_fixture_does_not_renew_expired_artifact_authority() -> None:
+    with pytest.raises(ValueError, match="artifact_promotion_inactive"):
+        verify_current_artifact_promotion(ROOT, now=NOW)

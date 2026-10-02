@@ -40,11 +40,11 @@ NOW = datetime(2026, 8, 24, 2, tzinfo=timezone.utc)
 
 
 def _binding() -> CapabilityBindingKeyV1:
-    closed = closed_execution_registry()["zap-controlled-runtime@2"]
+    closed = closed_execution_registry()["zap-controlled-runtime@3"]
     return CapabilityBindingKeyV1(
         schema_version="redagent.r119-capability-binding/v1",
         capability_id="zap-controlled-runtime",
-        capability_revision=2,
+        capability_revision=3,
         execution_manifest_sha256="a" * 64,
         adapter_id=closed.adapter_id,
         adapter_version=closed.adapter_version,

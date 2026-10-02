@@ -18,12 +18,12 @@ async def register_nuclei_capability(
 ) -> dict[str, object]:
     planning = workspace / "runtime-assets" / "attestations"
     receipt, signature_sha256 = verify_current_nuclei_artifact_promotion(
-        promotion_bytes=(planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json").read_bytes(),
-        signature_bundle_bytes=(planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json").read_bytes(),
-        public_key_bytes=(planning / "260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub").read_bytes(),
-        runtime_lock_bytes=(workspace / "config/r105-nuclei-runtime-v2.json").read_bytes(),
+        promotion_bytes=(planning / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.json").read_bytes(),
+        signature_bundle_bytes=(planning / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.sigstore.json").read_bytes(),
+        public_key_bytes=(planning / "261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.pub").read_bytes(),
+        runtime_lock_bytes=(workspace / "config/r105-nuclei-runtime-v3.json").read_bytes(),
         qualification_bytes=(
-            planning / "260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json"
+            planning / "261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json"
         ).read_bytes(),
         now=occurred_at,
     )

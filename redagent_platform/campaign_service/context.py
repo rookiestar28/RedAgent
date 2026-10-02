@@ -56,16 +56,16 @@ from redagent_platform.zap_service.contracts import (
 
 _ZAP_IDENTITY = (
     "zap-controlled-runtime",
-    2,
+    3,
     "zap-service",
-    "2.17.0-r104.2",
+    "2.17.0-r104.3",
     "zap-certified-profile-v1",
 )
 _NUCLEI_IDENTITY = (
     "nuclei-trusted-runtime",
-    2,
+    3,
     "nuclei-service",
-    "3.11.1-r105.2",
+    "3.11.1-r105.3",
     "nuclei-certified-profile-v1",
 )
 _NUCLEI_BUNDLE_SHA256 = CURRENT_R105_HTTP_HEADER_BUNDLE_SHA256
@@ -82,13 +82,13 @@ _EXPECTED_PROFILE_SHA256 = {
     "artifact-posture": "1e0e70f9c6b63eb40606e1081cede810c748369b760d642e2b3f87a7effaa3e8",  # pragma: allowlist secret
 }
 _EXPECTED_MANIFEST_SHA256 = {
-    "zap-controlled-runtime": "24c1c1a0f18a3bbf473f34107f1636c911e0711b6873988ceaaa4601b0f8c6c3",  # pragma: allowlist secret
-    "nuclei-trusted-runtime": "f4a1d955aa81f19b9afe0bf6d55daa6cc78d0533c994875214f859e97b34cd82",  # pragma: allowlist secret
+    "zap-controlled-runtime": "5e14f84e9141cf1be60936e6533cf6ca2eb8df5503db637cbc8e935680baced6",  # pragma: allowlist secret
+    "nuclei-trusted-runtime": "06c8887db37a3ed262c329da098f9b9fece20c6b9c96fc1c16c10a4b2ae6bbf7",  # pragma: allowlist secret
     "artifact-posture": "968c0367f5f61c6c341b452287881b64b93efda49da657798e33f2e4bece4f86",  # pragma: allowlist secret
 }
 _EXPECTED_PROJECTION_SHA256 = {
-    "zap-controlled-runtime": "bafa1c3b2bfe105407a0452408d3cf6e0dce343d331f50f6011ea087aac3eb6d",  # pragma: allowlist secret
-    "nuclei-trusted-runtime": "08ff0dc9305bd11903104c09e4c18a5d7589c951a8e6c424bf4c73047b1a81b2",  # pragma: allowlist secret
+    "zap-controlled-runtime": "75df7ca789086692237d7df2a9c437ae09077fa1465b112f6d2d1691e32491b8",  # pragma: allowlist secret
+    "nuclei-trusted-runtime": "c9f633f7542f0e36f564480acf49e63f2034985563b84c545c853cc192c9bb07",  # pragma: allowlist secret
     "artifact-posture": "dbc5eef3b0cf3b46681a725d0f81d7d4c8932b9e9e1b30de665d9e63b272930f",  # pragma: allowlist secret
 }
 _EXPECTED_SEMANTICS_SHA256 = {
@@ -96,12 +96,12 @@ _EXPECTED_SEMANTICS_SHA256 = {
     "nuclei-trusted-runtime": "b4814f92bbe4b94537e70da43b0157f65562bcfd8e8e6f2b576d35417c3a833b",  # pragma: allowlist secret
 }
 _EXPECTED_BINDING_SHA256 = {
-    "zap-controlled-runtime": "4021073fac5b11b645065410c19153d8ed997bd5ce0fc31863c296f6d9afb242",  # pragma: allowlist secret
-    "nuclei-trusted-runtime": "fee05ae6b093cc53e633d6372553e2fc3c28af30c30c821813d5b636d822e81c",  # pragma: allowlist secret
+    "zap-controlled-runtime": "edd7cb15764d5ac0923e76f229c638b81b7fa3714b3837c7df781fe57c35210b",  # pragma: allowlist secret
+    "nuclei-trusted-runtime": "7098b15caabb05db154e91ca3b3387961dff32cfbb1323a6cc5570d07e53a6a6",  # pragma: allowlist secret
 }
 _EXPECTED_NUCLEI_BUNDLE = (
     "r105-http-header-bundle",
-    2,
+    3,
     "redagent-r105-missing-header",
     "templates/redagent-r105-missing-header.yaml",
     "7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",  # pragma: allowlist secret
@@ -115,65 +115,65 @@ _EXPECTED_NUCLEI_BUNDLE = (
     ("redagent", "synthetic"),
     ("missing-security-header",),
     ("templates/redagent-r105-missing-header.yaml",),
-    "2026-08-24T17:03:42+08:00",
-    "2026-09-23T17:03:42+08:00",
+    "2026-10-02T11:58:19.928804+00:00",
+    "2026-11-01T11:58:19.928804+00:00",
 )
 _FIRST_SLICE_BINDINGS = frozenset({_ZAP_IDENTITY[0], _NUCLEI_IDENTITY[0]})
 _EXPECTED_BINDINGS = frozenset((*_FIRST_SLICE_BINDINGS, _ARTIFACT_IDENTITY[0]))
 _NORMALIZED_OUTPUT_CONTRACTS = {
     "zap-controlled-runtime": {
         ObservationKind.TARGET_REACHABILITY.value: (
-            "zap-service", "2.17.0-r104.2", "zap-progress-v1",
+            "zap-service", "2.17.0-r104.3", "zap-progress-v1",
             "target-reachability", "reachable", "/passive/missing-header", "target", "$target",
         ),
         ObservationKind.HTTP_RESPONSE_STATUS.value: (
-            "zap-service", "2.17.0-r104.2", "zap-progress-v1",
+            "zap-service", "2.17.0-r104.3", "zap-progress-v1",
             "http-response-status", "status", "/passive/missing-header",
             "http-response", "response-status",
         ),
         ObservationKind.SECURITY_HEADER_PRESENT.value: (
-            "zap-service", "2.17.0-r104.2", "zap-progress-v1",
+            "zap-service", "2.17.0-r104.3", "zap-progress-v1",
             "security-header-presence", "10021", "/passive/missing-header",
             "security-header", "x-content-type-options",
         ),
         ObservationKind.SECURITY_HEADER_MISSING.value: (
-            "zap-service", "2.17.0-r104.2", "zap-alert-v1",
+            "zap-service", "2.17.0-r104.3", "zap-alert-v1",
             "10021", "10021", "/passive/missing-header",
             "security-header", "x-content-type-options",
         ),
         ObservationKind.CAPABILITY_OUTCOME.value: (
-            "zap-service", "2.17.0-r104.2", "zap-progress-v1",
+            "zap-service", "2.17.0-r104.3", "zap-progress-v1",
             "capability-outcome", "terminal-status", "/passive/missing-header",
             "capability", "$capability",
         ),
         ObservationKind.EVIDENCE_IDENTITY.value: (
-            "zap-service", "2.17.0-r104.2", "zap-cleanup-v1",
+            "zap-service", "2.17.0-r104.3", "zap-cleanup-v1",
             "evidence-identity", "finalized-evidence", "/passive/missing-header",
             "evidence", "$evidence",
         ),
     },
     "nuclei-trusted-runtime": {
         ObservationKind.TARGET_REACHABILITY.value: (
-            "nuclei-service", "3.11.1-r105.2", "nuclei-gateway-v1",
+            "nuclei-service", "3.11.1-r105.3", "nuclei-gateway-v1",
             "target-reachability", "reachable", "/nuclei/missing-header", "target", "$target",
         ),
         ObservationKind.SECURITY_HEADER_PRESENT.value: (
-            "nuclei-service", "3.11.1-r105.2", "nuclei-gateway-v1",
+            "nuclei-service", "3.11.1-r105.3", "nuclei-gateway-v1",
             "security-header-presence", "missing-security-header", "/nuclei/missing-header",
             "security-header", "x-content-type-options",
         ),
         ObservationKind.SECURITY_HEADER_MISSING.value: (
-            "nuclei-service", "3.11.1-r105.2", "nuclei-result-v1",
+            "nuclei-service", "3.11.1-r105.3", "nuclei-result-v1",
             "redagent-r105-missing-header", "missing-security-header", "/nuclei/missing-header",
             "security-header", "x-content-type-options",
         ),
         ObservationKind.CAPABILITY_OUTCOME.value: (
-            "nuclei-service", "3.11.1-r105.2", "nuclei-cleanup-v1",
+            "nuclei-service", "3.11.1-r105.3", "nuclei-cleanup-v1",
             "capability-outcome", "terminal-status", "/nuclei/missing-header",
             "capability", "$capability",
         ),
         ObservationKind.EVIDENCE_IDENTITY.value: (
-            "nuclei-service", "3.11.1-r105.2", "nuclei-cleanup-v1",
+            "nuclei-service", "3.11.1-r105.3", "nuclei-cleanup-v1",
             "evidence-identity", "finalized-evidence", "/nuclei/missing-header",
             "evidence", "$evidence",
         ),

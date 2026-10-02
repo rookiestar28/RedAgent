@@ -10,7 +10,7 @@ def _input():
         "revision": {"candidate_plan": {"nodes": [{"operator_id": "passive", "environment": "synthetic_loopback"}]}},
         "domain": {"operators": [{
             "operator_id": "passive",
-            "capability": {"capability_id": "zap-controlled-runtime", "capability_revision": 2},
+            "capability": {"capability_id": "zap-controlled-runtime", "capability_revision": 3},
             "max_duration_seconds": 60, "max_rate_per_minute": 60,
             "concurrency_weight": 1, "max_retries": 1,
             "max_requests": 20, "max_evidence_bytes": 10 * 1024 * 1024,
@@ -31,7 +31,7 @@ def test_only_current_closed_root_capabilities_fit_owned_slice(capability):
     lambda p: p["revision"]["candidate_plan"]["nodes"][0].update(environment="owned_staging"),
     lambda p: p["revision"]["candidate_plan"]["nodes"][0].update(environment="internet"),
     lambda p: p["domain"]["operators"][0]["capability"].update(capability_id="arbitrary-shell"),
-    lambda p: p["domain"]["operators"][0]["capability"].update(capability_revision=3),
+    lambda p: p["domain"]["operators"][0]["capability"].update(capability_revision=2),
     lambda p: p["domain"]["operators"][0].update(concurrency_weight=2),
     lambda p: p["domain"]["operators"][0].update(max_duration_seconds=61),
     lambda p: p["domain"]["operators"][0].update(max_rate_per_minute=61),

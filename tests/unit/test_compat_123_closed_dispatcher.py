@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from datetime import timedelta
 from datetime import datetime, timezone
 
 import pytest
@@ -67,16 +68,16 @@ def _request(capability_key: str) -> CampaignAdapterRequest:
 
 
 def _dispatcher() -> tuple[ClosedCampaignDispatcher, Adapter, Adapter]:
-    zap = Adapter("zap-service", "2.17.0-r104.2")
-    nuclei = Adapter("nuclei-service", "3.11.1-r105.2")
+    zap = Adapter("zap-service", "2.17.0-r104.3")
+    nuclei = Adapter("nuclei-service", "3.11.1-r105.3")
     return ClosedCampaignDispatcher((zap, nuclei)), zap, nuclei
 
 
 def test_dispatcher_routes_only_exact_two_noninterchangeable_bindings() -> None:
     dispatcher, zap, nuclei = _dispatcher()
 
-    zap_result = asyncio.run(dispatcher.dispatch(_request("zap-controlled-runtime@2")))
-    nuclei_result = asyncio.run(dispatcher.dispatch(_request("nuclei-trusted-runtime@2")))
+    zap_result = asyncio.run(dispatcher.dispatch(_request("zap-controlled-runtime@3")))
+    nuclei_result = asyncio.run(dispatcher.dispatch(_request("nuclei-trusted-runtime@3")))
 
     assert zap_result.state == "confirmed"
     assert nuclei_result.state == "confirmed"
@@ -101,14 +102,14 @@ def test_dispatcher_rejects_adapter_profile_or_bundle_substitution(
     dispatcher, zap, nuclei = _dispatcher()
 
     with pytest.raises(ValueError, match=reason):
-        request = replace(_request("zap-controlled-runtime@2"), **{field: value})
+        request = replace(_request("zap-controlled-runtime@3"), **{field: value})
         asyncio.run(dispatcher.dispatch(request))
     assert zap.requests == [] and nuclei.requests == []
 
 
 def test_dispatcher_status_lookup_is_read_only_and_requires_exact_binding() -> None:
     dispatcher, zap, nuclei = _dispatcher()
-    request = _request("zap-controlled-runtime@2")
+    request = _request("zap-controlled-runtime@3")
 
     result = asyncio.run(dispatcher.lookup(request))
 
@@ -163,7 +164,7 @@ def test_terminal_receipt_requires_complete_not_applied_status_and_cleanup_proof
 
 
 def test_adapter_request_rejects_tenant_identifier_that_cannot_fit_canonical_owners() -> None:
-    request = _request("zap-controlled-runtime@2")
+    request = _request("zap-controlled-runtime@3")
 
     with pytest.raises(ValueError, match="tenant_id_invalid"):
         replace(request, tenant_id="t" * 65)
@@ -190,6 +191,9 @@ class LifecycleOwner:
         self.events.append(("begin", request.effect_id, occurred_at))
         return f"runner-handle-{request.effect_id}"
 
+    def execution_deadline(self, handle):
+        return NOW + timedelta(seconds=60)
+
     async def complete(self, request, handle, receipt, *, occurred_at):
         self.events.append(("complete", handle, receipt.external_receipt_id, occurred_at))
         return receipt
@@ -204,7 +208,7 @@ def test_runner_owned_dispatcher_wraps_adapter_with_canonical_lifecycle() -> Non
     closed, _, _ = _dispatcher()
     lifecycle = LifecycleOwner()
     dispatcher = RunnerOwnedCampaignDispatcher(closed, lifecycle, clock=lambda: NOW)
-    request = _request("zap-controlled-runtime@2")
+    request = _request("zap-controlled-runtime@3")
 
     receipt = asyncio.run(dispatcher.dispatch(request))
 
@@ -259,7 +263,7 @@ def test_runner_owned_dispatcher_records_ambiguity_after_possible_adapter_accept
     dispatcher = RunnerOwnedCampaignDispatcher(
         FailingClosedDispatcher(), lifecycle, clock=lambda: NOW
     )
-    request = _request("nuclei-trusted-runtime@2")
+    request = _request("nuclei-trusted-runtime@3")
 
     with pytest.raises(RuntimeError, match="accepted_then_connection_lost"):
         asyncio.run(dispatcher.dispatch(request))
@@ -293,7 +297,7 @@ def test_runner_owned_dispatcher_preserves_original_failure_when_ambiguity_write
 ) -> None:
     lifecycle = LifecycleOwner(ambiguity_fail=True)
     dispatcher = RunnerOwnedCampaignDispatcher(closed, lifecycle, clock=lambda: NOW)
-    request = _request("nuclei-trusted-runtime@2")
+    request = _request("nuclei-trusted-runtime@3")
 
     if expected_message is None:
         with pytest.raises(expected_exception):
@@ -314,7 +318,7 @@ def test_runner_owned_dispatcher_rejects_unbound_receipt_before_terminalizing_li
     dispatcher = RunnerOwnedCampaignDispatcher(
         WrongReceiptDispatcher(), lifecycle, clock=lambda: NOW
     )
-    request = _request("zap-controlled-runtime@2")
+    request = _request("zap-controlled-runtime@3")
 
     with pytest.raises(ValueError, match="r123_runner_owned_receipt_invalid"):
         asyncio.run(dispatcher.dispatch(request))
@@ -334,8 +338,54 @@ def test_runner_owned_lookup_does_not_mutate_runner_lifecycle() -> None:
     closed, zap, _ = _dispatcher()
     lifecycle = LifecycleOwner()
     dispatcher = RunnerOwnedCampaignDispatcher(closed, lifecycle, clock=lambda: NOW)
-    request = _request("zap-controlled-runtime@2")
+    request = _request("zap-controlled-runtime@3")
 
     assert asyncio.run(dispatcher.lookup(request)) is None
     assert lifecycle.events == []
     assert zap.lookups == [request.invocation_id]
+
+
+@pytest.mark.parametrize("deadline", [NOW, NOW - timedelta(seconds=1), NOW.replace(tzinfo=None), None])
+def test_runner_owned_dispatcher_denies_invalid_or_expired_deadline_before_adapter_io(deadline):
+    class DeadlineOwner(LifecycleOwner):
+        def execution_deadline(self, handle):
+            return deadline
+
+    class CountingDispatcher:
+        calls = 0
+        async def dispatch(self, request):
+            self.calls += 1
+            raise AssertionError("expired authority reached adapter I/O")
+
+    closed = CountingDispatcher()
+    owner = DeadlineOwner()
+    dispatcher = RunnerOwnedCampaignDispatcher(closed, owner, clock=lambda: NOW)
+    with pytest.raises(ValueError, match="runner_execution_deadline_invalid_or_expired"):
+        asyncio.run(dispatcher.dispatch(_request("zap-controlled-runtime@3")))
+    assert closed.calls == 0
+    assert owner.events[-1][0] == "ambiguity"
+
+
+def test_runner_owned_dispatcher_deadline_cancels_and_awaits_adapter_cleanup():
+    class DeadlineOwner(LifecycleOwner):
+        def execution_deadline(self, handle):
+            return NOW + timedelta(milliseconds=30)
+
+    class PendingDispatcher:
+        cleanup_completed = False
+        async def dispatch(self, request):
+            try:
+                await asyncio.sleep(0.15)
+                raise AssertionError("runner deadline did not stop adapter I/O")
+            finally:
+                await asyncio.sleep(0.01)
+                self.cleanup_completed = True
+
+    closed = PendingDispatcher()
+    owner = DeadlineOwner()
+    dispatcher = RunnerOwnedCampaignDispatcher(closed, owner, clock=lambda: NOW)
+    with pytest.raises(TimeoutError):
+        asyncio.run(asyncio.wait_for(dispatcher.dispatch(_request("zap-controlled-runtime@3")), timeout=0.5))
+    assert closed.cleanup_completed
+    assert owner.events[-1][0] == "ambiguity"
+    assert not any(event[0] == "complete" for event in owner.events)

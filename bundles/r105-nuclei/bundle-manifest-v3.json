@@ -1,0 +1,86 @@
+{
+  "bundle_id": "r105-http-header-bundle",
+  "bundle_revision": 3,
+  "deprecated": false,
+  "engine": {
+    "image_digest": "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
+    "version": "3.11.1"
+  },
+  "expires_at": "2026-11-01T11:58:19.928804+00:00",
+  "files": [
+    {
+      "kind": "nuclei-template",
+      "path": "templates/redagent-r105-missing-header.yaml",
+      "sha256": "7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8",
+      "size_bytes": 700
+    }
+  ],
+  "production_qualified": false,
+  "promoted_at": "2026-10-02T11:58:19.928804+00:00",
+  "qualification": {
+    "candidate_bundle_sha256": "ab271a7b17cba2fd10e45a90703ad2ea010b415e8bddda77ae8272b14e3a06d9",
+    "cleanup_residual_resource_count": 0,
+    "direct_target_route": false,
+    "engine_image_id": "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
+    "external_target_contacts": 0,
+    "false_positive_regression_passed": true,
+    "network_isolation_verified": true,
+    "owned_fixture_finding_count": 1,
+    "production_qualified": false,
+    "profiles": [
+      {
+        "cleanup_residual_resource_count": 0,
+        "external_target_contacts": 0,
+        "native_stop_acknowledged": true,
+        "network_isolation_verified": true,
+        "passed": true,
+        "profile_id": "nuclei-http-header-v1",
+        "receipt_path": "runtime-assets/attestations/261002-R105_nuclei-http-header-v1_V3.json",
+        "receipt_sha256": "dc6b607a39601c04ca8d2b4fa31ac2d675ca2e1565c910b8e29c9595a253242f"
+      }
+    ],
+    "qualified_at": "2026-10-02T11:56:36.081778+00:00",
+    "receipt_path": "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json",
+    "receipt_sha256": "acb39323e45843779f1429055d26369be9cbfcd24d17d52e9164aecdf88a1523",
+    "runtime_lock_sha256": "09db574eb041844c2d9b6c514870d40fa51792fe0d01f82b2a516a7564ce5a15",
+    "schema": "redagent.r105-runtime-qualification/v3",
+    "signed_bundle_verified": true
+  },
+  "review": {
+    "author": "redagent-r105-author",
+    "result": "approved-local-lab-only",
+    "reviewer": "redagent-r105-independent-review",
+    "scope": "unchanged-template-source-only",
+    "separation_of_duties": true,
+    "source_manifest_sha256": "6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc",
+    "template_sha256": "7f0689cdad1a2daf912de264a4c4894f7cd136f4936767bad06ea8d10d8965a8"
+  },
+  "schema": "redagent.r105-template-bundle/v3",
+  "signer": {
+    "certificate_fingerprint_sha256": "9e10dbdfe4bd2897e6bea2a1f86585ae1437804a722fca56e51f5180cbb732fd",
+    "certificate_path": "config/trust/r105-nuclei-user.crt",
+    "certificate_sha256": "04c820859f6253abf27eafc340b8f8b375bb7f40cbc5ad36c23672dcf21ec481",
+    "nuclei_signature_verified": true
+  },
+  "template": {
+    "elevated_features": [],
+    "expected_evidence": [
+      "missing-security-header"
+    ],
+    "id": "redagent-r105-missing-header",
+    "methods": [
+      "GET"
+    ],
+    "paths": [
+      "/nuclei/missing-header"
+    ],
+    "payload_files": [],
+    "protocol": "http",
+    "risk_class": "low",
+    "scope_predicate": "owned-r105-gateway-exact-path",
+    "tags": [
+      "redagent",
+      "synthetic"
+    ]
+  }
+}

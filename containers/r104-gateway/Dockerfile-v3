@@ -1,0 +1,17 @@
+FROM docker.io/library/python@sha256:53739acebd52a300f19f52d93f2a6165f63300689bdf6f8af2bff0d63780e5e6
+
+USER root
+# CRITICAL: the pinned base has Critical OpenSSL findings; apply only reviewed signed APKs.
+# Keep the helper build network-none and reject any complete inventory drift.
+RUN --mount=type=bind,source=.tmp/runtime-requalification-v3/packages,target=/opt/patch,readonly \
+    --mount=type=bind,source=containers/r104-gateway/packages-v3.txt,target=/tmp/expected-packages.txt,readonly \
+    apk add --no-network --no-cache /opt/patch/libcrypto3-3.5.9-r0.apk /opt/patch/libssl3-3.5.9-r0.apk \
+    && apk info -v | LC_ALL=C sort > /tmp/observed-packages.txt \
+    && diff -u /tmp/expected-packages.txt /tmp/observed-packages.txt \
+    && rm -f /var/log/apk.log /tmp/observed-packages.txt
+
+WORKDIR /app
+COPY containers/r104-gateway/gateway_server.py /app/gateway_server.py
+USER 65532:65532
+EXPOSE 8080
+ENTRYPOINT ["python", "-I", "/app/gateway_server.py"]

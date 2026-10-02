@@ -18,17 +18,17 @@ NUCLEI_CRITICAL_REPORT_SHA256 = "ebb1ada367bcfd5d5d12759ab80bde3261d6265cda68834
 R105_HTTP_HEADER_BUNDLE_SHA256 = "6c16355c64475bbea0b647f5a0c8571a461a7382ec9acb9a0aff9800108bc768"
 R105_TARGET_SOURCE_SHA256 = "d2012077f8bb7f5e5bef3c1fbd591c9777b2f19e4d45e159692ed182c0bbc6e3"
 R105_TARGET_IMAGE_ID = "sha256:cf0aaa75b9a6e4cbbb78af5ca4ed99a0b51c2109cfc7e4df1c2690965f13ab4e"
-CURRENT_R105_TARGET_IMAGE_ID = "sha256:c83d8a5ebaa0d46f0d0cf3f3e15b709ced2b904e9d14babe8eea64598a552dc5"
+CURRENT_R105_TARGET_IMAGE_ID = "sha256:b874d619d8e5a9269beb034f339f874a3936e082d68d86c2b69c92d77b1a33f2"
 NUCLEI_IMAGE_DIGEST_BY_PLATFORM: Mapping[str, str] = MappingProxyType({
     "linux/amd64": "sha256:4e95c15953fe894bda1a8a16ecde958497e335a7a0b1f6fdb17b06af38630871",
 })
 CURRENT_NUCLEI_VERSION = "3.11.1"
-CURRENT_NUCLEI_SBOM_SHA256 = "9cbc9fc562decdb01d61c71b62efe2060ee97725f10257f4f65c1787d5dd603b"
-CURRENT_NUCLEI_CRITICAL_REPORT_SHA256 = "cfb0ccb20acc39cce8ff842bccb0789f2ba8c571f81f93eddc1a438127dad816"
+CURRENT_NUCLEI_SBOM_SHA256 = "57b9aa17c912d9a0003a79b97cf9f72b21f6a75b7192e2db5afadbcfc9d4d865"
+CURRENT_NUCLEI_CRITICAL_REPORT_SHA256 = "7b6cd9d14d687aea16fd8ff8abfe709aa4f67b7d1eb0be35d51461dfbab147e9"
 CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM: Mapping[str, str] = MappingProxyType({
-    "linux/amd64": "sha256:92781786bc926d2a809c1239953bdeabb31151492b87fd54a9f834835c8217ad",
+    "linux/amd64": "sha256:871c1b17ef594f3cc01cbd20cb6e2632f16e0f19a2c4a7e90f060845b1a6a593",
 })
-CURRENT_R105_HTTP_HEADER_BUNDLE_SHA256 = "6903c7fe75c14c67e3b3fe0d41ab52da9ef9e6790b5062d79fcf68ce7950affc"
+CURRENT_R105_HTTP_HEADER_BUNDLE_SHA256 = "ab8cbe219bb7b886dccd5b638583b374961560d688bd53e7bdc4164b0babc5ef"
 GATEWAY_ENDPOINT = "http://redagent-r105-gateway:8080"
 TARGET_NETWORK = "redagent-r105-gateway-target"
 TEMPLATE_ID = "redagent-r105-missing-header"
@@ -85,7 +85,7 @@ class NucleiBundleManifest:
     def __post_init__(self) -> None:
         for value in (self.bundle_id, self.template_id, self.reviewer_user_id):
             _identifier(value)
-        if self.revision not in {1, 2} or self.template_id != TEMPLATE_ID or self.template_relative_path != TEMPLATE_PATH:
+        if self.revision not in {1, 2, 3} or self.template_id != TEMPLATE_ID or self.template_relative_path != TEMPLATE_PATH:
             raise ValueError("nuclei_bundle_identity_invalid")
         _sha(self.template_sha256)
         _sha(self.bundle_sha256)
@@ -226,3 +226,5 @@ def _sha(value: object) -> None:
 def _aware(value: datetime) -> None:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("nuclei_time_invalid")
+
+CURRENT_R105_GATEWAY_IMAGE_ID = "sha256:bd7dbb9139b78e447968dc6a06b8c646c71936fe07b962da52b1c35503abdc8a"

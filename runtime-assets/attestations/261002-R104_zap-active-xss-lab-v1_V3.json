@@ -1,0 +1,106 @@
+{
+  "action": "qualify",
+  "alert_receipt": {
+    "action": "alerts",
+    "count": 5,
+    "ok": true
+  },
+  "cancel": {
+    "evidence_finalized": true,
+    "gateway_blocked": true,
+    "lease_revoked": true,
+    "native_stop_acknowledged": true,
+    "native_stop_attempted": true,
+    "schema": "redagent.r104-cancel/v1",
+    "sensitive_files_remaining": 0
+  },
+  "cleanup": {
+    "action": "stop",
+    "cleanup_complete": true,
+    "native_stop_attempted": true,
+    "ok": true,
+    "residual_resource_count": 0,
+    "schema": "redagent.r104-cleanup/v1"
+  },
+  "contact_proof": "observed-internal-networks-and-closed-gateway",
+  "discarded_uncertified_alert_count": 4,
+  "engine_image_id": "sha256:98745eb0d8f07d3efa4f94cf5e7173188ae6c356c3582ffa9479e35a37506f9e",
+  "execution": {
+    "action": "run",
+    "addon_inventory_sha256": "50293fde751b211ed6432b0b5039e8bf3fec7676a738c635a9c1e6844c511e43",
+    "compile": {
+      "action": "compile",
+      "gateway_policy_sha256": "244ea9a71fd0a39db7873b310c8aae3b5b262ed487127f6bf1eb6b2dd65ea924",
+      "ok": true,
+      "plan_sha256": "aafaff22bbc9504aaff277b2ba51cca01e06b2cb7f0e4024c8e43bf6d092f3ad",
+      "profile_id": "zap-active-xss-lab-v1",
+      "schema": "redagent.r104-compile-receipt/v1",
+      "target_attestation_sha256": "ef2cbfd67921f619721ce2a21e51635ea761f8efbe6f775699117a00e0c528e2",
+      "topology": true
+    },
+    "controller": {
+      "action": "run",
+      "ok": true,
+      "plan_id": "0"
+    },
+    "ok": true,
+    "profile_id": "zap-active-xss-lab-v1"
+  },
+  "external_target_contacts": 0,
+  "network_isolation_verified": true,
+  "normalized_alert_count": 1,
+  "ok": true,
+  "profile_id": "zap-active-xss-lab-v1",
+  "qualified_at": "2026-10-02T11:56:06.009397+00:00",
+  "qualifier_source_sha256": "b3f25388f8695865e35a8d1af7fd6db92b02a2b1d8e3eddb00571103263fa198",
+  "runtime_lock_sha256": "c5509b73a55bf5ae96decc3f86c26eff8d7b8b1fc2081803c1d4f6677516604d",
+  "schema": "redagent.r104-qualification/v1",
+  "status_sha256": "512a75d887c5570b29dd67a3baa72ecf85c3df747eec95f0062740be12908c40",
+  "topology": {
+    "action": "status",
+    "networks": {
+      "redagent-r104-gateway-target": {
+        "container_count": 2,
+        "exists": true,
+        "internal": true
+      },
+      "redagent-r104-zap-gateway": {
+        "container_count": 2,
+        "exists": true,
+        "internal": true
+      }
+    },
+    "no_direct_zap_target_route": true,
+    "ok": true,
+    "resources": {
+      "redagent-r104-gateway": {
+        "exists": true,
+        "image_id": "sha256:268185dbf49a86bc601534dbe656b8819710dd478a264e21dd196d935e179a5b",
+        "networks": [
+          "redagent-r104-gateway-target",
+          "redagent-r104-zap-gateway"
+        ],
+        "published_ports": false,
+        "running": true
+      },
+      "redagent-r104-target": {
+        "exists": true,
+        "image_id": "sha256:d38e2718b088593e3e63aaeb8546e0caed4e475d37975a81c29d8fdd72c96636",
+        "networks": [
+          "redagent-r104-gateway-target"
+        ],
+        "published_ports": false,
+        "running": true
+      },
+      "redagent-r104-zap": {
+        "exists": true,
+        "image_id": "sha256:98745eb0d8f07d3efa4f94cf5e7173188ae6c356c3582ffa9479e35a37506f9e",
+        "networks": [
+          "redagent-r104-zap-gateway"
+        ],
+        "published_ports": false,
+        "running": true
+      }
+    }
+  }
+}

@@ -12,7 +12,8 @@ def test_current_lifecycle_is_reconstructed_from_locked_relational_authority() -
     assert 'metadata.tables["plan_admission_receipts"]' in source
     assert 'metadata.tables["campaign_budget_reservations"]' in source
     assert 'metadata.tables["containment_controls"]' in source
-    assert "select(func.now())" in source
+    assert "authority_sha256: str, now: datetime" in source
+    assert "_aware(now)" in source
     assert "with_for_update()" in source
     assert "CampaignAuthorityLifecycleV2(" in source
 

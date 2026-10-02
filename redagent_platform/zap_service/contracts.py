@@ -20,16 +20,16 @@ ZAP_ADDON_INVENTORY_COUNT = 48
 ZAP_ADDON_INVENTORY_SHA256 = "50293fde751b211ed6432b0b5039e8bf3fec7676a738c635a9c1e6844c511e43"  # pragma: allowlist secret
 R104_TARGET_SOURCE_SHA256 = "eadf76b79ea4b64f956cac5f6dc5e004990405f4f4504997fe43002768b7e493"  # pragma: allowlist secret
 R104_TARGET_IMAGE_ID = "sha256:db8bf25081f45eb2496cc423a5ff15c4b66813ae9420bc8682cbaead1ce803e0"
-CURRENT_R104_TARGET_IMAGE_ID = "sha256:a9196612dd4d48af9f60be06024ac15bd64b39d2fb617b54f2fc66921dda1642"
+CURRENT_R104_TARGET_IMAGE_ID = "sha256:d38e2718b088593e3e63aaeb8546e0caed4e475d37975a81c29d8fdd72c96636"
 ZAP_UPSTREAM_BARE_DIGEST = "sha256:627781353231d056d5a6305ec1f2092f54735cc654915f533d2e8d5d9d41bcb2"
 ZAP_IMAGE_DIGEST_BY_PLATFORM: Mapping[str, str] = MappingProxyType({
     "linux/amd64": "sha256:ccd16df57aed6724abdafe71b1077099c2b992d0945359d32d84f0939186b0c3",
 })
 CURRENT_ZAP_IMAGE_DIGEST_BY_PLATFORM: Mapping[str, str] = MappingProxyType({
-    "linux/amd64": "sha256:3cd55809bfea0393bc67862eec614091faa873cfb219d28465122f04ae8d266b",
+    "linux/amd64": "sha256:98745eb0d8f07d3efa4f94cf5e7173188ae6c356c3582ffa9479e35a37506f9e",
 })
-CURRENT_ZAP_SBOM_SHA256 = "d049db94f2c81e2885a27f028660eb1e527623b0b0406438042fa89860450574"
-CURRENT_ZAP_CRITICAL_REPORT_SHA256 = "431f3676ea80af5139890a6be8806d4040583d0d13f9b364c309bf8adc163856"
+CURRENT_ZAP_SBOM_SHA256 = "6a55f34b6cb604e297b5f497e91884a819b5786b567688350c98d1be270f6a65"
+CURRENT_ZAP_CRITICAL_REPORT_SHA256 = "710de7a2b1df08d9243030b8ca034d8cf368be36bc9fddb465cbbf6e871f5261"
 GATEWAY_ENDPOINT = "http://redagent-r104-gateway:8080"
 TARGET_NETWORK = "redagent-r104-gateway-target"
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -212,3 +212,5 @@ def _window(name: str, start: datetime, end: datetime, maximum_seconds: int) -> 
         raise ValueError(f"{name}_window_invalid")
     if (end - start).total_seconds() > maximum_seconds:
         raise ValueError(f"{name}_ttl_exceeded")
+
+CURRENT_R104_GATEWAY_IMAGE_ID = "sha256:268185dbf49a86bc601534dbe656b8819710dd478a264e21dd196d935e179a5b"

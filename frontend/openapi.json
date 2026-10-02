@@ -11372,7 +11372,7 @@
             "type": "string"
           },
           "bundle_revision": {
-            "const": 2,
+            "const": 3,
             "title": "Bundle Revision",
             "type": "integer"
           },

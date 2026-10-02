@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import hashlib
 import os
 from pathlib import Path
@@ -33,7 +33,7 @@ from redagent_platform.persistence.repository import ControlPlaneRepository
 
 
 ROOT = Path(__file__).resolve().parents[2]
-NOW = datetime(2026, 8, 24, 10, 0, tzinfo=timezone.utc)
+NOW = datetime.fromisoformat("2026-10-02T11:58:19.928804+00:00") + timedelta(minutes=1)
 
 
 def test_nuclei_foundation_target_plan_run_result_cleanup_and_tenant_isolation() -> None:
@@ -52,20 +52,20 @@ async def _scenario() -> None:
     plan_id = f"plan-r105-{suffix}"
     run_id = f"run-r105-{suffix}"
     promoted = verify_current_nuclei_bundle_promotion(
-        manifest_bytes=(ROOT / "bundles/r105-nuclei/bundle-manifest-v2.json").read_bytes(),
-        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json").read_bytes(),
-        public_key_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.pub").read_bytes(),
+        manifest_bytes=(ROOT / "bundles/r105-nuclei/bundle-manifest-v3.json").read_bytes(),
+        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json").read_bytes(),
+        public_key_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.pub").read_bytes(),
         template_bytes=(ROOT / "bundles/r105-nuclei/templates/redagent-r105-missing-header.yaml").read_bytes(),
         certificate_bytes=(ROOT / "config/trust/r105-nuclei-user.crt").read_bytes(),
-        qualification_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json").read_bytes(),
+        qualification_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json").read_bytes(),
         now=NOW,
     )
     artifact_receipt, artifact_signature_sha = verify_current_nuclei_artifact_promotion(
-        promotion_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.json").read_bytes(),
-        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.sigstore.json").read_bytes(),
-        public_key_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_ARTIFACT_PROMOTION_V2.pub").read_bytes(),
-        runtime_lock_bytes=(ROOT / "config/r105-nuclei-runtime-v2.json").read_bytes(),
-        qualification_bytes=(ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_RUNTIME_QUALIFICATION_V2.json").read_bytes(),
+        promotion_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.json").read_bytes(),
+        signature_bundle_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.sigstore.json").read_bytes(),
+        public_key_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_ARTIFACT_PROMOTION_V3.pub").read_bytes(),
+        runtime_lock_bytes=(ROOT / "config/r105-nuclei-runtime-v3.json").read_bytes(),
+        qualification_bytes=(ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_RUNTIME_QUALIFICATION_V3.json").read_bytes(),
         now=NOW,
     )
     target = NucleiTargetBinding(
@@ -97,14 +97,14 @@ async def _scenario() -> None:
             foundation = await repository.ensure_certified_foundation(
                 bundle=promoted, artifact_signature_sha256=artifact_signature_sha,
                 artifact_provenance_sha256=artifact_receipt.provenance_sha256,
-                bundle_signature_sha256=hashlib.sha256((ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json").read_bytes()).hexdigest(),
+                bundle_signature_sha256=hashlib.sha256((ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json").read_bytes()).hexdigest(),
                 occurred_at=NOW,
             )
             assert foundation["profile"]["profile_id"] == "nuclei-http-header-v1"
             replay = await repository.ensure_certified_foundation(
                 bundle=promoted, artifact_signature_sha256=artifact_signature_sha,
                 artifact_provenance_sha256=artifact_receipt.provenance_sha256,
-                bundle_signature_sha256=hashlib.sha256((ROOT / "runtime-assets/attestations/260824-R105_NUCLEI_BUNDLE_PROMOTION_V2.sigstore.json").read_bytes()).hexdigest(),
+                bundle_signature_sha256=hashlib.sha256((ROOT / "runtime-assets/attestations/261002-R105_NUCLEI_BUNDLE_PROMOTION_V3.sigstore.json").read_bytes()).hexdigest(),
                 occurred_at=NOW,
             )
             assert replay["bundle"]["id"] == foundation["bundle"]["id"]
@@ -242,7 +242,7 @@ async def _bootstrap_job_runner_and_quotas(session, tenant: str, actor: str, suf
         id=f"registration-r105-{suffix}", runner_id=runner_id, runner_class_record_id=runner_class_id,
         environment="local-conformance", network_plane="r105-owned-gateway",
         spiffe_id=f"spiffe://redagent.test/runner/{runner_id}", certificate_fingerprint="f" * 64,
-        certificate_serial=f"serial-{suffix}", adapter_allowlist=["nuclei-service:3.11.1-r105.2"],
+        certificate_serial=f"serial-{suffix}", adapter_allowlist=["nuclei-service:3.11.1-r105.3"],
         image_allowlist=[CURRENT_NUCLEI_IMAGE_DIGEST_BY_PLATFORM["linux/amd64"]],
         required_policy_revision="r099-v1", generation=1, attestation_sha256="9" * 64,
         registration_state="active", registered_at=NOW, expires_at=NOW + timedelta(minutes=10),
