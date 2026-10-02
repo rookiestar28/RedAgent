@@ -269,7 +269,7 @@ def build_autonomous_campaign_application_factory(
             PostgresAutonomousCampaignApplicationRepository(
                 cast(async_sessionmaker[AsyncSession], sessions)
             ),
-            mode=AutonomousCampaignMode.PLAN_ONLY,
+            mode=mode,
             approval_context_provider=approval_context_provider,
             trusted_approval_keys=trusted_approval_keys,
             validation_limits=validation_limits,
@@ -536,6 +536,7 @@ def build_runner_owned_campaign_dispatcher(
     evidence_service: object,
     actor_user_id: str,
     kms_reference: str,
+    owned_execution: bool = False,
 ) -> RunnerOwnedCampaignDispatcher:
     """Compose the sole certified adapter and runner-lifecycle dispatch boundary."""
     result_writer = PostgresAdapterResultWriter(
@@ -547,8 +548,8 @@ def build_runner_owned_campaign_dispatcher(
     closed = ClosedCampaignDispatcher(
         (
             ArtifactCampaignAdapter(workspace, result_writer),
-            ZapCampaignAdapter(ZapDockerTransport(workspace), result_writer),
-            NucleiCampaignAdapter(NucleiDockerTransport(workspace), result_writer),
+            ZapCampaignAdapter(ZapDockerTransport(workspace, owned_execution=owned_execution), result_writer),
+            NucleiCampaignAdapter(NucleiDockerTransport(workspace, owned_execution=owned_execution), result_writer),
         )
     )
     return RunnerOwnedCampaignDispatcher(

@@ -14,6 +14,7 @@ APPLICATION_CONTRACT_VERSION = "redagent.autonomous-campaign-application/v1"
 class AutonomousCampaignMode(str, Enum):
     DISABLED = "disabled"
     PLAN_ONLY = "plan_only"
+    OWNED_LOOPBACK_AUTO = "owned_loopback_auto"
 
 
 class AutonomousCampaignLifecycle(str, Enum):
@@ -145,6 +146,8 @@ _LIFECYCLE_EDGES: Mapping[AutonomousCampaignLifecycle, frozenset[AutonomousCampa
             AutonomousCampaignLifecycle.REVOKED,
             AutonomousCampaignLifecycle.FAILED_CONTAINED,
             AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,
+            AutonomousCampaignLifecycle.CLEANUP_INCOMPLETE,
+            AutonomousCampaignLifecycle.EVIDENCE_INCOMPLETE,
         }
     ),
     AutonomousCampaignLifecycle.RUNNING: frozenset(
@@ -154,6 +157,8 @@ _LIFECYCLE_EDGES: Mapping[AutonomousCampaignLifecycle, frozenset[AutonomousCampa
             AutonomousCampaignLifecycle.REVOKED,
             AutonomousCampaignLifecycle.FAILED_CONTAINED,
             AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,
+            AutonomousCampaignLifecycle.CLEANUP_INCOMPLETE,
+            AutonomousCampaignLifecycle.EVIDENCE_INCOMPLETE,
         }
     ),
     AutonomousCampaignLifecycle.EVIDENCE_PENDING: frozenset(
@@ -168,8 +173,11 @@ _LIFECYCLE_EDGES: Mapping[AutonomousCampaignLifecycle, frozenset[AutonomousCampa
         {
             AutonomousCampaignLifecycle.EXECUTION_QUEUED,
             AutonomousCampaignLifecycle.RUNNING,
+            AutonomousCampaignLifecycle.EVIDENCE_PENDING,
             AutonomousCampaignLifecycle.FAILED_CONTAINED,
             AutonomousCampaignLifecycle.MANUAL_REVIEW_REQUIRED,
+            AutonomousCampaignLifecycle.CLEANUP_INCOMPLETE,
+            AutonomousCampaignLifecycle.EVIDENCE_INCOMPLETE,
         }
     ),
     AutonomousCampaignLifecycle.CLEANUP_INCOMPLETE: frozenset(
@@ -224,9 +232,12 @@ class CreateAutonomousCampaignIntentV1:
     idempotency_key: str
     correlation_id: str
     occurred_at: datetime
+    mode: AutonomousCampaignMode = AutonomousCampaignMode.PLAN_ONLY
 
     def __post_init__(self) -> None:
         _schema(self.schema_version)
+        if not isinstance(self.mode, AutonomousCampaignMode) or self.mode not in (AutonomousCampaignMode.PLAN_ONLY, AutonomousCampaignMode.OWNED_LOOPBACK_AUTO):
+            raise ValueError("application_mode_invalid")
         for name, value, maximum in (
             ("tenant_id", self.tenant_id, 64),
             ("campaign_id", self.campaign_id, 64),
@@ -309,8 +320,8 @@ class AutonomousCampaignApplicationStateV1:
             _identifier(name, value, maximum)
         _sha256("intent_sha256", self.intent_sha256)
         _sha256("source_binding_sha256", self.source_binding_sha256)
-        if self.mode is not AutonomousCampaignMode.PLAN_ONLY:
-            raise ValueError("application_mode_not_plan_only")
+        if not isinstance(self.mode, AutonomousCampaignMode) or self.mode is AutonomousCampaignMode.DISABLED:
+            raise ValueError("application_mode_invalid")
         if not isinstance(self.lifecycle_state, AutonomousCampaignLifecycle):
             raise ValueError("lifecycle_state_unknown")
         if (

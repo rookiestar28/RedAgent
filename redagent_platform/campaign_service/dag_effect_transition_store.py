@@ -25,6 +25,7 @@ from redagent_platform.campaign_service.repository import (
 )
 from redagent_platform.campaign_service.service import EffectDispatchCommand
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.owned_execution_store import project_owned_execution
 
 
 class DagEffectProjectionConflict(RuntimeError):
@@ -403,9 +404,12 @@ class PostgresDagEffectTransitionStore:
                 version=runs.c.version + 1,
                 updated_at=now,
             )
+            .returning(runs)
         )
-        if getattr(result, "rowcount", None) != 1:
+        updated = result.mappings().one_or_none()
+        if updated is None:
             raise DagEffectProjectionConflict("dag_effect_run_projection_conflict")
+        await project_owned_execution(session, updated, now=now, actor_user_id=self._actor_user_id)
 
     async def _audit(
         self,

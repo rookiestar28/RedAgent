@@ -19,12 +19,12 @@ MIGRATION = ROOT / "migrations/versions/0027_campaign_dag_execution.py"
 
 def test_dag_execution_migration_is_the_single_head_and_runtime_default() -> None:
     scripts = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini")))
-    assert scripts.get_heads() == ["0031_autonomous_admission_start"]
+    assert scripts.get_heads() == ["0032_owned_execution_mode"]
     assert scripts.get_revision("0027_campaign_dag_execution").down_revision == (
         "0026_campaign_plan_admission"
     )
     assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0031_autonomous_admission_start"
+        "0032_owned_execution_mode"
     )
     source = MIGRATION.read_text(encoding="utf-8")
     assert "OLD.input_payload::jsonb" in source

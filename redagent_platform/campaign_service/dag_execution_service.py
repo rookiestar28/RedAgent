@@ -37,6 +37,7 @@ from redagent_platform.campaign_service.planning.search_contracts import (
     AttackPathDagRevisionV1,
 )
 from redagent_platform.campaign_service.registry import closed_execution_registry
+from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")
@@ -60,6 +61,7 @@ class DagExecutionStartRequestV1:
     admission_receipt: PlanAdmissionReceiptV1
     max_activity_attempts: int
     max_transitions: int
+    execution_bindings: tuple[CapabilityBindingKeyV1, ...] = ()
 
     def __post_init__(self) -> None:
         for name in (
@@ -351,6 +353,9 @@ class DagExecutionStartService(Generic[_DagExecutionStartResult]):
             )
         )
         input_sha256 = canonical_planning_sha256(input_payload)
+        if request.execution_bindings:
+            input_payload["execution_bindings"] = json.loads(canonical_planning_bytes(request.execution_bindings))
+            input_sha256 = canonical_planning_sha256(input_payload)
         stable = hashlib.sha256(
             (
                 f"campaign-dag-run-v1\0{request.tenant_id}\0{request.campaign_id}\0"

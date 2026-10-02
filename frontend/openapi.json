@@ -2845,6 +2845,36 @@
             "title": "Engagement Id",
             "type": "string"
           },
+          "execution_bindings": {
+            "default": [],
+            "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "title": "Execution Bindings",
+            "type": "array"
+          },
+          "execution_mode": {
+            "default": "plan_only",
+            "enum": [
+              "plan_only",
+              "owned_loopback_auto"
+            ],
+            "title": "Execution Mode",
+            "type": "string"
+          },
           "expires_at": {
             "format": "date-time",
             "title": "Expires At",

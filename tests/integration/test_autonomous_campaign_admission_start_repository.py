@@ -29,6 +29,7 @@ from redagent_platform.campaign_service.admission_start_store import (
 )
 from redagent_platform.campaign_service.application_contracts import (
     AutonomousCampaignLifecycle,
+    AutonomousCampaignMode,
 )
 from redagent_platform.campaign_service.application_repository import (
     PostgresAutonomousCampaignApplicationRepository,
@@ -82,6 +83,7 @@ from tests.unit.test_campaign_planning_contracts import (
     operator,
     world,
 )
+from tests.unit.test_owned_execution_mode import _full_binding
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -403,7 +405,8 @@ def _load_migration() -> ModuleType:
     return module
 
 
-async def _prepare_approved_campaign() -> _Prepared:
+async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, capability_key="zap-controlled-runtime@2", capability_manifest_sha256="1" * 64, now=NOW, validity_seconds=60, policy_revision="policy-a") -> _Prepared:
+    NOW = now
     engine, sessions = _database()
     suffix = uuid4().hex
     tenant = f"tenant-r173-{suffix}"[:64]
@@ -456,15 +459,15 @@ async def _prepare_approved_campaign() -> _Prepared:
         suffix=suffix,
     )
     assert create.campaign_id == campaign
-    await repository.create_intent(create)
+    await repository.create_intent(replace(create, mode=mode))
 
-    binding = closed_execution_registry()["zap-controlled-runtime@2"]
+    binding = closed_execution_registry()[capability_key]
     capability = CapabilityIdentityV1(
         capability_id=binding.capability_id,
         capability_revision=binding.capability_revision,
         adapter_id=binding.adapter_id,
         adapter_version=binding.adapter_version,
-        execution_manifest_sha256="1" * 64,
+        execution_manifest_sha256=capability_manifest_sha256,
         profile_id=binding.profile_id,
         profile_revision=binding.profile_revision,
         profile_sha256=binding.profile_sha256,
@@ -472,7 +475,12 @@ async def _prepare_approved_campaign() -> _Prepared:
         bundle_revision=binding.bundle_revision,
         bundle_sha256=binding.bundle_sha256,
     )
-    current_domain = domain(operators=(replace(operator(), capability=capability),))
+    current_operator = replace(operator(), capability=capability)
+    if mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+        current_operator = replace(current_operator, max_duration_seconds=60, max_requests=20,
+            max_rate_per_minute=60, max_evidence_bytes=(10 if binding.capability_id == "zap-controlled-runtime" else 2) * 1024 * 1024,
+            max_data_bytes=20 * 1024 * 1024)
+    current_domain = domain(operators=(current_operator,))
     current_authority = authority(
         envelope_id=f"authority-r173-{suffix}"[:64],
         tenant_id=tenant,
@@ -480,11 +488,16 @@ async def _prepare_approved_campaign() -> _Prepared:
         target_ids=(target,),
         capability_ids=(binding.capability_id,),
         valid_from=NOW,
-        expires_at=NOW + timedelta(seconds=60),
+        expires_at=NOW + timedelta(seconds=validity_seconds),
+        policy_revision=policy_revision,
         required_approvers=(CampaignApproverRequirementV2(approver, "campaign-owner"),),
         nonce=f"nonce-r173-{suffix}"[:100],
     )
     private_key = Ed25519PrivateKey.generate()
+    if mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+        current_authority = replace(current_authority, bounds=replace(current_authority.bounds,
+            max_requests=20, max_rate_per_minute=60, max_concurrency=1, max_width=1,
+            max_evidence_bytes=current_operator.max_evidence_bytes, max_data_bytes=current_operator.max_data_bytes))
     approval_signature = sign_campaign_authority(
         current_authority,
         private_key,
@@ -492,7 +505,7 @@ async def _prepare_approved_campaign() -> _Prepared:
         approver_role="campaign-owner",
         key_id="key-a",
         approved_at=NOW + timedelta(seconds=1),
-        expires_at=NOW + timedelta(seconds=50),
+        expires_at=NOW + timedelta(seconds=validity_seconds - 10),
     )
     signed = SignedCampaignAuthorityEnvelopeV2(
         authority=current_authority,
@@ -510,7 +523,7 @@ async def _prepare_approved_campaign() -> _Prepared:
     current_lifecycle = lifecycle(
         current_authority,
         observed_at=NOW + timedelta(seconds=1),
-        valid_until=NOW + timedelta(seconds=55),
+        valid_until=NOW + timedelta(seconds=validity_seconds - 5),
     )
     stage = StageAutonomousCampaignPlanV1(
         schema_version=PLAN_STAGE_SCHEMA_VERSION,
@@ -532,6 +545,7 @@ async def _prepare_approved_campaign() -> _Prepared:
         campaign_id=campaign,
         signed_authority=signed,
         authority_lifecycle=current_lifecycle,
+        execution_bindings=(_full_binding(capability),) if mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO else (),
     )
     current_trusted_key = trusted_key(private_key, approver_id=approver)
     application_service = AutonomousCampaignApplicationService(
@@ -611,7 +625,7 @@ async def _prepare_approved_campaign() -> _Prepared:
 
 
 def _admission_service(
-    *, sessions, repository, context_provider, context, trusted_keys
+    *, sessions, repository, context_provider, context, trusted_keys, policy_provider=None, lease_seconds=60
 ):
     def _store_factory(command, bundle, current_context):
         return PostgresAutonomousCampaignAdmissionStartStore(
@@ -626,7 +640,7 @@ def _admission_service(
         context_provider=context_provider,
         store_factory=_store_factory,
         policy=AdmissionPolicyAdapter(
-            DeterministicFakePolicyProvider(
+            policy_provider or DeterministicFakePolicyProvider(
                 revision=context.signed_authority.authority.policy_revision
             ),
             required_revision=context.signed_authority.authority.policy_revision,
@@ -636,6 +650,7 @@ def _admission_service(
         validation_limits=limits(),
         trusted_validator_version=VALIDATOR_VERSION,
         trusted_validator_sha256=VALIDATOR_SHA256,
+        lease_seconds=lease_seconds,
     )
 async def _count(session, table_name: str, tenant: str) -> int:
     table = metadata.tables[table_name]

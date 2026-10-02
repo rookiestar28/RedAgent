@@ -457,6 +457,8 @@ function CampaignOperationsWorkspace({ operations }: { operations: CampaignOpera
       <article>
         <span>Execution</span>
         <strong>{title(operations.execution.state)}</strong>
+        {/* IMPORTANT: state alone hides whether recovery must reconcile the start, cleanup, or evidence. */}
+        {operations.execution.terminal_reason && <small>{human(operations.execution.terminal_reason)}</small>}
         <small>{operations.execution.transition_count} of {operations.execution.max_transitions} bounded transitions</small>
       </article>
     </div>

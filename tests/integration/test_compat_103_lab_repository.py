@@ -306,7 +306,7 @@ class _PostgresBackedFoundationBoundary:
 
     async def execute(self, definition) -> BoundaryReceipt:
         revision = await self.session.scalar(text("SELECT version_num FROM alembic_version"))
-        assert revision == "0031_autonomous_admission_start"
+        assert revision == "0032_owned_execution_mode"
         return BoundaryReceipt(
             receipt_types=("audit", "outbox", "telemetry", "cleanup", "evidence", "finding", "incident"),
             reason_code="fixed_local_foundation_passed", request_count=1, contact_count=0,

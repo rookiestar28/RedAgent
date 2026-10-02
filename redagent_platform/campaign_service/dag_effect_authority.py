@@ -194,7 +194,12 @@ class DagEffectAuthorityGate:
         if not isinstance(command, EffectDispatchCommand):
             raise ValueError("dag_authority_command_invalid")
         _aware("dag_authority_now", now)
-        material = await self._state.read(command, now=now)
+        from redagent_platform.campaign_service.owned_execution import OwnedExecutionDenied
+
+        try:
+            material = await self._state.read(command, now=now)
+        except OwnedExecutionDenied as exc:
+            return _deny(str(exc))
         binding_reason = _command_reason(material, command)
         if binding_reason is not None:
             return _deny(binding_reason)
@@ -294,13 +299,16 @@ class DagEffectAuthorityGate:
 
         if material.effect_state == "dispatching":
             # CRITICAL: this locked commit is the final current-policy fact; dispatcher I/O is next.
-            await self._state.commit_pre_io(
-                material,
-                decision=decision,
-                request=request,
-                runner_binding_sha256=runner_binding_sha256,
-                now=now,
-            )
+            try:
+                await self._state.commit_pre_io(
+                    material,
+                    decision=decision,
+                    request=request,
+                    runner_binding_sha256=runner_binding_sha256,
+                    now=now,
+                )
+            except OwnedExecutionDenied as exc:
+                return _deny(str(exc))
         return AuthorityRecheck(
             True,
             "allowed",

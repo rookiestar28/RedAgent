@@ -52,7 +52,7 @@ async def _migration_scenario() -> None:
             assert upgraded.returncode == 0, upgraded.stderr
             current = _alembic(secret_file, "current")
             assert current.returncode == 0
-            assert "0031_autonomous_admission_start (head)" in current.stdout
+            assert "0032_owned_execution_mode (head)" in current.stdout
 
             async with engine.begin() as connection:
                 revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))

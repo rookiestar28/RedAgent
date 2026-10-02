@@ -13,7 +13,8 @@ def test_dag_relay_store_claims_only_its_event_and_updates_execution_run() -> No
     assert 'runs.c.id == row["aggregate_id"]' in source
     assert 'runs.c.workflow_id == expected_workflow_id' in source
     assert 'runs.c.request_sha256 == expected_request_sha256' in source
-    assert 'run_state="running"' in source
+    assert 'current_run["run_state"] == "start_pending"' in source
+    assert 'else current_run["run_state"]' in source
     assert 'action="campaign.dag.workflow_started"' in source
 
 

@@ -35,7 +35,9 @@ GATEWAY_SOURCE = ROOT / "containers" / "r104-gateway" / "gateway_server.py"
 TARGET_DOCKERFILE = ROOT / "containers" / "r104-target" / "Dockerfile"
 GATEWAY_DOCKERFILE = ROOT / "containers" / "r104-gateway" / "Dockerfile"
 ZAP_DOCKERFILE = ROOT / "containers" / "r104-zap" / "Dockerfile"
-CONTROLLER = ROOT / "scripts" / "r104_zap_controller.py"
+# CRITICAL: resolve the current public controller filename, not its retired private alias.
+# The old path fails source validation before any owned runtime can start.
+CONTROLLER = ROOT / "scripts" / "compat_104_zap_controller.py"
 TARGET = "redagent-r104-target"
 GATEWAY = "redagent-r104-gateway"
 ZAP = "redagent-r104-zap"

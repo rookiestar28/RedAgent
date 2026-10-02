@@ -21,7 +21,7 @@ class DatabaseSettings:
     driver: str
     host: str
     database: str
-    expected_revision: str = "0031_autonomous_admission_start"
+    expected_revision: str = "0032_owned_execution_mode"
     pool_size: int = 10
     max_overflow: int = 10
     pool_timeout_seconds: int = 30

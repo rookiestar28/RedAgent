@@ -28,8 +28,10 @@ class PostgresDagManifestLineageOwner:
         now: datetime,
     ) -> ManifestLineageContext:
         del stable
+        # CRITICAL: use the RLS tenant key and set_config for bound PostgreSQL parameters.
+        # SET LOCAL cannot bind a value; app.current_tenant also leaves tenant isolation unset.
         await session.execute(
-            text("SET LOCAL app.current_tenant = :tenant_id"),
+            text("SELECT set_config('redagent.tenant_id', :tenant_id, true)"),
             {"tenant_id": command.tenant_id},
         )
         effects = metadata.tables["campaign_effects"]

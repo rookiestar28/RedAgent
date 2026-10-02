@@ -47,8 +47,9 @@ def test_r171_contract_is_versioned_plan_only_and_closed() -> None:
     assert load_autonomous_campaign_mode({"REDAGENT_AUTONOMOUS_CAMPAIGN_MODE": "disabled"}) is (
         AutonomousCampaignMode.DISABLED
     )
+    assert load_autonomous_campaign_mode({"REDAGENT_AUTONOMOUS_CAMPAIGN_MODE": "owned_loopback_auto"}) is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO
     with pytest.raises(ValueError, match="autonomous_campaign_mode_invalid"):
-        load_autonomous_campaign_mode({"REDAGENT_AUTONOMOUS_CAMPAIGN_MODE": "owned_loopback_auto"})
+        load_autonomous_campaign_mode({"REDAGENT_AUTONOMOUS_CAMPAIGN_MODE": "arbitrary_auto"})
 
 
 @pytest.mark.parametrize(

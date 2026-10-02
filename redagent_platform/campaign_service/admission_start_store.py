@@ -42,8 +42,10 @@ from redagent_platform.campaign_service.application_contracts import (
     ApplicationRevisionConflict,
     AutonomousCampaignApplicationStateV1,
     AutonomousCampaignLifecycle,
+    AutonomousCampaignMode,
     assert_lifecycle_transition,
 )
+from redagent_platform.campaign_service.owned_execution import OwnedExecutionDenied, validate_owned_execution_input
 from redagent_platform.campaign_service.application_repository import (
     _record_lifecycle_event,
     _state_from_row,
@@ -181,9 +183,15 @@ class PostgresAutonomousCampaignAdmissionStartStore:
                         admission_receipt=admission_receipt,
                         max_activity_attempts=2,
                         max_transitions=min(10_000, max(16, node_count * 8)),
+                        execution_bindings=self._bundle.preview.execution_bindings,
                     ),
                     now=self._command.occurred_at,
                 )
+                if current.mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+                    try:
+                        validate_owned_execution_input(material.input_payload)
+                    except OwnedExecutionDenied as exc:
+                        raise ApplicationPlanInvalid(str(exc)) from exc
                 await CampaignDagExecutionRepository(
                     session,
                     tenant_id=self._command.tenant_id,

@@ -15,7 +15,7 @@ TABLES = {
 
 
 def test_revision_0018_is_expected_head_and_force_rls_owned():
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0031_autonomous_admission_start"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0032_owned_execution_mode"
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0018_r111_purple"' in source and 'down_revision = "0017_r110_artifact"' in source
     assert "FORCE ROW LEVEL SECURITY" in source and "redagent.tenant_id" in source

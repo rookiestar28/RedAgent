@@ -62,6 +62,35 @@ test("compat_124 attention and recovery surfaces expose guidance without raw-ID 
   await expect(page.getByText("opaque-attention-binding")).toHaveCount(0);
 });
 
+for (const attention of [
+  { state: "reconciliation_required", reason: "owned_execution_start_outcome_unknown", cleanup: "pending" },
+  { state: "manual_review_required", reason: "owned_execution_cleanup_incomplete", cleanup: "incomplete" },
+  { state: "manual_review_required", reason: "owned_execution_evidence_incomplete", cleanup: "complete" },
+]) {
+  test(`owned execution ${attention.reason} preserves attention and blocks completion/export`, async ({ page }) => {
+    const operations = campaignOperations();
+    operations.execution.state = attention.state;
+    operations.execution.terminal_reason = attention.reason;
+    operations.execution.frontier = { ambiguous: 1 };
+    operations.evidence.cleanup_state = attention.cleanup;
+    operations.evidence.evidence_count = 0;
+    operations.evidence.terminal_receipt_present = false;
+    await campaignRoutes(page, async () => {}, { operations });
+    await page.goto("/campaigns");
+    await page.getByRole("button", { name: "View current status" }).click();
+
+    await expect(page.getByRole("heading", { name: "Autonomous campaign operations" })).toBeVisible();
+    await expect(page.getByText(attention.reason.replaceAll("_", " "), { exact: true })).toBeVisible();
+    const evidence = page.locator("article").filter({ has: page.getByRole("heading", { name: "Cleanup and export" }) });
+    await expect(evidence).toContainText(attention.cleanup);
+    await expect(evidence).toContainText("Not present");
+    await expect(evidence).toContainText("Export remains disabled");
+    await expect(page.getByRole("button", { name: /export|start|approve|dispatch/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Request containment" })).toBeVisible();
+    await expect(page.getByText(/execution complete|evidence verified|containment complete/i)).toHaveCount(0);
+  });
+}
+
 test("R162 campaign operations renders server truth and keeps export unavailable", async ({ page }) => {
   await campaignRoutes(page);
   await page.goto("/campaigns");

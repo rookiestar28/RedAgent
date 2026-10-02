@@ -88,15 +88,27 @@ class CampaignDagExecutionWorkflow:
         for _ in range(request.max_transitions):
             if self._pending_stop is not None:
                 return await self._contain(self._pending_stop)
-            self._snapshot = await workflow.execute_activity(
-                "redagent.campaign-dag.reconcile.v1",
-                request,
-                result_type=DagExecutionSnapshotV1,
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=dag_activity_retry_policy(request.max_activity_attempts),
-            )
+            try:
+                self._snapshot = await workflow.execute_activity(
+                    "redagent.campaign-dag.reconcile.v1",
+                    request,
+                    result_type=DagExecutionSnapshotV1,
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=dag_activity_retry_policy(request.max_activity_attempts),
+                )
+            except (asyncio.CancelledError, ActivityError):
+                if not workflow.patched("campaign-dag-failure-containment"):
+                    raise
+                return await self._contain(self._pending_stop or self._failure_stop("reconcile"))
             snapshot = self._required_snapshot()
             self._validate_snapshot(snapshot)
+            if snapshot.stop_requested and workflow.patched("campaign-dag-owned-frontier-stop"):
+                return await self._contain(DagStopSignalV1(
+                    schema_version=DAG_EXECUTION_SCHEMA_VERSION,
+                    signal_id=f"authority-stop-{request.execution_run_id}",
+                    actor_user_id="redagent-workflow",
+                    reason_sha256="c729f5f93861e2ef9a9e1d9503b6a6cb17d1b6fd162eee4a332610c2293090b5",
+                ))
             if snapshot.state in _TERMINAL_STATES:
                 return snapshot
             if self._pending_stop is not None:
@@ -117,7 +129,11 @@ class CampaignDagExecutionWorkflow:
                 self._snapshot = await self._dispatch_handle
             except (asyncio.CancelledError, ActivityError):
                 if self._pending_stop is None:
-                    raise
+                    if not workflow.patched("campaign-dag-failure-containment"):
+                        raise
+                    # CRITICAL: an exhausted Activity may have persisted I/O; contain the same run,
+                    # never start another dispatch to obtain a successful Workflow result.
+                    return await self._contain(self._failure_stop("dispatch"))
                 continue
             finally:
                 self._dispatch_handle = None
@@ -139,6 +155,14 @@ class CampaignDagExecutionWorkflow:
             self._snapshot = replace(self._snapshot, stop_requested=True)
         if self._dispatch_handle is not None and workflow.patched("campaign-dag-v1-cancel-wait"):
             self._dispatch_handle.cancel()
+
+    def _failure_stop(self, phase: str) -> DagStopSignalV1:
+        return DagStopSignalV1(
+            schema_version=DAG_EXECUTION_SCHEMA_VERSION,
+            signal_id=f"activity-failed-{phase}-{self._required_request().execution_run_id}",
+            actor_user_id="redagent-workflow",
+            reason_sha256="c729f5f93861e2ef9a9e1d9503b6a6cb17d1b6fd162eee4a332610c2293090b5",
+        )
 
     @workflow.query(name="status")
     def status(self) -> DagExecutionSnapshotV1:

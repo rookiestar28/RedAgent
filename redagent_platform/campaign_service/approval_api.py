@@ -120,6 +120,8 @@ class AutonomousCampaignPlanPreviewData(_StrictModel):
     required_approvers: tuple[AutonomousCampaignPlanApproverData, ...]
     issued_at: datetime
     expires_at: datetime
+    execution_mode: Literal["plan_only", "owned_loopback_auto"] = "plan_only"
+    execution_bindings: tuple[dict[str, str | int | None], ...] = ()
 
 
 class AutonomousCampaignPlanPreviewResponse(_StrictModel):

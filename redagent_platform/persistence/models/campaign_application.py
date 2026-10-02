@@ -61,7 +61,10 @@ Table(
         "contract_version = 'redagent.autonomous-campaign-application/v1'",
         name="autonomous_campaign_application_contract_version_closed",
     ),
-    CheckConstraint("mode = 'plan_only'", name="autonomous_campaign_application_mode_plan_only"),
+    CheckConstraint(
+        "mode IN ('plan_only','owned_loopback_auto')",
+        name="autonomous_campaign_application_mode_closed",
+    ),
     CheckConstraint(
         f"lifecycle_state IN ({_LIFECYCLE_SQL})",
         name="autonomous_campaign_application_lifecycle_closed",

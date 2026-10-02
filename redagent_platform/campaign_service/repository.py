@@ -401,6 +401,7 @@ class ClaimedWorkflowStart:
     claim_owner: str
     claim_expires_at: datetime
     payload: dict[str, object]
+    reconciliation_only: bool = False
 
 
 @dataclass(frozen=True)

@@ -36,6 +36,7 @@ from redagent_platform.campaign_service.planning.contracts import (
 )
 from redagent_platform.campaign_service.service import EffectDispatchCommand
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.owned_execution_store import assert_owned_execution_current
 from redagent_platform.policy_service.contracts import (
     PolicyDecision,
     PolicyDecisionInput,
@@ -57,8 +58,10 @@ class PostgresDagEffectAuthorityStateOwner:
         *,
         actor_user_id: str,
         correlation_prefix: str,
+        owned_execution_enabled: bool = False,
     ) -> None:
         self._sessions = session_factory
+        self._owned_execution_enabled = owned_execution_enabled
         self._actor_user_id = _required(
             "dag_authority_store_actor", actor_user_id, 64
         )
@@ -77,6 +80,7 @@ class PostgresDagEffectAuthorityStateOwner:
                 tenant_id=command.tenant_id,
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"{self._correlation_prefix}-read-{suffix}",
+                owned_execution_enabled=self._owned_execution_enabled,
             ).read(command, now=now)
 
     async def observe_lifecycle(
@@ -93,6 +97,7 @@ class PostgresDagEffectAuthorityStateOwner:
                 tenant_id=material.tenant_id,
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"{self._correlation_prefix}-observe-{suffix}",
+                owned_execution_enabled=self._owned_execution_enabled,
             ).observe_lifecycle(material, lifecycle, now=now)
 
     async def commit_pre_io(
@@ -111,6 +116,7 @@ class PostgresDagEffectAuthorityStateOwner:
                 tenant_id=material.tenant_id,
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"{self._correlation_prefix}-preio-{suffix}",
+                owned_execution_enabled=self._owned_execution_enabled,
             ).commit_pre_io(
                 material,
                 decision=decision,
@@ -128,11 +134,13 @@ class _Repository:
         tenant_id: str,
         actor_user_id: str,
         correlation_id: str,
+        owned_execution_enabled: bool = False,
     ) -> None:
         self.session = session
         self.tenant_id = tenant_id
         self.actor_user_id = actor_user_id
         self.correlation_id = correlation_id
+        self.owned_execution_enabled = owned_execution_enabled
 
     async def read(
         self, command: EffectDispatchCommand, *, now: datetime
@@ -160,6 +168,7 @@ class _Repository:
             node_id=str(effect["node_id"]),
         )
         payload = effect["effect_intent_payload"]
+        await assert_owned_execution_current(self.session, run, now=now, enabled=self.owned_execution_enabled)
         binding = payload.get("binding") if isinstance(payload, dict) else None
         if (
             not isinstance(payload, dict)
@@ -337,6 +346,12 @@ class _Repository:
             != runner_binding_sha256
         ):
             raise DagEffectAuthorityConflict("dag_pre_io_policy_binding_mismatch")
+        runs = metadata.tables["campaign_execution_runs"]
+        current_run = (await self.session.execute(select(runs).where(
+            runs.c.tenant_id == self.tenant_id, runs.c.id == material.execution_run_id
+        ).with_for_update())).mappings().one()
+        # CRITICAL: this locked check is after fresh policy and immediately before runner I/O.
+        await assert_owned_execution_current(self.session, current_run, now=now, enabled=self.owned_execution_enabled)
         decision.assert_current(
             request, required_revision=material.policy_bundle_revision, now=now
         )

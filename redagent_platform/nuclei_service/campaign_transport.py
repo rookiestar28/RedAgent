@@ -134,7 +134,10 @@ def _contained(root: Path, path: Path) -> Path:
 class NucleiDockerTransport:
     """Exact local Docker implementation; no caller-controlled target, template, or flags."""
 
-    def __init__(self, workspace: Path) -> None:
+    def __init__(self, workspace: Path, *, owned_execution: bool = False) -> None:
+        if not isinstance(owned_execution, bool):
+            raise ValueError("owned_execution_transport_mode_invalid")
+        self._request_rate = 1 if owned_execution else 2
         self._workspace = workspace.resolve()
         self._runtime = _contained(
             self._workspace, self._workspace / ".local/redagent/r123-nuclei"
@@ -228,7 +231,7 @@ class NucleiDockerTransport:
                 "expected_target_ip": target_ip,
                 "allowed_paths": ["/nuclei/missing-header"],
                 "request_limit": 20,
-                "request_rate_per_second": 2,
+                "request_rate_per_second": self._request_rate,
                 "concurrency": 1,
                 "timeout_seconds": 60,
                 "response_bytes_limit": NUCLEI_RESPONSE_BYTES_LIMIT,

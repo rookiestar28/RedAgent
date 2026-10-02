@@ -19,11 +19,11 @@ def test_admission_migration_is_the_single_additive_head() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["0031_autonomous_admission_start"]
+    assert scripts.get_heads() == ["0032_owned_execution_mode"]
     source = MIGRATION.read_text(encoding="utf-8")
     assert 'revision = "0026_campaign_plan_admission"' in source
     assert 'down_revision = "0025_r123_closed_loop"' in source
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0031_autonomous_admission_start")
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0032_owned_execution_mode")
 
 
 def test_admission_metadata_is_closed_tenant_owned_and_bounded() -> None:

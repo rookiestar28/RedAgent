@@ -51,6 +51,7 @@ from redagent_platform.campaign_service.planning.contracts import (
     canonical_planning_sha256,
 )
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
 
 
 _CREATE_OPERATION = "autonomous_campaign.application.create.v1"
@@ -104,7 +105,7 @@ class PostgresAutonomousCampaignApplicationRepository:
                     created_by_user_id=command.actor_user_id,
                     intent_sha256=command.intent_sha256,
                     source_binding_sha256=command.source_binding_sha256,
-                    mode=AutonomousCampaignMode.PLAN_ONLY,
+                    mode=command.mode,
                     lifecycle_state=AutonomousCampaignLifecycle.INTENT_CREATED,
                     aggregate_revision=1,
                     attention_reason=None,
@@ -144,7 +145,7 @@ class PostgresAutonomousCampaignApplicationRepository:
                     event_payload={
                         "intent_sha256": command.intent_sha256,
                         "source_binding_sha256": command.source_binding_sha256,
-                        "mode": AutonomousCampaignMode.PLAN_ONLY.value,
+                        "mode": command.mode.value,
                     },
                     occurred_at=command.occurred_at,
                     response_status=201,
@@ -315,6 +316,7 @@ class PostgresAutonomousCampaignApplicationRepository:
                     or preview.campaign_id != current.campaign_id
                     or preview.engagement_id != current.engagement_id
                     or preview.application_revision != current.aggregate_revision + 2
+                    or preview.execution_mode is not current.mode
                 ):
                     raise ApplicationBindingConflict("plan_preview_application_binding_mismatch")
                 assert_lifecycle_transition(current.lifecycle_state, AutonomousCampaignLifecycle.PLAN_VALIDATED)
@@ -1377,6 +1379,8 @@ def _semantic_request_sha256(
             "source_binding_sha256": command.source_binding_sha256,
             "expected_revision": command.expected_revision,
         }
+        if command.mode is not AutonomousCampaignMode.PLAN_ONLY:
+            payload["mode"] = command.mode.value
     else:
         payload = {
             "schema_version": command.schema_version,
@@ -1547,6 +1551,8 @@ def _preview_from_payload(payload: object) -> AutonomousCampaignPlanPreviewV1:
     actions = _stored_list("actions", payload.get("actions"))
     approvers = _stored_list("required_approvers", payload.get("required_approvers"))
     return AutonomousCampaignPlanPreviewV1(
+        execution_mode=AutonomousCampaignMode(str(payload.get("execution_mode", "plan_only"))),
+        execution_bindings=tuple(CapabilityBindingKeyV1(**item) for item in payload.get("execution_bindings", [])),
         schema_version=str(payload["schema_version"]),
         preview_id=str(payload["preview_id"]),
         tenant_id=str(payload["tenant_id"]),

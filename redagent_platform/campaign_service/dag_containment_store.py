@@ -18,6 +18,7 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
     dag_workflow_request_sha256,
 )
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.owned_execution_store import project_owned_execution
 
 
 class DagContainmentConflict(RuntimeError):
@@ -85,9 +86,12 @@ class PostgresDagContainmentOwner:
                 or run["request_sha256"] != dag_workflow_request_sha256(workflow)
                 or run["input_sha256"] != workflow.input_sha256
                 or run["plan_sha256"] != workflow.plan_sha256
-                or int(run["version"]) != request.expected_revision
+                # CRITICAL: lost Activity replies can leave a newer durable revision. A stop
+                # binds the exact immutable run and uses its locked version for CAS; only a
+                # future revision is invalid. Requiring equality strands cleanup after timeout.
+                or int(run["version"]) < request.expected_revision
                 or str(run["run_state"])
-                not in {"running", "stopping", "reconciliation_required"}
+                not in {"start_pending", "running", "stopping", "reconciliation_required"}
             ):
                 raise DagContainmentConflict("dag_containment_binding_conflict")
             if outcome == "contained":
@@ -135,6 +139,7 @@ class PostgresDagContainmentOwner:
             ).mappings().one_or_none()
             if updated is None:
                 raise DagContainmentConflict("dag_containment_projection_conflict")
+            await project_owned_execution(session, updated, now=now, actor_user_id=request.stop.actor_user_id)
             await session.execute(
                 insert(metadata.tables["audit_events"]).values(
                     id=str(uuid4()),

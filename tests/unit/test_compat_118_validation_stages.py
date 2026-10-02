@@ -186,6 +186,7 @@ def test_runner_uses_bounded_environment_without_shell_and_records_terminal_resu
     assert result.exit_code == 0
     assert calls[0]["shell"] is False
     assert calls[0]["env"] == {
+        "npm_config_cache": str(ROOT / ".tmp" / "npm-cache"),
         "PATH": "bounded",
         "PRE_COMMIT_HOME": "repo-local-cache",
         "TMPDIR": "repo-local-playwright-temp",

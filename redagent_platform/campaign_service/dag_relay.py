@@ -15,6 +15,7 @@ from redagent_platform.campaign_service.relay import (
     WorkflowAlreadyStarted,
     WorkflowStartGateway,
     WorkflowStartUnavailable,
+    WorkflowStartUnknown,
 )
 from redagent_platform.campaign_service.repository import ClaimedWorkflowStart
 from redagent_platform.orchestration.dag_execution_gateway import (
@@ -70,13 +71,17 @@ class DagWorkflowRelay:
             request.tenant_id, request.execution_run_id
         )
         request_sha256 = dag_workflow_request_sha256(request)
+        if claim.reconciliation_only:
+            return await self._reconcile_duplicate(
+                claim, workflow_id=workflow_id, request_sha256=request_sha256, now=now
+            )
         try:
             receipt = await self._gateway.start(
                 workflow_id=workflow_id,
                 request_sha256=request_sha256,
                 payload=claim.payload,
             )
-        except WorkflowAlreadyStarted:
+        except (WorkflowAlreadyStarted, WorkflowStartUnknown):
             return await self._reconcile_duplicate(
                 claim,
                 workflow_id=workflow_id,

@@ -172,6 +172,7 @@ class StageRunner:
         "PROGRAMFILES(X86)",
         "PROGRAMW6432",
         "PRE_COMMIT_HOME",
+        "REDAGENT_E2E_PORT",
         "REDAGENT_DATABASE_URL_FILE",
     }
     _FIXED_ENVIRONMENT_VALUES = {
@@ -195,6 +196,12 @@ class StageRunner:
             for key, value in inherited_environment.items()
             if key.upper() in self._ALLOWED_ENVIRONMENT
         }
+        # CRITICAL: npm otherwise writes its default user cache outside the workspace.
+        # Keep the cache code-owned and included in the stage environment digest.
+        npm_cache = (self._repository_root / ".tmp" / "npm-cache").resolve()
+        if not npm_cache.is_relative_to(self._repository_root):
+            raise ValidationConfigError("npm stage cache escaped the repository")
+        self._environment["npm_config_cache"] = str(npm_cache)
         if fixed_environment is not None:
             fixed_values = dict(fixed_environment)
             if fixed_values not in (

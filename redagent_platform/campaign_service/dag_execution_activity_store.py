@@ -45,6 +45,8 @@ from redagent_platform.campaign_service.service import (
     binding_from_campaign_context,
 )
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.owned_execution import OwnedExecutionDenied
+from redagent_platform.campaign_service.owned_execution_store import assert_owned_execution_current, project_owned_execution
 from redagent_platform.runner_service.campaign_dispatch import (
     CampaignAdapterRequest,
 )
@@ -61,10 +63,12 @@ class PostgresDagExecutionActivityStateOwner:
         *,
         actor_user_id: str,
         correlation_prefix: str,
+        owned_execution_enabled: bool = False,
     ) -> None:
         self._sessions = session_factory
         self._actor_user_id = actor_user_id
         self._correlation_prefix = correlation_prefix
+        self._owned_execution_enabled = owned_execution_enabled
 
     async def prepare(
         self, request: DagWorkflowInputV1, *, now: datetime
@@ -75,6 +79,7 @@ class PostgresDagExecutionActivityStateOwner:
                 session,
                 actor_user_id=self._actor_user_id,
                 correlation_prefix=self._correlation_prefix,
+                owned_execution_enabled=self._owned_execution_enabled,
             )
             return await repository.prepare(request, now=now)
 
@@ -87,6 +92,7 @@ class PostgresDagExecutionActivityStateOwner:
                 session,
                 actor_user_id=self._actor_user_id,
                 correlation_prefix=self._correlation_prefix,
+                owned_execution_enabled=self._owned_execution_enabled,
             )
             run, nodes = await repository.locked_run(request)
             return _snapshot(run, nodes)
@@ -99,10 +105,12 @@ class _Repository:
         *,
         actor_user_id: str,
         correlation_prefix: str,
+        owned_execution_enabled: bool = False,
     ) -> None:
         self.session = session
         self.actor_user_id = actor_user_id
         self.correlation_prefix = correlation_prefix
+        self.owned_execution_enabled = owned_execution_enabled
 
     async def prepare(
         self, request: DagWorkflowInputV1, *, now: datetime
@@ -119,6 +127,14 @@ class _Repository:
                 DagActivityAction.TERMINAL, _snapshot(run, nodes), None, None
             )
         input_payload = run["input_payload"]
+        try:
+            await assert_owned_execution_current(self.session, run, now=now, enabled=self.owned_execution_enabled)
+        except OwnedExecutionDenied as exc:
+            # CRITICAL: revoke/config drift stops the frontier before another effect is reserved.
+            if run["run_state"] != DagRunState.STOPPING.value:
+                run = await self._advance_run(run, target=DagRunState.STOPPING, terminal_reason=str(exc), now=now)
+            return DagActivityMaterialV1(DagActivityAction.WAIT, _snapshot(run, nodes), None, None)
+        await project_owned_execution(self.session, run, now=now, actor_user_id=self.actor_user_id)
         if not isinstance(input_payload, dict):
             raise DagExecutionActivityConflict("dag_execution_input_invalid")
         revision_payload = input_payload.get("revision")
@@ -272,6 +288,18 @@ class _Repository:
     async def _binding_for_run(
         self, run: Any, capability_id: str
     ) -> CapabilityBindingKeyV1:
+        frozen = run["input_payload"].get("execution_bindings")
+        if frozen is not None:
+            # CRITICAL: application execution uses the full human-approved binding snapshot,
+            # never a freshly reconstructed registry binding or a synthetic legacy strategy.
+            from redagent_platform.campaign_service.service import _validate_closed_binding
+
+            matches = [item for item in frozen if isinstance(item, dict) and item.get("capability_id") == capability_id]
+            if len(matches) != 1:
+                raise DagExecutionActivityConflict("dag_execution_binding_context_invalid")
+            binding = CapabilityBindingKeyV1(**matches[0])
+            _validate_closed_binding(binding)
+            return binding
         campaigns = metadata.tables["campaigns"]
         strategies = metadata.tables["campaign_strategy_revisions"]
         context_payload = await self.session.scalar(
@@ -500,6 +528,8 @@ class _Repository:
         }
         if started:
             values["started_at"] = now
+        if target is DagRunState.STOPPING:
+            values["stop_requested"] = True
         if decrement_concurrency:
             values["active_concurrency"] = max(
                 int(run["active_concurrency"]) - 1, 0
@@ -520,6 +550,7 @@ class _Repository:
         ).mappings().one_or_none()
         if updated is None:
             raise DagExecutionActivityConflict("dag_execution_run_conflict")
+        await project_owned_execution(self.session, updated, now=now, actor_user_id=self.actor_user_id)
         return updated
 
     async def _reconciliation_command(

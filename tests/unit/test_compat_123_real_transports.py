@@ -108,6 +108,10 @@ def test_zap_real_transport_is_fixed_read_only_internal_and_passive_only() -> No
     assert command[entrypoint + 1] == invocation.argv[0]
     assert command[-3:] == invocation.argv[1:]
     assert "activeScan" not in rendered and "-daemon" not in command
+    from redagent_platform.zap_service.capability import build_zap_capability_manifest
+
+    manifest = build_zap_capability_manifest(platform="linux/amd64", artifact_receipt_id="artifact-test")
+    assert int(command[command.index("--pids-limit") + 1]) == manifest.limits.pids
 
 
 def test_r123_transport_timeouts_do_not_exceed_the_signed_effect_budget() -> None:

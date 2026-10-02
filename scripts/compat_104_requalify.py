@@ -80,6 +80,8 @@ def _build_once(dockerfile: Path, context: Path, tag: str, network_none: bool) -
 
 
 def build() -> dict[str, object]:
+    validate()
+    locked = json.loads(CURRENT_ZAP_RUNTIME_LOCK.read_text(encoding="utf-8"))
     observed: dict[str, str] = {}
     for name, dockerfile, context, tag, network_none in SPECS:
         first_tag = f"{tag}-repro-a"
@@ -90,6 +92,10 @@ def build() -> dict[str, object]:
             raise R104RequalificationError(
                 f"requalification_build_not_reproducible:{name}:{first}:{second}"
             )
+        # CRITICAL: reproducibility alone does not restore the reviewed image identity.
+        # Reject a mutually equal replacement before it can take the operational tag.
+        if second != locked[f"{name}_image_id"]:
+            raise R104RequalificationError(f"requalification_locked_image_mismatch:{name}")
         _run(["docker", "tag", second_tag, tag])
         _run(["docker", "image", "rm", first_tag, second_tag])
         observed[name] = second

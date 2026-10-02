@@ -32,12 +32,12 @@ def test_replanning_migration_is_the_single_additive_head() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["0031_autonomous_admission_start"]
+    assert scripts.get_heads() == ["0032_owned_execution_mode"]
     assert scripts.get_revision("0028_observation_replanning").down_revision == (
         "0027_campaign_dag_execution"
     )
     assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0031_autonomous_admission_start"
+        "0032_owned_execution_mode"
     )
 
 

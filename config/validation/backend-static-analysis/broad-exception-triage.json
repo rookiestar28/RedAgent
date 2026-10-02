@@ -14,7 +14,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-32b55780-c08b8b7d-719998e5-7460f5f0-43f9c18e-de774b36-d83df747-46e41c3e",
-      "line": 522,
+      "line": 541,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/application_service.py",
       "rationale": "The application boundary preserves typed domain outcomes and translates any otherwise-unclassified repository failure to the closed dependency-unavailable outcome."
@@ -139,8 +139,8 @@
     {
       "classification": "must_reraise",
       "exception": "BaseException",
-      "fingerprint": "ast-v1-8dbd3382-a8dbda30-3a73ae52-20459572-1742f8ad-73d739f9-dd0af977-414970a8",
-      "line": 1145,
+      "fingerprint": "ast-v1-18ebedf7-3de3e05b-4e56b257-cd5b1be1-e9bf4582-5fdfe272-469a71dc-21e7bd27",
+      "line": 1150,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/service.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
@@ -149,8 +149,8 @@
       "classification": "must_reraise",
       "exception": "BaseException",
       "fingerprint": "ast-v1-8dbd3382-a8dbda30-3a73ae52-20459572-1742f8ad-73d739f9-dd0af977-414970a8",
-      "line": 1189,
-      "occurrence": 2,
+      "line": 1194,
+      "occurrence": 1,
       "path": "redagent_platform/campaign_service/service.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
     },
@@ -158,7 +158,7 @@
       "classification": "legitimate_cleanup",
       "exception": "BaseException",
       "fingerprint": "ast-v1-f92f284d-d04a9331-d7c5c377-791ccb20-43baf7c9-6a7ae224-8ea97981-4daefebc",
-      "line": 1216,
+      "line": 1221,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/service.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -167,7 +167,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-a2451581-1f2eda44-70ae0cef-94f41e61-c316800b-951c234d-a3ae6530-6e912ea7",
-      "line": 1225,
+      "line": 1230,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/service.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
@@ -176,7 +176,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-c1246120-d8a8a387-a7a331cf-82bc5ef5-730cce51-16c2060d-cdb5fd11-ba92c7e8",
-      "line": 1238,
+      "line": 1243,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/service.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
@@ -383,7 +383,7 @@
       "classification": "legitimate_cleanup",
       "exception": "BaseException",
       "fingerprint": "ast-v1-55c0636f-8492aa75-03c3bbb5-51cfa9ea-32dd4717-5af8c1fc-b087a5bc-dcd16b1e",
-      "line": 160,
+      "line": 163,
       "occurrence": 1,
       "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -392,7 +392,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-f2a51f6b-d1083fe6-f7e899ed-2cba3cea-f3775458-18161702-fefa440b-d3c1c409",
-      "line": 165,
+      "line": 168,
       "occurrence": 1,
       "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -401,7 +401,7 @@
       "classification": "must_reraise",
       "exception": "BaseException",
       "fingerprint": "ast-v1-99c56bba-1bfc4192-d4207aa3-ac56c91f-6cd19cb5-12ef480f-205d4373-341173ff",
-      "line": 320,
+      "line": 323,
       "occurrence": 1,
       "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
@@ -410,7 +410,7 @@
       "classification": "must_reraise",
       "exception": "BaseException",
       "fingerprint": "ast-v1-8e50a8bb-d32fdf36-c402d1ae-98b4a84f-d369e29e-bc89d474-192a2e42-b6e0c6e8",
-      "line": 355,
+      "line": 358,
       "occurrence": 1,
       "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
@@ -419,7 +419,7 @@
       "classification": "legitimate_cleanup",
       "exception": "BaseException",
       "fingerprint": "ast-v1-55c0636f-8492aa75-03c3bbb5-51cfa9ea-32dd4717-5af8c1fc-b087a5bc-dcd16b1e",
-      "line": 604,
+      "line": 607,
       "occurrence": 2,
       "path": "redagent_platform/nuclei_service/campaign_transport.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -770,7 +770,7 @@
       "classification": "legitimate_cleanup",
       "exception": "BaseException",
       "fingerprint": "ast-v1-55c0636f-8492aa75-03c3bbb5-51cfa9ea-32dd4717-5af8c1fc-b087a5bc-dcd16b1e",
-      "line": 145,
+      "line": 150,
       "occurrence": 1,
       "path": "redagent_platform/zap_service/campaign_transport.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -779,7 +779,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-f2a51f6b-d1083fe6-f7e899ed-2cba3cea-f3775458-18161702-fefa440b-d3c1c409",
-      "line": 150,
+      "line": 155,
       "occurrence": 1,
       "path": "redagent_platform/zap_service/campaign_transport.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -788,7 +788,7 @@
       "classification": "must_reraise",
       "exception": "BaseException",
       "fingerprint": "ast-v1-99c56bba-1bfc4192-d4207aa3-ac56c91f-6cd19cb5-12ef480f-205d4373-341173ff",
-      "line": 309,
+      "line": 314,
       "occurrence": 1,
       "path": "redagent_platform/zap_service/campaign_transport.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
@@ -797,7 +797,7 @@
       "classification": "must_reraise",
       "exception": "BaseException",
       "fingerprint": "ast-v1-8e50a8bb-d32fdf36-c402d1ae-98b4a84f-d369e29e-bc89d474-192a2e42-b6e0c6e8",
-      "line": 343,
+      "line": 348,
       "occurrence": 1,
       "path": "redagent_platform/zap_service/campaign_transport.py",
       "rationale": "The boundary re-raises or translates the caught failure after preserving cleanup or fail-closed state."
@@ -806,7 +806,7 @@
       "classification": "legitimate_cleanup",
       "exception": "BaseException",
       "fingerprint": "ast-v1-55c0636f-8492aa75-03c3bbb5-51cfa9ea-32dd4717-5af8c1fc-b087a5bc-dcd16b1e",
-      "line": 553,
+      "line": 558,
       "occurrence": 2,
       "path": "redagent_platform/zap_service/campaign_transport.py",
       "rationale": "The broad catch is a bounded cleanup, readiness or fail-closed conversion, task-result consumption, or top-level safety boundary; narrowing would omit valid boundary failures."
@@ -815,7 +815,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-f9f25f7e-b7e3bb0a-0561feb2-706243a7-4fd78a6f-24c8d8ad-40a9eeec-85fab0a6",
-      "line": 277,
+      "line": 282,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/dag_effect_authority.py",
       "rationale": "The policy-provider boundary converts any unavailable decision path into a fail-closed denial; narrowing would permit provider failures to escape the authorization result contract."
@@ -824,7 +824,7 @@
       "classification": "legitimate_cleanup",
       "exception": "Exception",
       "fingerprint": "ast-v1-9bf47b59-4a4e1e4a-b9e5d073-304be803-1669388b-81055bed-a2bbd8e9-5f6b8830",
-      "line": 108,
+      "line": 113,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/dag_relay.py",
       "rationale": "An unqueryable duplicate workflow start is durably converted to reconciliation-required so the relay cannot retry an effectful start blindly."
@@ -841,20 +841,20 @@
     {
       "classification": "must_reraise",
       "exception": "Exception",
-      "fingerprint": "ast-v1-ec41427c-c414302d-d9d98384-0d21e7af-ce1169b6-5589a808-88533366-711cf6e5",
-      "line": 54,
+      "fingerprint": "ast-v1-b1ce3612-818dae53-525199d1-7a2f320b-1564930d-93e62ce1-05bf74f2-d8e7a1d0",
+      "line": 57,
       "occurrence": 1,
       "path": "redagent_platform/orchestration/dag_execution_gateway.py",
-      "rationale": "The Temporal start boundary translates client failures into the relay's explicit unavailable result and never swallows the failure."
+      "rationale": "A start RPC failure preserves an unknown outcome for query-only convergence; query failures remain unavailable except exact SDK NOT_FOUND."
     },
     {
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-9bf953ce-6aed1455-9ea85169-836c6574-b148e03b-578f03b0-a65c922b-d81a973d",
-      "line": 69,
+      "line": 77,
       "occurrence": 1,
       "path": "redagent_platform/orchestration/dag_execution_gateway.py",
-      "rationale": "The Temporal query boundary translates client failures into an explicit unavailable result so duplicate-start reconciliation remains fail closed."
+      "rationale": "A start RPC failure preserves an unknown outcome for query-only convergence; query failures remain unavailable except exact SDK NOT_FOUND."
     },
     {
       "classification": "legitimate_cleanup",

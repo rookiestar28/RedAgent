@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
 import re
 from typing import Protocol
 
 from redagent_platform.campaign_service.admission_contracts import CampaignBudgetVectorV1
-from redagent_platform.campaign_service.application_contracts import AutonomousCampaignApplicationStateV1
+from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
+from redagent_platform.campaign_service.application_contracts import AutonomousCampaignApplicationStateV1, AutonomousCampaignMode
 from redagent_platform.campaign_service.authority_envelope import (
     CampaignAuthorityLifecycleV2,
     SignedCampaignAuthorityEnvelopeV2,
@@ -49,6 +50,7 @@ class AutonomousCampaignApprovalContextV1:
     campaign_id: str
     signed_authority: SignedCampaignAuthorityEnvelopeV2
     authority_lifecycle: CampaignAuthorityLifecycleV2
+    execution_bindings: tuple[CapabilityBindingKeyV1, ...] = ()
 
     def __post_init__(self) -> None:
         _identifier("approval_context_tenant_id", self.tenant_id, 64)
@@ -207,10 +209,16 @@ class AutonomousCampaignPlanPreviewV1:
     required_approvers: tuple[AutonomousCampaignPlanApproverV1, ...]
     issued_at: datetime
     expires_at: datetime
+    execution_mode: AutonomousCampaignMode = AutonomousCampaignMode.PLAN_ONLY
+    execution_bindings: tuple[CapabilityBindingKeyV1, ...] = ()
 
     def __post_init__(self) -> None:
         if self.schema_version != PLAN_PREVIEW_SCHEMA_VERSION:
             raise ValueError("plan_preview_schema_unsupported")
+        if not isinstance(self.execution_mode, AutonomousCampaignMode) or self.execution_mode is AutonomousCampaignMode.DISABLED:
+            raise ValueError("plan_preview_execution_mode_invalid")
+        if not isinstance(self.execution_bindings, tuple) or any(not isinstance(item, CapabilityBindingKeyV1) for item in self.execution_bindings):
+            raise ValueError("plan_preview_execution_bindings_invalid")
         for name, maximum in (
             ("preview_id", 64),
             ("tenant_id", 64),
@@ -295,7 +303,14 @@ class AutonomousCampaignPlanPreviewV1:
 
     @property
     def preview_sha256(self) -> str:
-        return canonical_planning_sha256(self)
+        payload = asdict(self)
+        # CRITICAL: old plan-only approval digests remain valid; auto authority is explicit.
+        if self.execution_mode is AutonomousCampaignMode.PLAN_ONLY:
+            payload.pop("execution_mode")
+            if self.execution_bindings:
+                raise ValueError("plan_only_execution_bindings_forbidden")
+            payload.pop("execution_bindings")
+        return canonical_planning_sha256(payload)
 
     @property
     def etag(self) -> str:

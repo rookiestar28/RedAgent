@@ -3318,6 +3318,19 @@ export interface components {
             /** Engagement Id */
             engagement_id: string;
             /**
+             * Execution Bindings
+             * @default []
+             */
+            execution_bindings: {
+                [key: string]: string | number | null;
+            }[];
+            /**
+             * Execution Mode
+             * @default plan_only
+             * @enum {string}
+             */
+            execution_mode: "plan_only" | "owned_loopback_auto";
+            /**
              * Expires At
              * Format: date-time
              */

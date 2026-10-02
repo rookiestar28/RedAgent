@@ -35,6 +35,7 @@ from redagent_platform.campaign_service.dag_effect_transition_store import (
     PostgresDagEffectTransitionStore,
 )
 from redagent_platform.campaign_service.dag_execution_activity import DagExecutionActivity
+from redagent_platform.campaign_service.application_contracts import AutonomousCampaignMode, load_autonomous_campaign_mode
 from redagent_platform.campaign_service.dag_execution_activity_store import (
     PostgresDagExecutionActivityStateOwner,
 )
@@ -91,17 +92,20 @@ def build_dag_execution_temporal_activities(
     signing_key: Ed25519PrivateKey,
     signing_key_id: str,
     actor_user_id: str = "redagent-dag-worker",
+    owned_execution_enabled: bool = False,
 ) -> DagExecutionTemporalActivities:
     state = PostgresDagExecutionActivityStateOwner(
         sessions,
         actor_user_id=actor_user_id,
         correlation_prefix="dag-frontier",
+        owned_execution_enabled=owned_execution_enabled,
     )
     authority = DagEffectAuthorityGate(
         PostgresDagEffectAuthorityStateOwner(
             sessions,
             actor_user_id=actor_user_id,
             correlation_prefix="dag-authority",
+            owned_execution_enabled=owned_execution_enabled,
         ),
         resolver,
         lifecycle,
@@ -209,6 +213,7 @@ def build_stock_campaign_dag_factory(
             evidence_service=EvidenceService(sessions, evidence_backend),
             actor_user_id="redagent-dag-worker",
             kms_reference=kms_reference,
+            owned_execution=(load_autonomous_campaign_mode(env) is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO),
         )
         return build_dag_execution_temporal_activities(
             sessions=sessions,
@@ -219,6 +224,7 @@ def build_stock_campaign_dag_factory(
             containment=PostgresActivityContainmentOwner(sessions),
             signing_key=signing_key,
             signing_key_id=signing_key_id,
+            owned_execution_enabled=(load_autonomous_campaign_mode(env) is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO),
         )
 
     setattr(factory, "_redagent_temporal_readiness_factory", True)

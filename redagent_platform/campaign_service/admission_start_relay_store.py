@@ -32,6 +32,7 @@ from redagent_platform.campaign_service.admission_start_store import (
 from redagent_platform.campaign_service.application_contracts import (
     AutonomousCampaignApplicationStateV1,
     AutonomousCampaignLifecycle,
+    AutonomousCampaignMode,
 )
 from redagent_platform.campaign_service.application_repository import (
     _state_from_row,
@@ -49,6 +50,7 @@ from redagent_platform.orchestration.admission_start_gateway import (
     workflow_input_from_admission_start_payload,
 )
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.owned_execution_store import emit_owned_execution_start
 
 
 _ACK_OPERATION = "autonomous_campaign.start_bridge.acknowledge.v1"
@@ -334,6 +336,10 @@ class CampaignAdmissionStartBridgeRelayRepository:
             },
             occurred_at=occurred_at,
         )
+        if bound.application.mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+            # CRITICAL: only this confirmed exact approval emits the prepared DAG once.
+            # The bridge workflow itself remains effectless for all existing histories.
+            await emit_owned_execution_start(self.session, bound.execution_run, now=occurred_at)
 
     async def confirm_admission_start_bridge_ready(
         self,

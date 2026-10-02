@@ -6,7 +6,9 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import and_, insert, or_, select, text, update
+from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from redagent_platform.campaign_service.application_contracts import AutonomousCampaignMode
 
 from redagent_platform.campaign_service.dag_execution_contracts import (
     dag_workflow_request_sha256,
@@ -18,6 +20,7 @@ from redagent_platform.orchestration.dag_execution_gateway import (
     workflow_input_from_dag_start_payload,
 )
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.owned_execution_store import project_owned_execution
 
 
 class DagRelayConflict(RuntimeError):
@@ -70,6 +73,10 @@ class CampaignDagRelayRepository:
                             outbox.c.delivery_state == "claimed",
                             outbox.c.claim_expires_at <= now,
                         ),
+                        and_(
+                            outbox.c.delivery_state == "reconciliation_required",
+                            outbox.c.reconciliation_state == "start_outcome_unknown",
+                        ),
                     ),
                 )
                 .order_by(outbox.c.aggregate_sequence, outbox.c.created_at, outbox.c.id)
@@ -115,6 +122,9 @@ class CampaignDagRelayRepository:
                         claim_owner=str(updated["claim_owner"]),
                         claim_expires_at=updated["claim_expires_at"],
                         payload=dict(updated["payload"]),
+                        # CRITICAL: an expired claim may have lost a committed start response.
+                        # Query its existing identity; reclaiming must never grant another start.
+                        reconciliation_only=(row["delivery_state"] != "pending"),
                     )
                 )
         return claimed
@@ -159,6 +169,14 @@ class CampaignDagRelayRepository:
         )
         expected_request_sha256 = dag_workflow_request_sha256(request)
         runs = metadata.tables["campaign_execution_runs"]
+        current_run = (await self.session.execute(select(runs).where(
+            runs.c.tenant_id == self.tenant_id, runs.c.id == row["aggregate_id"],
+            runs.c.workflow_id == expected_workflow_id, runs.c.request_sha256 == expected_request_sha256,
+        ).with_for_update())).mappings().one_or_none()
+        if current_run is None or current_run["workflow_run_id"] is not None:
+            raise DagRelayConflict("dag_relay_run_ack_conflict")
+        # CRITICAL: the workflow may advance PostgreSQL before its start response is attached.
+        # Bind the one run ID without resetting execution progress or containment.
         run = (
             await self.session.execute(
                 update(runs)
@@ -167,13 +185,13 @@ class CampaignDagRelayRepository:
                     runs.c.id == row["aggregate_id"],
                     runs.c.workflow_id == expected_workflow_id,
                     runs.c.request_sha256 == expected_request_sha256,
-                    runs.c.run_state == "start_pending",
                     runs.c.workflow_run_id.is_(None),
+                    runs.c.version == current_run["version"],
                 )
                 .values(
                     workflow_run_id=run_id,
-                    run_state="running",
-                    started_at=occurred_at,
+                    run_state=("running" if current_run["run_state"] == "start_pending" else current_run["run_state"]),
+                    started_at=current_run["started_at"] or occurred_at,
                     version=runs.c.version + 1,
                     updated_at=occurred_at,
                 )
@@ -182,6 +200,7 @@ class CampaignDagRelayRepository:
         ).mappings().one_or_none()
         if run is None:
             raise DagRelayConflict("dag_relay_run_ack_conflict")
+        await project_owned_execution(self.session, run, now=occurred_at, actor_user_id=self.actor_user_id)
         await self.session.execute(
             update(outbox)
             .where(
@@ -253,6 +272,9 @@ class CampaignDagRelayRepository:
             now=occurred_at,
             max_attempts=max_attempts,
         )
+        reconciliation_state = decision.reconciliation_state
+        if failure is RelayFailure.AMBIGUOUS_START and error == "duplicate_query_unavailable" and int(row["attempt_count"]) < max_attempts:
+            reconciliation_state = "start_outcome_unknown"
         await self.session.execute(
             update(outbox)
             .where(
@@ -262,7 +284,7 @@ class CampaignDagRelayRepository:
             )
             .values(
                 delivery_state=decision.delivery_state.value,
-                reconciliation_state=decision.reconciliation_state,
+                reconciliation_state=reconciliation_state,
                 available_at=decision.available_at or row["available_at"],
                 claim_owner=None,
                 claim_expires_at=None,
@@ -272,18 +294,54 @@ class CampaignDagRelayRepository:
                 updated_at=occurred_at,
             )
         )
+        await self._project_start_failure(
+            row, reconciliation_state=reconciliation_state,
+            terminal=decision.delivery_state.value != "pending" and reconciliation_state != "start_outcome_unknown",
+            error=error, occurred_at=occurred_at,
+        )
         await self._audit(
             action="campaign.dag.workflow_start_delivery_failed",
             subject_id=str(row["aggregate_id"]),
             details={
                 "event_id": event,
                 "delivery_state": decision.delivery_state.value,
-                "reconciliation_state": decision.reconciliation_state,
+                "reconciliation_state": reconciliation_state,
                 "attempt_count": decision.attempt_count,
                 "error_code": error,
             },
             occurred_at=occurred_at,
         )
+
+    async def _project_start_failure(
+        self, row: RowMapping, *, reconciliation_state: str, terminal: bool, error: str,
+        occurred_at: datetime,
+    ) -> None:
+        if reconciliation_state == "none" and not terminal:
+            return
+        request = workflow_input_from_dag_start_payload(dict(row["payload"]))
+        runs = metadata.tables["campaign_execution_runs"]
+        applications = metadata.tables["autonomous_campaign_applications"]
+        run = (await self.session.execute(select(runs).join(applications, and_(
+            applications.c.tenant_id == runs.c.tenant_id,
+            applications.c.id == runs.c.campaign_id,
+        )).where(
+            runs.c.tenant_id == self.tenant_id, runs.c.id == request.execution_run_id,
+            runs.c.workflow_id == deterministic_dag_workflow_id(request.tenant_id, request.execution_run_id),
+            runs.c.request_sha256 == dag_workflow_request_sha256(request),
+            applications.c.mode == AutonomousCampaignMode.OWNED_LOOPBACK_AUTO.value,
+        ).with_for_update(of=runs))).mappings().one_or_none()
+        if run is None or run["run_state"] not in {"start_pending", "running", "reconciliation_required"}:
+            return
+        # CRITICAL: start ambiguity is operator-visible in the same transaction as recovery.
+        # Exhausted queries stop future effects without claiming containment or cleanup.
+        updated = (await self.session.execute(update(runs).where(
+            runs.c.tenant_id == self.tenant_id, runs.c.id == run["id"], runs.c.version == run["version"],
+        ).values(
+            run_state="manual_review_required" if terminal else "reconciliation_required",
+            stop_requested=bool(run["stop_requested"]) or terminal,
+            terminal_reason=error, version=runs.c.version + 1, updated_at=occurred_at,
+        ).returning(runs))).mappings().one()
+        await project_owned_execution(self.session, updated, now=occurred_at, actor_user_id=self.actor_user_id)
 
     async def _audit(
         self,

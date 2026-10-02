@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
+from dataclasses import replace
 from datetime import datetime
 from typing import Mapping, TypeVar, cast
 
@@ -26,6 +27,7 @@ from redagent_platform.campaign_service.application_contracts import (
     RevokeAutonomousCampaignIntentV1,
 )
 from redagent_platform.campaign_service.admission import authority_budget, calculate_plan_budget
+from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
 from redagent_platform.campaign_service.approval_contracts import (
     APPROVAL_RECEIPT_SCHEMA_VERSION,
     PLAN_PREVIEW_SCHEMA_VERSION,
@@ -59,7 +61,7 @@ _T = TypeVar("_T")
 
 
 class AutonomousCampaignApplicationService:
-    """Own Phase 26 commands while keeping planning and all execution paths unavailable."""
+    """Own application commands; execution remains in the admitted worker graph."""
 
     def __init__(
         self,
@@ -90,7 +92,8 @@ class AutonomousCampaignApplicationService:
         self._require_enabled()
         if not isinstance(command, CreateAutonomousCampaignIntentV1):
             raise ValueError("create_intent_command_invalid")
-        return await _await_repository(self._repository.create_intent(command))
+        # CRITICAL: mode is server-owned; a client command must never enable effects.
+        return await _await_repository(self._repository.create_intent(replace(command, mode=self._mode)))
 
     async def read(self, *, tenant_id: str, campaign_id: str) -> AutonomousCampaignReadinessV1:
         self._require_enabled()
@@ -304,6 +307,18 @@ class AutonomousCampaignApplicationService:
         if command.occurred_at >= expires_at:
             raise ApplicationApprovalExpired("plan_preview_expired")
         capability_ids = tuple(sorted({item.capability_id for item in actions}))
+        execution_bindings: tuple[CapabilityBindingKeyV1, ...] = ()
+        if state.mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+            execution_bindings = tuple(sorted(context.execution_bindings, key=lambda item: item.capability_id))
+            if tuple(item.capability_id for item in execution_bindings) != capability_ids:
+                raise ApplicationPlanInvalid("auto_execution_bindings_missing")
+            for binding in execution_bindings:
+                capability = next(item.capability for item in domain.operators if item.capability.capability_id == binding.capability_id)
+                if any(getattr(binding, field) != getattr(capability, field) for field in (
+                    "capability_revision", "execution_manifest_sha256", "adapter_id", "adapter_version",
+                    "profile_id", "profile_revision", "profile_sha256", "bundle_id", "bundle_revision", "bundle_sha256"
+                )):
+                    raise ApplicationPlanInvalid("auto_execution_binding_mismatch")
         effect_classes = tuple(sorted({item.effect_class for item in actions}))
         application_revision = command.expected_revision + 2
         preview_identity = canonical_planning_sha256(
@@ -318,6 +333,8 @@ class AutonomousCampaignApplicationService:
             }
         )
         return AutonomousCampaignPlanPreviewV1(
+            execution_mode=state.mode,
+            execution_bindings=execution_bindings,
             schema_version=PLAN_PREVIEW_SCHEMA_VERSION,
             preview_id=f"preview-{preview_identity[:24]}",
             tenant_id=state.tenant_id,
@@ -504,6 +521,8 @@ class AutonomousCampaignApplicationService:
             or lifecycle.roe_revocation_epoch != preview.roe_revocation_epoch
             or lifecycle.kill_switch_epoch != preview.kill_switch_epoch
             or current_expires_at != preview.expires_at
+            or (preview.execution_mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO and
+                tuple(sorted(context.execution_bindings, key=lambda item: item.capability_id)) != preview.execution_bindings)
         ):
             # CRITICAL: a persisted preview is evidence, never current authority for a later decision.
             raise ApplicationPlanInvalid("approval_authority_context_drift")

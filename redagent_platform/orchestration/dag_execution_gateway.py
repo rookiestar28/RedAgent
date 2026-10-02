@@ -6,6 +6,7 @@ from typing import Any
 
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
+from temporalio.service import RPCError, RPCStatusCode
 
 from redagent_platform.campaign_service.dag_execution_contracts import (
     DAG_EXECUTION_SCHEMA_VERSION,
@@ -16,9 +17,11 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
 )
 from redagent_platform.campaign_service.relay import (
     WorkflowAlreadyStarted,
+    WorkflowNotFound,
     WorkflowQueryReceipt,
     WorkflowStartReceipt,
     WorkflowStartUnavailable,
+    WorkflowStartUnknown,
 )
 from redagent_platform.orchestration.dag_execution_workflow import (
     CampaignDagExecutionWorkflow,
@@ -52,10 +55,11 @@ class DagExecutionTemporalStartGateway:
         except WorkflowAlreadyStartedError as exc:
             raise WorkflowAlreadyStarted("dag_workflow_already_started") from exc
         except Exception as exc:
-            raise WorkflowStartUnavailable("dag_temporal_start_unavailable") from exc
+            # CRITICAL: a lost start response does not prove absence; never blindly restart.
+            raise WorkflowStartUnknown("dag_temporal_start_outcome_unknown") from exc
         run_id = _started_run_id(handle)
         if run_id is None:
-            raise WorkflowStartUnavailable("dag_temporal_start_run_id_missing")
+            raise WorkflowStartUnknown("dag_temporal_start_run_id_missing")
         return WorkflowStartReceipt(workflow_run_id=run_id)
 
     async def query(self, workflow_id: str) -> WorkflowQueryReceipt:
@@ -66,6 +70,10 @@ class DagExecutionTemporalStartGateway:
                 "status", result_type=DagExecutionSnapshotV1
             )
             description = await handle.describe()
+        except RPCError as exc:
+            if exc.status is RPCStatusCode.NOT_FOUND:
+                raise WorkflowNotFound("dag_temporal_workflow_not_found") from exc
+            raise WorkflowStartUnavailable("dag_temporal_query_unavailable") from exc
         except Exception as exc:
             raise WorkflowStartUnavailable("dag_temporal_query_unavailable") from exc
         if not isinstance(snapshot, DagExecutionSnapshotV1):

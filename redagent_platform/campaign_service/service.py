@@ -1130,9 +1130,14 @@ class CampaignEffectCoordinator:
                 now=pre_io_at,
             )
             raise RuntimeError("effect_dispatch_reconciliation_required")
+        receipt_failure = "adapter_receipt_commit_unknown"
         try:
             receipt = await self._dispatcher.dispatch(request)
             if receipt.state != "confirmed":
+                # IMPORTANT: preserve explicit cleanup/evidence loss for operator attention;
+                # generic commit ambiguity must not hide an observed incomplete result.
+                if receipt.failure_code in {"cleanup_receipt_missing", "cleanup_failed", "evidence_output_incomplete", "evidence_persistence_failed"}:
+                    receipt_failure = receipt.failure_code
                 raise RuntimeError("adapter_terminal_receipt_unconfirmed")
             receipt = await self._result_owner.finalize(command, receipt, now=pre_io_at)
             if (
@@ -1147,7 +1152,7 @@ class CampaignEffectCoordinator:
             await self._record_ambiguity(
                 command,
                 expected_claim_version=dispatching_version,
-                failure_code="adapter_receipt_commit_unknown",
+                failure_code=receipt_failure,
                 now=pre_io_at,
                 preserve=exc,
             )

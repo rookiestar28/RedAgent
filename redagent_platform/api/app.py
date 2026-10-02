@@ -262,7 +262,7 @@ def create_app(
                         application_service = await application_service
                     if (
                         not isinstance(application_service, AutonomousCampaignApplicationService)
-                        or application_service.mode is not AutonomousCampaignMode.PLAN_ONLY
+                        or application_service.mode is AutonomousCampaignMode.DISABLED
                     ):
                         raise RuntimeError("autonomous_campaign_factory_result_invalid")
                     application.state.autonomous_campaign_application_service = application_service

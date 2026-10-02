@@ -87,6 +87,36 @@ admission_metadata_current if {
 	object.get(input.attributes, "campaign_kill_switch_epoch", -1) >= 0
 }
 
+# CRITICAL: admission is not effect authority. This closed branch rechecks the live
+# lease and counters for the two fixed owned-loopback profiles before each dispatch.
+boundary_allowed if {
+	input.boundary == "workflow"
+	input.action == "campaign.node.execute"
+	"campaign:execute" in input.permissions
+	admission_metadata_current
+	input.attributes.campaign_environment_class == "synthetic_loopback"
+	input.attributes.campaign_capability_id in {"zap-controlled-runtime", "nuclei-trusted-runtime"}
+	input.attributes.campaign_effect_class == "read_only_observation"
+	input.attributes.campaign_data_access_class == "metadata_only"
+	input.attributes.campaign_credential_class == "none"
+	input.attributes.campaign_lifecycle_state == "active"
+	input.attributes.campaign_reservation_state in {"reserved", "held"}
+	sha256_attribute("campaign_admission_receipt_sha256")
+	sha256_attribute("campaign_reserved_budget_sha256")
+	sha256_attribute("campaign_node_sha256")
+	sha256_attribute("campaign_effect_intent_sha256")
+	sha256_attribute("campaign_runner_binding_sha256")
+	input.attributes.campaign_execution_run_id != ""
+	input.attributes.campaign_target_id != ""
+	input.attributes.campaign_rate_limit > 0
+	input.attributes.campaign_rate_limit <= 60
+	input.attributes.campaign_rate_claimed_requests >= 0
+	input.attributes.campaign_rate_claimed_requests < input.attributes.campaign_rate_limit
+	input.attributes.campaign_concurrency_limit == 1
+	input.attributes.campaign_active_concurrency == 0
+	time.parse_rfc3339_ns(input.attributes.campaign_reservation_lease_expires_at) > time.parse_rfc3339_ns(input.requested_at)
+}
+
 sha256_attribute(name) if {
 	regex.match("^[0-9a-f]{64}$", object.get(input.attributes, name, ""))
 }
