@@ -33,6 +33,7 @@ from redagent_platform.campaign_service.authority_envelope import (
     TrustedCampaignApproverKeyV2,
 )
 from redagent_platform.campaign_service.planning.contracts import ValidationLimitsV1
+from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
 from redagent_platform.campaign_service.relay_runtime import PostgresRelayTenantSource
 from redagent_platform.orchestration.admission_start_gateway import (
     AutonomousCampaignStartBridgeTemporalGateway,
@@ -49,6 +50,7 @@ def build_autonomous_campaign_admission_start_factory(
     validation_limits: ValidationLimitsV1 | None = None,
     trusted_validator_version: str | None = None,
     trusted_validator_sha256: str | None = None,
+    child_lineage_verifier: ChildLineageVerifier | None = None,
 ) -> Callable[[object], AutonomousCampaignAdmissionStartService] | None:
     """Build R173 only when every current-authority dependency is explicit."""
     mode = load_autonomous_campaign_mode(env)
@@ -83,6 +85,7 @@ def build_autonomous_campaign_admission_start_factory(
                 command=command,
                 bundle=bundle,
                 context=context,
+                child_lineage_verifier=child_lineage_verifier,
             )
 
         return AutonomousCampaignAdmissionStartService(
@@ -101,6 +104,7 @@ def build_autonomous_campaign_admission_start_factory(
 
 def build_stock_autonomous_campaign_start_bridge_relay_factory(
     env: Mapping[str, str],
+    *, child_lineage_verifier: ChildLineageVerifier | None = None,
 ):
     """Bind the inert Workflow and relay to the enabled autonomous application mode."""
     mode = load_autonomous_campaign_mode(env)
@@ -121,6 +125,7 @@ def build_stock_autonomous_campaign_start_bridge_relay_factory(
             repository_factory=postgres_admission_start_bridge_relay_repository_factory(
                 sessions,
                 instance_id=instance_id,
+                child_lineage_verifier=child_lineage_verifier,
             ),
             gateway=AutonomousCampaignStartBridgeTemporalGateway(
                 client,

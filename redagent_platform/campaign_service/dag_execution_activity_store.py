@@ -47,6 +47,7 @@ from redagent_platform.campaign_service.service import (
 from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.owned_execution import OwnedExecutionDenied
 from redagent_platform.campaign_service.owned_execution_store import assert_owned_execution_current, project_owned_execution
+from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
 from redagent_platform.runner_service.campaign_dispatch import (
     CampaignAdapterRequest,
 )
@@ -64,11 +65,13 @@ class PostgresDagExecutionActivityStateOwner:
         actor_user_id: str,
         correlation_prefix: str,
         owned_execution_enabled: bool = False,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
     ) -> None:
         self._sessions = session_factory
         self._actor_user_id = actor_user_id
         self._correlation_prefix = correlation_prefix
         self._owned_execution_enabled = owned_execution_enabled
+        self._child_lineage_verifier = child_lineage_verifier
 
     async def prepare(
         self, request: DagWorkflowInputV1, *, now: datetime
@@ -80,6 +83,7 @@ class PostgresDagExecutionActivityStateOwner:
                 actor_user_id=self._actor_user_id,
                 correlation_prefix=self._correlation_prefix,
                 owned_execution_enabled=self._owned_execution_enabled,
+                child_lineage_verifier=self._child_lineage_verifier,
             )
             return await repository.prepare(request, now=now)
 
@@ -93,6 +97,7 @@ class PostgresDagExecutionActivityStateOwner:
                 actor_user_id=self._actor_user_id,
                 correlation_prefix=self._correlation_prefix,
                 owned_execution_enabled=self._owned_execution_enabled,
+                child_lineage_verifier=self._child_lineage_verifier,
             )
             run, nodes = await repository.locked_run(request)
             return _snapshot(run, nodes)
@@ -106,11 +111,13 @@ class _Repository:
         actor_user_id: str,
         correlation_prefix: str,
         owned_execution_enabled: bool = False,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
     ) -> None:
         self.session = session
         self.actor_user_id = actor_user_id
         self.correlation_prefix = correlation_prefix
         self.owned_execution_enabled = owned_execution_enabled
+        self.child_lineage_verifier = child_lineage_verifier
 
     async def prepare(
         self, request: DagWorkflowInputV1, *, now: datetime
@@ -128,7 +135,8 @@ class _Repository:
             )
         input_payload = run["input_payload"]
         try:
-            await assert_owned_execution_current(self.session, run, now=now, enabled=self.owned_execution_enabled)
+            await assert_owned_execution_current(self.session, run, now=now, enabled=self.owned_execution_enabled,
+                                                 child_lineage_verifier=self.child_lineage_verifier)
         except OwnedExecutionDenied as exc:
             # CRITICAL: revoke/config drift stops the frontier before another effect is reserved.
             if run["run_state"] != DagRunState.STOPPING.value:

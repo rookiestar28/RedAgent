@@ -9,8 +9,8 @@ from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from redagent_platform.campaign_service.application_contracts import (
+    is_owned_execution_mode,
     AutonomousCampaignLifecycle,
-    AutonomousCampaignMode,
 )
 from redagent_platform.campaign_service.application_repository import (
     _state_from_row,
@@ -30,10 +30,14 @@ from redagent_platform.campaign_service.owned_execution import (
 )
 from redagent_platform.campaign_service.planning.contracts import canonical_planning_sha256
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.child_lineage import (
+    ChildLineageConflict, ChildLineageVerifier, require_current_child_lineage,
+)
 
 
 async def assert_owned_execution_current(
-    session: AsyncSession, run: Any, *, now: datetime, enabled: bool
+    session: AsyncSession, run: Any, *, now: datetime, enabled: bool,
+    child_lineage_verifier: ChildLineageVerifier | None = None,
 ) -> None:
     """Legacy unlinked DAGs retain their gate; application DAGs require exact auto approval."""
     applications = metadata.tables["autonomous_campaign_applications"]
@@ -44,7 +48,7 @@ async def assert_owned_execution_current(
     if row is None:
         return
     current = _state_from_row(row)
-    if not enabled or current.mode is not AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+    if not enabled or not is_owned_execution_mode(current.mode):
         raise OwnedExecutionDenied("owned_execution_mode_denied")
     if current.lifecycle_state not in {AutonomousCampaignLifecycle.EXECUTION_QUEUED, AutonomousCampaignLifecycle.RUNNING, AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED}:
         raise OwnedExecutionDenied("owned_execution_lifecycle_denied")
@@ -97,6 +101,11 @@ async def assert_owned_execution_current(
         raise OwnedExecutionDenied("owned_execution_target_binding_mismatch")
     if int(run["max_transitions"]) > 32:
         raise OwnedExecutionDenied("owned_execution_transition_bound_exceeded")
+    try:
+        await require_current_child_lineage(preview=preview, tenant_id=current.tenant_id, campaign_id=current.campaign_id,
+            now=now, verifier=child_lineage_verifier, session=session)
+    except (ChildLineageConflict, ValueError) as exc:
+        raise OwnedExecutionDenied("owned_execution_child_lineage_not_current") from exc
 
 
 async def emit_owned_execution_start(session: AsyncSession, run: Any, *, now: datetime) -> None:
@@ -133,7 +142,7 @@ async def project_owned_execution(
     if row is None:
         return
     current = _state_from_row(row)
-    if current.mode is not AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+    if not is_owned_execution_mode(current.mode):
         return
     target = {
         "running": AutonomousCampaignLifecycle.RUNNING,

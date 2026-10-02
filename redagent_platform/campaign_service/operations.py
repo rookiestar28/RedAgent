@@ -77,6 +77,8 @@ _FACT_LABELS = {
     "finding-count": "Finding count",
     "http_header_present": "HTTP header present",
     "posture-collected": "Posture collected",
+    "owned.zap.passive.completed": "ZAP passive profile completed",
+    "owned.nuclei.header.completed": "Nuclei header profile completed",
 }
 _PRODUCER_LABELS = {
     "dag_runner_result": "DAG runner result",

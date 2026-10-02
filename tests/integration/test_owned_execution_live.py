@@ -243,26 +243,26 @@ async def _scenario(client, policy_provider, capability_key):
         await prepared.engine.dispose()
 
 
-async def _install_runner(prepared, capability, suffix, now):
+async def _install_runner(prepared, capability, suffix, now, *, class_identity="r123-closed-runner", certificate_fingerprint="a" * 64):
     owned = {"tenant_id": prepared.tenant, "version": 1, "created_at": now, "updated_at": now}
     class_id = f"owned-class-{suffix}"
     registration_id = f"owned-registration-{suffix}"
     async with prepared.sessions() as session, session.begin():
         await _set_tenant(session, prepared.tenant)
         await session.execute(insert(metadata.tables["runner_classes"]).values(id=class_id,
-            class_id="r123-closed-runner", class_revision=1, environment="local-conformance", network_plane="owned-loopback",
+            class_id=class_identity, class_revision=1, environment="local-conformance", network_plane="owned-loopback",
             isolation_tier="container", runtime_name="docker", sandbox_profile_id=capability.sandbox_profile_id,
             policy_revision="r099-v1", resource_limits=asdict(capability.limits), credential_classes=["none"],
             evidence_schemas=list(capability.evidence_schema), class_status="active", author_user_id=prepared.command.actor_user_id,
             reviewer_user_id="owned-fixture-reviewer", **owned))
         await session.execute(insert(metadata.tables["runner_registrations"]).values(id=registration_id,
             runner_id=f"owned-runner-{suffix}", runner_class_record_id=class_id, environment="local-conformance", network_plane="owned-loopback",
-            spiffe_id=f"spiffe://redagent.test/runner/{suffix}", certificate_fingerprint="a" * 64, certificate_serial=suffix,
+            spiffe_id=f"spiffe://redagent.test/runner/{suffix}", certificate_fingerprint=certificate_fingerprint, certificate_serial=suffix,
             adapter_allowlist=[f"{capability.adapter_id}:{capability.adapter_version}"], image_allowlist=[capability.image_digest],
             required_policy_revision="r099-v1", generation=1, attestation_sha256="b" * 64, registration_state="active",
             registered_at=now, expires_at=now + timedelta(minutes=10), revoked_at=None, last_seen_at=now, **owned))
         await session.execute(insert(metadata.tables["runner_identities"]).values(id=f"owned-identity-{suffix}",
-            registration_id=registration_id, spiffe_id=f"spiffe://redagent.test/runner/{suffix}", certificate_fingerprint="a" * 64,
+            registration_id=registration_id, spiffe_id=f"spiffe://redagent.test/runner/{suffix}", certificate_fingerprint=certificate_fingerprint,
             certificate_serial=suffix, not_before=now, not_after=now + timedelta(minutes=10), identity_state="observed", observed_at=now, **owned))
         await session.execute(insert(metadata.tables["execution_capability_manifests"]).values(id=f"owned-capability-{suffix}",
             capability_id=capability.capability_id, capability_revision=capability.revision, adapter_id=capability.adapter_id,

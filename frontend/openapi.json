@@ -2830,6 +2830,18 @@
             "title": "Certificate Sha256",
             "type": "string"
           },
+          "child_lineage_sha256": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Child Lineage Sha256"
+          },
           "domain_sha256": {
             "title": "Domain Sha256",
             "type": "string"
@@ -2870,7 +2882,8 @@
             "default": "plan_only",
             "enum": [
               "plan_only",
-              "owned_loopback_auto"
+              "owned_loopback_auto",
+              "bounded_replan"
             ],
             "title": "Execution Mode",
             "type": "string"
@@ -4065,6 +4078,22 @@
           "data"
         ],
         "title": "CampaignResponse",
+        "type": "object"
+      },
+      "CanonicalChildReplanRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_revision"
+        ],
+        "title": "CanonicalChildReplanRequest",
         "type": "object"
       },
       "CloudCancelRequest": {
@@ -19517,6 +19546,154 @@
           }
         },
         "summary": "Admit And Queue"
+      }
+    },
+    "/api/v1/autonomous-campaigns/{campaign_id}/child-replan": {
+      "post": {
+        "operationId": "prepare_autonomous_campaign_child",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._:-]+$",
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Policy-Reference",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Policy-Reference"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-ROE-Version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Roe-Version"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Subject",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Subject"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-RedAgent-Test-Permissions",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Redagent-Test-Permissions"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CanonicalChildReplanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutonomousCampaignPlanPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prepare Child"
       }
     },
     "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval": {

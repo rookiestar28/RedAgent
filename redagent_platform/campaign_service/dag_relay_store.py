@@ -328,7 +328,7 @@ class CampaignDagRelayRepository:
             runs.c.tenant_id == self.tenant_id, runs.c.id == request.execution_run_id,
             runs.c.workflow_id == deterministic_dag_workflow_id(request.tenant_id, request.execution_run_id),
             runs.c.request_sha256 == dag_workflow_request_sha256(request),
-            applications.c.mode == AutonomousCampaignMode.OWNED_LOOPBACK_AUTO.value,
+            applications.c.mode.in_((AutonomousCampaignMode.OWNED_LOOPBACK_AUTO.value, AutonomousCampaignMode.BOUNDED_REPLAN.value)),
         ).with_for_update(of=runs))).mappings().one_or_none()
         if run is None or run["run_state"] not in {"start_pending", "running", "reconciliation_required"}:
             return

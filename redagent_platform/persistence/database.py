@@ -21,7 +21,7 @@ class DatabaseSettings:
     driver: str
     host: str
     database: str
-    expected_revision: str = "0032_owned_execution_mode"
+    expected_revision: str = "0033_bounded_child_replanning"
     pool_size: int = 10
     max_overflow: int = 10
     pool_timeout_seconds: int = 30

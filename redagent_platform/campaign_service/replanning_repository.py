@@ -22,12 +22,39 @@ from redagent_platform.campaign_service.trusted_observations import (
     ObservationCandidateV1,
     ObservationPromotionDecisionV1,
     ObservationProducerKind,
+    OwnedCompletionSourceV1,
 )
 from redagent_platform.persistence.models import metadata
 
 
 class ReplanningPersistenceConflict(RuntimeError):
     """A replay or tenant-owned lineage binding did not match exactly."""
+
+
+def _proposal_parent_admission_at(
+    *, tenant_id: str, proposal: BoundedReplanProposalV1,
+    occurred_at: datetime, source: OwnedCompletionSourceV1 | None,
+) -> datetime:
+    if source is None:
+        return occurred_at
+    if (not isinstance(source, OwnedCompletionSourceV1)
+            or source.tenant_id != tenant_id or source.campaign_id != proposal.campaign_id
+            or source.engagement_id != proposal.engagement_id
+            or source.parent_revision_sha256 != proposal.parent_revision_sha256
+            or source.plan_sha256 != proposal.parent_plan_sha256
+            or source.domain_sha256 != proposal.parent_domain_sha256
+            or source.authority_sha256 != proposal.parent_authority_sha256
+            or any(getattr(source, name) != getattr(proposal, name) for name in (
+                "lifecycle_epoch", "policy_revocation_epoch", "roe_revocation_epoch", "kill_switch_epoch"))
+            or source.verified_at > occurred_at or source.effect_receipt.completed_at is None
+            or source.effect_receipt.completed_at > occurred_at
+            or len(proposal.trusted_observation_sha256s) != 1
+            or proposal.invalidated_parent_node_ids != (source.node_id,)
+            or len(proposal.retained_parent_node_ids) != 1
+            or proposal.child_revision.node_count != 1 or proposal.replan_sequence != 1):
+        raise ReplanningPersistenceConflict("replan_persistence_historical_parent_source_mismatch")
+    # CRITICAL: only sealed terminal completion proves historical authorization; it never renews or transfers a parent grant.
+    return source.effect_receipt.completed_at
 
 
 class CampaignReplanningRepository:
@@ -157,6 +184,7 @@ class CampaignReplanningRepository:
         campaign_id: str,
         proposal: BoundedReplanProposalV1,
         occurred_at: datetime,
+        parent_completion_source: OwnedCompletionSourceV1 | None = None,
     ) -> str:
         child = proposal.child_revision
         if (
@@ -166,6 +194,10 @@ class CampaignReplanningRepository:
         ):
             raise ReplanningPersistenceConflict("replan_persistence_tenant_mismatch")
         await self._set_tenant()
+        parent_admission_at = _proposal_parent_admission_at(
+            tenant_id=self.tenant_id, proposal=proposal, occurred_at=occurred_at,
+            source=parent_completion_source,
+        )
         parent_receipt = await self._admission_receipt(
             receipt_id=proposal.parent_admission_receipt_id,
             campaign_id=campaign_id,
@@ -181,9 +213,27 @@ class CampaignReplanningRepository:
             or parent_receipt.policy_revocation_epoch != proposal.policy_revocation_epoch
             or parent_receipt.roe_revocation_epoch != proposal.roe_revocation_epoch
             or parent_receipt.kill_switch_epoch != proposal.kill_switch_epoch
-            or not parent_receipt.issued_at <= occurred_at < parent_receipt.expires_at
+            or not parent_receipt.issued_at <= parent_admission_at < parent_receipt.expires_at
+            or (parent_completion_source is not None
+                and parent_completion_source.effect_receipt.started_at < parent_receipt.issued_at)
         ):
             raise ReplanningPersistenceConflict("replan_persistence_parent_admission_mismatch")
+        if parent_completion_source is not None:
+            observations = metadata.tables["trusted_campaign_observations"]
+            observation = (await self.session.execute(select(observations).where(
+                observations.c.tenant_id == self.tenant_id,
+                observations.c.campaign_id == campaign_id,
+                observations.c.observation_sha256 == proposal.trusted_observation_sha256s[0],
+            ))).mappings().one_or_none()
+            source = parent_completion_source
+            if (observation is None
+                    or observation["source_execution_run_id"] != source.snapshot.execution_run_id
+                    or observation["source_node_id"] != source.node_id
+                    or observation["observed_at"] != source.effect_receipt.completed_at
+                    or observation["source_result_sha256"] != source.effect_receipt.receipt_sha256
+                    or observation["evidence_sha256"] != source.effect_receipt.receipt_sha256
+                    or not observation["promoted_at"] <= occurred_at < observation["expires_at"]):
+                raise ReplanningPersistenceConflict("replan_persistence_historical_parent_observation_mismatch")
         table = metadata.tables["campaign_replan_proposals"]
         existing = (
             await self.session.execute(

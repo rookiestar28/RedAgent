@@ -16,7 +16,7 @@ TABLES = (
 
 
 def test_runner_tables_are_tenant_owned_and_database_requires_revision_0008() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0032_owned_execution_mode"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0033_bounded_child_replanning"
     for name in TABLES:
         assert name in metadata.tables
         columns = metadata.tables[name].columns

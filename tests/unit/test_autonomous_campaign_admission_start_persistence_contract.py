@@ -20,12 +20,12 @@ MIGRATION = ROOT / "migrations/versions/0031_autonomous_campaign_admission_start
 
 def test_r173_additive_schema_is_current_and_transactionally_bound() -> None:
     scripts = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini")))
-    assert scripts.get_heads() == ["0032_owned_execution_mode"]
+    assert scripts.get_heads() == ["0033_bounded_child_replanning"]
     assert scripts.get_revision("0031_autonomous_admission_start").down_revision == (
         "0030_autonomous_plan_approval"
     )
     assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0032_owned_execution_mode"
+        "0033_bounded_child_replanning"
     )
 
     starts = metadata.tables["autonomous_campaign_execution_starts"]

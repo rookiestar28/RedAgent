@@ -17,9 +17,9 @@ def test_r171_migration_is_additive_single_head_and_runtime_expected() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["0032_owned_execution_mode"]
+    assert scripts.get_heads() == ["0033_bounded_child_replanning"]
     assert scripts.get_revision("0029_autonomous_campaign_app").down_revision == ("0028_observation_replanning")
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0032_owned_execution_mode")
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == ("0033_bounded_child_replanning")
 
 
 def test_r171_metadata_is_tenant_bound_closed_and_audit_linked() -> None:

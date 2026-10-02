@@ -39,6 +39,8 @@ from redagent_platform.campaign_service.approval_contracts import (
 )
 from redagent_platform.campaign_service.authority_envelope import TrustedCampaignApproverKeyV2
 from redagent_platform.campaign_service.planning.contracts import ValidationLimitsV1
+from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
+from redagent_platform.campaign_service.child_replan_contracts import CanonicalChildReplanStore
 from redagent_platform.campaign_service.resolver import CampaignContextResolver
 from redagent_platform.campaign_service.relay_runtime import (
     PostgresRelayTenantSource,
@@ -247,6 +249,8 @@ def build_autonomous_campaign_application_factory(
     validation_limits: ValidationLimitsV1 | None = None,
     trusted_validator_version: str | None = None,
     trusted_validator_sha256: str | None = None,
+    child_lineage_verifier: ChildLineageVerifier | None = None,
+    canonical_child_store_factory: Callable[[object], CanonicalChildReplanStore] | None = None,
 ) -> Callable[[object], AutonomousCampaignApplicationService] | None:
     """Build R172 only when every server-owned approval dependency is explicit."""
     mode = load_autonomous_campaign_mode(env)
@@ -275,6 +279,8 @@ def build_autonomous_campaign_application_factory(
             validation_limits=validation_limits,
             trusted_validator_version=trusted_validator_version,
             trusted_validator_sha256=trusted_validator_sha256,
+            child_lineage_verifier=child_lineage_verifier,
+            canonical_child_store=None if canonical_child_store_factory is None else canonical_child_store_factory(sessions),
         )
 
     return factory

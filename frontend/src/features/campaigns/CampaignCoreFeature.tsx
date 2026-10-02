@@ -518,13 +518,20 @@ function CampaignOperationsWorkspace({ operations }: { operations: CampaignOpera
         <div className="campaign-operations__panel-heading"><div><span className="eyebrow">Trusted only</span><h4>Observations</h4></div></div>
         {operations.observations.length === 0 ? <p>No trusted observation has been promoted.</p> : <ul className="campaign-detail-list">
           {operations.observations.map((observation, index) => <li key={`${observation.observation_sha256 ?? "observation"}-${index}`}>
-            <strong>{observation.fact}</strong><span>{human(observation.producer_kind)} · {human(observation.freshness)}</span>
+            <strong>{observation.fact}</strong><span>{human(observation.producer_kind)} · {title(observation.freshness)}</span>
+            <details><summary>Evidence provenance</summary>
+              <dl><dt>Observation SHA-256</dt><dd>{observation.observation_sha256 ?? "Unavailable"}</dd>
+                <dt>Provenance SHA-256</dt><dd>{observation.provenance_sha256 ?? "Unavailable"}</dd></dl>
+            </details>
           </li>)}
         </ul>}
       </article>
 
       <article className="campaign-operations__panel">
         <div className="campaign-operations__panel-heading"><div><span className="eyebrow">Bounded lineage</span><h4>Revision differences</h4></div></div>
+        {operations.revisions.length > 0 && <p className="campaign-operations__note">
+          Each child proposal needs a new exact approval and admission before execution.
+        </p>}
         {operations.revisions.length === 0 ? <p>No bounded replan proposal is available.</p> : <ul className="campaign-detail-list">
           {operations.revisions.map((revision) => <li key={`${revision.label}-${revision.proposal_sha256 ?? "unavailable"}`}>
             <strong>{revision.label} · {human(revision.state)}</strong>

@@ -62,7 +62,7 @@ Table(
         name="autonomous_campaign_application_contract_version_closed",
     ),
     CheckConstraint(
-        "mode IN ('plan_only','owned_loopback_auto')",
+        "mode IN ('plan_only','owned_loopback_auto','bounded_replan')",
         name="autonomous_campaign_application_mode_closed",
     ),
     CheckConstraint(
@@ -146,6 +146,7 @@ Table(
         name="fk_autonomous_campaign_plan_preview_tenant_application",
     ),
     UniqueConstraint("tenant_id", "id", name="uq_autonomous_campaign_plan_preview_tenant_identity"),
+    UniqueConstraint("tenant_id", "id", "application_id", name="uq_autonomous_campaign_preview_application_identity"),
     UniqueConstraint(
         "tenant_id",
         "application_id",

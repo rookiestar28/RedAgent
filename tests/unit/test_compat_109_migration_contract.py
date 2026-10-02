@@ -9,7 +9,7 @@ REVISION = ROOT / "migrations/versions/0016_r109_identity_saas.py"
 
 
 def test_revision_0016_is_expected_database_head() -> None:
-    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0032_owned_execution_mode"
+    assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == "0033_bounded_child_replanning"
     source = REVISION.read_text(encoding="utf-8")
     assert 'revision = "0016_r109_identity"' in source
     assert 'down_revision = "0015_r108_cloud"' in source

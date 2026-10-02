@@ -90,7 +90,7 @@ def test_r172_configured_factory_can_stage_and_decide_end_to_end(monkeypatch) ->
     assert approved.application.lifecycle_state is AutonomousCampaignLifecycle.APPROVED
 
 
-def test_phase26_application_exposes_r172_decision_and_r173_start_bridge_routes() -> None:
+def test_application_exposes_current_plan_decision_start_and_child_routes() -> None:
     paths = create_app(test_issuer_enabled=True).openapi()["paths"]
     autonomous = {path for path in paths if "autonomous" in path}
     assert autonomous == {
@@ -98,6 +98,7 @@ def test_phase26_application_exposes_r172_decision_and_r173_start_bridge_routes(
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval",
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial",
         "/api/v1/autonomous-campaigns/{campaign_id}/admission-start",
+        "/api/v1/autonomous-campaigns/{campaign_id}/child-replan",
     }
     assert "/api/v1/campaign-core/campaigns" in paths
     assert "/api/v1/internal/r123/qualification" in paths

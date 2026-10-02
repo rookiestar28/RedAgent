@@ -10,6 +10,7 @@ import re
 from redagent_platform.campaign_service.dag_execution_contracts import (
     DagExecutionSnapshotV1,
     DagNodeState,
+    DagRunState,
     DagWorkflowInputV1,
     dag_workflow_request_sha256,
 )
@@ -27,6 +28,7 @@ from redagent_platform.campaign_service.contracts import (
     canonical_sha256,
 )
 from redagent_platform.campaign_service.planning.contracts import (
+    CapabilityIdentityV1,
     ScalarValueV1,
     ScalarType,
     PlanningDomainV1,
@@ -34,6 +36,8 @@ from redagent_platform.campaign_service.planning.contracts import (
     canonical_planning_sha256,
 )
 from redagent_platform.campaign_service.planning.search_contracts import AttackPathDagRevisionV1
+from redagent_platform.campaign_service.child_replan_contracts import OWNED_COMPLETION_FACTS
+from redagent_platform.campaign_service.registry import closed_execution_binding_for
 
 
 PREDICTED_STATE_SCHEMA_VERSION = "redagent.predicted-state/v1"
@@ -48,6 +52,7 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _REASON = re.compile(r"^[a-z][a-z0-9_]{0,99}$")
 _VERIFIED_EVIDENCE_TOKEN = object()
 _TRUSTED_OBSERVATION_TOKEN = object()
+_OWNED_COMPLETION_SOURCE_TOKEN = object()
 
 
 class ObservationProducerKind(str, Enum):
@@ -57,6 +62,73 @@ class ObservationProducerKind(str, Enum):
     PLANNER_PREDICTION = "planner_prediction"
     UI_ASSERTION = "ui_assertion"
     UNVERIFIED_TELEMETRY = "unverified_telemetry"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class OwnedCompletionSourceV1:
+    """Minted after canonical owner and exact backend bytes verification; never an API input."""
+
+    tenant_id: str
+    campaign_id: str
+    engagement_id: str
+    target_id: str
+    authority_sha256: str
+    lifecycle_epoch: int
+    policy_revocation_epoch: int
+    roe_revocation_epoch: int
+    kill_switch_epoch: int
+    snapshot: DagExecutionSnapshotV1
+    parent_revision_sha256: str
+    domain_sha256: str
+    plan_sha256: str
+    node_id: str
+    persisted_node_state: DagNodeState
+    capability: CapabilityIdentityV1
+    effect_receipt: EffectReceiptV1
+    report_artifact_id: str
+    report_sha256: str
+    report_size_bytes: int
+    evidence_owner_sha256: str
+    cleanup_owner_sha256: str
+    verified_at: datetime
+    _validation_token: InitVar[object] = None
+
+    def __post_init__(self, _validation_token: object) -> None:
+        # CRITICAL: receipt/report digests supplied by callers cannot replace canonical owner/backend verification.
+        if _validation_token is not _OWNED_COMPLETION_SOURCE_TOKEN:
+            raise ValueError("owned_completion_owner_factory_required")
+        for name in ("tenant_id", "campaign_id", "engagement_id", "target_id", "node_id", "report_artifact_id"):
+            _identifier("owned_completion_" + name, getattr(self, name))
+        for name in ("authority_sha256", "parent_revision_sha256", "domain_sha256", "plan_sha256",
+                     "report_sha256", "evidence_owner_sha256", "cleanup_owner_sha256"):
+            _sha256("owned_completion_" + name, getattr(self, name))
+        for name in ("lifecycle_epoch", "policy_revocation_epoch", "roe_revocation_epoch", "kill_switch_epoch"):
+            _bounded_int("owned_completion_" + name, getattr(self, name), 0, 2_147_483_647)
+        _bounded_int("owned_completion_report_size", self.report_size_bytes, 1, 1_048_576)
+        _aware("owned_completion_verified_at", self.verified_at)
+        if (not isinstance(self.snapshot, DagExecutionSnapshotV1)
+                or self.snapshot.state not in {DagRunState.COMPLETED, DagRunState.CONTAINED}
+                or self.snapshot.current_node_id is not None or self.snapshot.current_node_state is not None
+                or self.persisted_node_state is not DagNodeState.CONFIRMED):
+            raise ValueError("owned_completion_terminal_parent_required")
+        receipt = self.effect_receipt
+        if (not isinstance(receipt, EffectReceiptV1) or receipt.reconciliation_state is not ReconciliationState.CONFIRMED
+                or receipt.completed_at is None or receipt.completed_at > self.verified_at
+                or not receipt.adapter_accepted or not receipt.output_complete or receipt.external_contact_count != 0
+                or receipt.cleanup_receipt_id is None or receipt.redispatch_permitted or receipt.failure_code is not None
+                or self.report_artifact_id not in receipt.evidence_ids):
+            raise ValueError("owned_completion_confirmed_cleanup_receipt_required")
+        if not isinstance(self.capability, CapabilityIdentityV1) or self.capability.capability_id not in OWNED_COMPLETION_FACTS:
+            raise ValueError("owned_completion_capability_invalid")
+        current = closed_execution_binding_for(self.capability.capability_id)
+        for name in ("capability_revision", "adapter_id", "adapter_version", "profile_id", "profile_revision",
+                     "profile_sha256", "bundle_id", "bundle_revision", "bundle_sha256"):
+            if getattr(self.capability, name) != getattr(current, name):
+                raise ValueError("owned_completion_current_capability_required")
+
+    @property
+    def provenance_sha256(self) -> str:
+        return canonical_planning_sha256(self)
 
 
 class ObservationPromotionOutcome(str, Enum):
@@ -468,6 +540,51 @@ def verify_dag_node_observation_evidence(
         verification_sha256=verification_sha256,
         verified_at=verified_at,
         _validation_token=_VERIFIED_EVIDENCE_TOKEN,
+    )
+
+
+def verify_completed_owned_node_observation_evidence(
+    *, candidate: ObservationCandidateV1, source: OwnedCompletionSourceV1,
+    domain: PlanningDomainV1, revision: AttackPathDagRevisionV1, verified_at: datetime,
+) -> VerifiedObservationEvidenceV1:
+    if (not isinstance(candidate, ObservationCandidateV1) or not isinstance(source, OwnedCompletionSourceV1)
+            or not isinstance(domain, PlanningDomainV1) or not isinstance(revision, AttackPathDagRevisionV1)):
+        raise ValueError("owned_completion_observation_input_invalid")
+    _aware("owned_completion_observation_time", verified_at)
+    if source.verified_at > verified_at or not candidate.received_at <= verified_at < candidate.expires_at:
+        raise ValueError("owned_completion_observation_time_invalid")
+    if candidate.producer != DAG_RESULT_PRODUCER_V1:
+        raise ValueError("owned_completion_producer_invalid")
+    for name in ("tenant_id", "campaign_id", "engagement_id", "target_id", "authority_sha256",
+                 "lifecycle_epoch", "policy_revocation_epoch", "roe_revocation_epoch", "kill_switch_epoch"):
+        if getattr(candidate, name) != getattr(source, name):
+            raise ValueError("owned_completion_scope_binding_mismatch")
+    nodes = tuple(n for n in revision.candidate_plan.nodes if n.node_id == source.node_id)
+    operators = tuple(o for o in domain.operators if len(nodes) == 1 and o.operator_id == nodes[0].operator_id)
+    if (revision.revision_sha256 != source.parent_revision_sha256
+            or revision.candidate_plan.plan_sha256 != source.plan_sha256
+            or revision.domain_sha256 != domain.domain_sha256 or domain.domain_sha256 != source.domain_sha256
+            or revision.tenant_id != source.tenant_id or revision.engagement_id != source.engagement_id
+            or revision.authority_sha256 != source.authority_sha256 or len(nodes) != 1 or len(operators) != 1
+            or nodes[0].target_id != source.target_id or operators[0].capability != source.capability):
+        raise ValueError("owned_completion_parent_node_binding_mismatch")
+    fact = OWNED_COMPLETION_FACTS[source.capability.capability_id]
+    # CRITICAL: actual certified-profile completion is the only fact here; planned security/finding effects are not observations.
+    if (candidate.fact_id != fact or candidate.value.value_type is not ScalarType.BOOLEAN
+            or candidate.value.value is not True or candidate.observed_at != source.effect_receipt.completed_at
+            or candidate.source_result_sha256 != source.effect_receipt.receipt_sha256
+            or candidate.evidence_sha256 != source.effect_receipt.receipt_sha256):
+        raise ValueError("owned_completion_fact_or_receipt_binding_mismatch")
+    verification_sha256 = canonical_planning_sha256(
+        ("redagent.owned-completion-observation/v1", candidate.candidate_sha256, source.provenance_sha256, verified_at)
+    )
+    return VerifiedObservationEvidenceV1(
+        observation_sha256=candidate.candidate_sha256, producer=candidate.producer,
+        source_record_id=source.effect_receipt.effect_id,
+        source_execution_run_id=source.snapshot.execution_run_id, source_node_id=source.node_id,
+        fact_id=fact, value=candidate.value, source_result_sha256=source.effect_receipt.receipt_sha256,
+        evidence_sha256=source.effect_receipt.receipt_sha256, verification_sha256=verification_sha256,
+        verified_at=verified_at, _validation_token=_VERIFIED_EVIDENCE_TOKEN,
     )
 
 

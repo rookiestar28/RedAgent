@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Mapping, TypeVar, cast
 
 from redagent_platform.campaign_service.application_contracts import (
+    is_owned_execution_mode,
     ApplicationDependencyUnavailable,
     ApplicationModeDisabled,
     ApplicationNotFound,
@@ -55,6 +56,9 @@ from redagent_platform.campaign_service.planning.contracts import (
     canonical_planning_sha256,
 )
 from redagent_platform.campaign_service.planning.validation import validate_candidate_plan
+from redagent_platform.campaign_service.planning.owned_sequential import validate_owned_sequential_candidate_plan
+from redagent_platform.campaign_service.child_lineage import ChildLineageConflict, ChildLineageVerifier
+from redagent_platform.campaign_service.child_replan_contracts import CanonicalChildReplanStore, PrepareAutonomousCampaignChildV1
 
 
 _T = TypeVar("_T")
@@ -73,6 +77,8 @@ class AutonomousCampaignApplicationService:
         validation_limits: ValidationLimitsV1 | None = None,
         trusted_validator_version: str | None = None,
         trusted_validator_sha256: str | None = None,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
+        canonical_child_store: CanonicalChildReplanStore | None = None,
     ) -> None:
         if not isinstance(mode, AutonomousCampaignMode):
             raise ValueError("autonomous_campaign_mode_invalid")
@@ -83,6 +89,8 @@ class AutonomousCampaignApplicationService:
         self._validation_limits = validation_limits
         self._trusted_validator_version = trusted_validator_version
         self._trusted_validator_sha256 = trusted_validator_sha256
+        self._child_lineage_verifier = child_lineage_verifier
+        self._canonical_child_store = canonical_child_store
 
     @property
     def mode(self) -> AutonomousCampaignMode:
@@ -136,6 +144,32 @@ class AutonomousCampaignApplicationService:
         if not callable(stage):
             raise ApplicationDependencyUnavailable("application_dependency_unavailable")
         return await _await_repository(stage(command, preview))
+
+    async def prepare_child(self, command: PrepareAutonomousCampaignChildV1) -> AutonomousCampaignPlanPreviewResultV1:
+        self._require_enabled()
+        if self._mode is not AutonomousCampaignMode.BOUNDED_REPLAN:
+            raise ApplicationModeDisabled("bounded_child_mode_required")
+        if self._canonical_child_store is None:
+            raise ApplicationDependencyUnavailable("canonical_child_store_unavailable")
+        try:
+            self._require_plan_staging_configured()
+        except ApplicationPlanUnavailable as exc:
+            raise ApplicationDependencyUnavailable("canonical_child_current_dependencies_unavailable") from exc
+        if not isinstance(command, PrepareAutonomousCampaignChildV1):
+            raise ValueError("canonical_child_command_invalid")
+        from redagent_platform.campaign_service.child_replan_service import CanonicalChildReplanService
+        from redagent_platform.campaign_service.child_replan_store import ChildParentConflict
+
+        service = CanonicalChildReplanService(self._canonical_child_store, application_service=self,
+            context_provider=self._approval_context_provider, trusted_keys=self._trusted_approval_keys)
+
+        async def prepare_owned() -> AutonomousCampaignPlanPreviewResultV1:
+            try:
+                return await service.prepare_child(command)
+            except (ChildParentConflict, ValueError) as exc:
+                raise ApplicationPlanInvalid("canonical_child_preparation_denied") from exc
+
+        return await _await_repository(prepare_owned())
 
     async def read_plan_preview(self, *, tenant_id: str, campaign_id: str) -> AutonomousCampaignPlanPreviewV1:
         self._require_enabled()
@@ -258,7 +292,10 @@ class AutonomousCampaignApplicationService:
             or certificate.validator_sha256 != self._trusted_validator_sha256
         ):
             raise ApplicationPlanInvalid("plan_validation_certificate_mismatch")
-        recomputed = validate_candidate_plan(
+        validator = (validate_owned_sequential_candidate_plan
+                     if self._mode is AutonomousCampaignMode.BOUNDED_REPLAN and state.mode is AutonomousCampaignMode.BOUNDED_REPLAN
+                     else validate_candidate_plan)
+        recomputed = validator(
             revision.candidate_plan,
             domain,
             authority,
@@ -308,7 +345,7 @@ class AutonomousCampaignApplicationService:
             raise ApplicationApprovalExpired("plan_preview_expired")
         capability_ids = tuple(sorted({item.capability_id for item in actions}))
         execution_bindings: tuple[CapabilityBindingKeyV1, ...] = ()
-        if state.mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+        if is_owned_execution_mode(state.mode):
             execution_bindings = tuple(sorted(context.execution_bindings, key=lambda item: item.capability_id))
             if tuple(item.capability_id for item in execution_bindings) != capability_ids:
                 raise ApplicationPlanInvalid("auto_execution_bindings_missing")
@@ -401,7 +438,17 @@ class AutonomousCampaignApplicationService:
             tenant_id=command.tenant_id,
             campaign_id=command.campaign_id,
         )
-        self._verify_current_approval_context(context, preview=preview, now=command.occurred_at)
+        child_verified = False
+        if preview.child_lineage_sha256 is not None:
+            if self._child_lineage_verifier is None:
+                raise ApplicationDependencyUnavailable("child_lineage_verifier_unavailable")
+            try:
+                await self._child_lineage_verifier.verify(tenant_id=command.tenant_id, campaign_id=command.campaign_id,
+                    preview=preview, now=command.occurred_at)
+            except (ChildLineageConflict, ValueError) as exc:
+                raise ApplicationPlanInvalid("child_lineage_not_current") from exc
+            child_verified = True
+        self._verify_current_approval_context(context, preview=preview, now=command.occurred_at, child_verified=child_verified)
         request_sha256 = canonical_approval_decision_request_sha256(command)
         receipt_identity = canonical_planning_sha256(
             {"request_sha256": request_sha256, "idempotency_key": command.idempotency_key}
@@ -489,6 +536,7 @@ class AutonomousCampaignApplicationService:
         *,
         preview: AutonomousCampaignPlanPreviewV1,
         now: datetime,
+        child_verified: bool = False,
     ) -> None:
         signed = context.signed_authority
         authority = signed.authority
@@ -507,6 +555,11 @@ class AutonomousCampaignApplicationService:
             lifecycle.valid_until,
             *(approval.expires_at for approval in signed.approvals),
         )
+        current_bindings = context.execution_bindings
+        if child_verified and preview.child_lineage_sha256 is not None:
+            # CRITICAL: only freshly proved strict-subset children may project the root capability catalog to remaining actions.
+            required_capabilities = {action.capability_id for action in preview.actions}
+            current_bindings = tuple(binding for binding in current_bindings if binding.capability_id in required_capabilities)
         if (
             context.tenant_id != preview.tenant_id
             or context.campaign_id != preview.campaign_id
@@ -521,8 +574,8 @@ class AutonomousCampaignApplicationService:
             or lifecycle.roe_revocation_epoch != preview.roe_revocation_epoch
             or lifecycle.kill_switch_epoch != preview.kill_switch_epoch
             or current_expires_at != preview.expires_at
-            or (preview.execution_mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO and
-                tuple(sorted(context.execution_bindings, key=lambda item: item.capability_id)) != preview.execution_bindings)
+            or (is_owned_execution_mode(preview.execution_mode) and
+                tuple(sorted(current_bindings, key=lambda item: item.capability_id)) != preview.execution_bindings)
         ):
             # CRITICAL: a persisted preview is evidence, never current authority for a later decision.
             raise ApplicationPlanInvalid("approval_authority_context_drift")

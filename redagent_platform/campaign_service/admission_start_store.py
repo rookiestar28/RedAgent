@@ -36,13 +36,13 @@ from redagent_platform.campaign_service.admission_start_contracts import (
     deterministic_admission_start_bridge_workflow_id,
 )
 from redagent_platform.campaign_service.application_contracts import (
+    is_owned_execution_mode,
     ApplicationBindingConflict,
     ApplicationIdempotencyConflict,
     ApplicationPlanInvalid,
     ApplicationRevisionConflict,
     AutonomousCampaignApplicationStateV1,
     AutonomousCampaignLifecycle,
-    AutonomousCampaignMode,
     assert_lifecycle_transition,
 )
 from redagent_platform.campaign_service.owned_execution import OwnedExecutionDenied, validate_owned_execution_input
@@ -61,6 +61,8 @@ from redagent_platform.campaign_service.dag_execution_store import (
 )
 from redagent_platform.campaign_service.planning.contracts import canonical_planning_bytes
 from redagent_platform.persistence.models import metadata
+from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
+from redagent_platform.campaign_service.child_admission import CanonicalChildAdmissionRepository
 
 
 _ADMISSION_START_OPERATION = "autonomous_campaign.admission_start.v1"
@@ -77,6 +79,7 @@ class PostgresAutonomousCampaignAdmissionStartStore:
         command: AutonomousCampaignAdmissionStartCommandV1,
         bundle: AutonomousCampaignApprovalBundleV1,
         context: AutonomousCampaignAdmissionContextV1,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
     ) -> None:
         if not callable(sessions) or not isinstance(
             command, AutonomousCampaignAdmissionStartCommandV1
@@ -97,6 +100,7 @@ class PostgresAutonomousCampaignAdmissionStartStore:
         self._command = command
         self._bundle = bundle
         self._context = context
+        self._child_lineage_verifier = child_lineage_verifier
         self._request_sha256 = canonical_admission_start_request_sha256(command)
 
     async def replay(
@@ -187,7 +191,7 @@ class PostgresAutonomousCampaignAdmissionStartStore:
                     ),
                     now=self._command.occurred_at,
                 )
-                if current.mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+                if is_owned_execution_mode(current.mode):
                     try:
                         validate_owned_execution_input(material.input_payload)
                     except OwnedExecutionDenied as exc:
@@ -590,6 +594,10 @@ class PostgresAutonomousCampaignAdmissionStartStore:
             raise ValueError("admission_start_admission_binding_mismatch")
 
     def _admission_repository(self, session: AsyncSession) -> CampaignAdmissionRepository:
+        if self._bundle.preview.child_lineage_sha256 is not None:
+            return CanonicalChildAdmissionRepository(session, tenant_id=self._command.tenant_id,
+                actor_user_id=self._command.actor_user_id, correlation_id=self._command.correlation_id,
+                preview=self._bundle.preview, verifier=self._child_lineage_verifier, now=self._command.occurred_at)
         return CampaignAdmissionRepository(
             session,
             tenant_id=self._command.tenant_id,

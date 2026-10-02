@@ -19,6 +19,7 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
 )
 from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.owned_execution_store import project_owned_execution
+from redagent_platform.campaign_service.owned_dag_cleanup import OwnedDagCleanupVerifier
 
 
 class DagContainmentConflict(RuntimeError):
@@ -32,9 +33,11 @@ class PostgresDagContainmentOwner:
         containment: ActivityContainmentOwner,
         *,
         correlation_prefix: str,
+        owned_cleanup_verifier: OwnedDagCleanupVerifier | None = None,
     ) -> None:
         self._sessions = sessions
         self._containment = containment
+        self._owned_cleanup_verifier = owned_cleanup_verifier
         self._correlation_prefix = _required(
             "dag_containment_correlation", correlation_prefix, 60
         )
@@ -48,21 +51,17 @@ class PostgresDagContainmentOwner:
         workflow = request.request
         correlation_id = f"{self._correlation_prefix}-{request.stop.signal_id}"[:100]
         campaign_id = await self._read_campaign_id(request)
-        outcome, reason = await self._containment.contain(
-            tenant_id=workflow.tenant_id,
-            campaign_id=campaign_id,
-            signal_id=request.stop.signal_id,
-            actor_user_id=request.stop.actor_user_id,
-            reason_sha256=request.stop.reason_sha256,
-            now=now,
-            correlation_id=correlation_id,
-        )
-        if outcome not in {
-            "contained",
-            "manual_review_required",
-            "containment_failed",
-        }:
-            raise ValueError("dag_containment_outcome_invalid")
+        outcome, reason = "manual_review_required", "owned_execution_cleanup_unverified"
+        if self._owned_cleanup_verifier is None:
+            outcome, reason = await self._containment.contain(
+                tenant_id=workflow.tenant_id,
+                campaign_id=campaign_id,
+                signal_id=request.stop.signal_id,
+                actor_user_id=request.stop.actor_user_id,
+                reason_sha256=request.stop.reason_sha256,
+                now=now,
+                correlation_id=correlation_id,
+            )
         async with self._sessions() as session, session.begin():
             await _set_tenant(session, workflow.tenant_id)
             runs = metadata.tables["campaign_execution_runs"]
@@ -94,6 +93,14 @@ class PostgresDagContainmentOwner:
                 not in {"start_pending", "running", "stopping", "reconciliation_required"}
             ):
                 raise DagContainmentConflict("dag_containment_binding_conflict")
+            if self._owned_cleanup_verifier is not None:
+                # CRITICAL: lock this exact run before cleanup proof and terminal CAS; never approve or remove broad controls.
+                try:
+                    outcome, reason = await self._owned_cleanup_verifier.verify_in_session(session, request, run, now=now)
+                except (ValueError, RuntimeError, KeyError, TypeError):
+                    outcome, reason = "manual_review_required", "owned_execution_cleanup_unverified"
+            if outcome not in {"contained", "manual_review_required", "containment_failed"}:
+                raise ValueError("dag_containment_outcome_invalid")
             if outcome == "contained":
                 run_state = "contained"
                 node_state = "contained"

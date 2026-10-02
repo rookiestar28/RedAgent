@@ -293,6 +293,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/autonomous-campaigns/{campaign_id}/child-replan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare Child */
+        post: operations["prepare_autonomous_campaign_child"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval": {
         parameters: {
             query?: never;
@@ -3311,6 +3328,8 @@ export interface components {
             capability_set_sha256: string;
             /** Certificate Sha256 */
             certificate_sha256: string;
+            /** Child Lineage Sha256 */
+            child_lineage_sha256?: string | null;
             /** Domain Sha256 */
             domain_sha256: string;
             /** Effect Classes */
@@ -3329,7 +3348,7 @@ export interface components {
              * @default plan_only
              * @enum {string}
              */
-            execution_mode: "plan_only" | "owned_loopback_auto";
+            execution_mode: "plan_only" | "owned_loopback_auto" | "bounded_replan";
             /**
              * Expires At
              * Format: date-time
@@ -3675,6 +3694,11 @@ export interface components {
         /** CampaignResponse */
         CampaignResponse: {
             data: components["schemas"]["CampaignData"];
+        };
+        /** CanonicalChildReplanRequest */
+        CanonicalChildReplanRequest: {
+            /** Expected Revision */
+            expected_revision: number;
         };
         /** CloudCancelRequest */
         CloudCancelRequest: {
@@ -9134,6 +9158,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutonomousCampaignAdmissionStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_autonomous_campaign_child: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CanonicalChildReplanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignPlanPreviewResponse"];
                 };
             };
             /** @description Validation Error */

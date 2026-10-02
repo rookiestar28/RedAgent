@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from redagent_platform.campaign_service.application_contracts import AutonomousCampaignMode
+
 from typing import Any, Mapping
 
 from redagent_platform.campaign_service.admission import (
@@ -93,6 +95,7 @@ class AutonomousCampaignAdmissionStartService:
             trusted_validator_version=self._trusted_validator_version,
             trusted_validator_sha256=self._trusted_validator_sha256,
             lease_seconds=self._lease_seconds,
+            owned_sequential=bundle.preview.execution_mode is AutonomousCampaignMode.BOUNDED_REPLAN,
         )
         return await admission.admit_plan(
             signed_authority=context.signed_authority,

@@ -44,6 +44,18 @@ def validate_candidate_plan(
     limits: ValidationLimitsV1,
     validated_at: datetime,
 ) -> PlanValidationCertificateV1:
+    return _validate_candidate_plan(plan, domain, authority, limits=limits, validated_at=validated_at)
+
+
+def _validate_candidate_plan(
+    plan: CandidatePlanV1,
+    domain: PlanningDomainV1,
+    authority: CampaignAuthorityEnvelopeV2,
+    *,
+    limits: ValidationLimitsV1,
+    validated_at: datetime,
+    _owned_peak_rate: bool = False,
+) -> PlanValidationCertificateV1:
     """Validate a candidate without trusting its producer or performing I/O."""
     if (
         not isinstance(plan, CandidatePlanV1)
@@ -136,7 +148,8 @@ def validate_candidate_plan(
         active_depth_weights[depth] += operator.concurrency_weight
         totals["max_duration_seconds"] += operator.max_duration_seconds
         totals["max_requests"] += operator.max_requests
-        totals["max_rate_per_minute"] += operator.max_rate_per_minute
+        totals["max_rate_per_minute"] = (max(totals["max_rate_per_minute"], operator.max_rate_per_minute)
+                                        if _owned_peak_rate else totals["max_rate_per_minute"] + operator.max_rate_per_minute)
         totals["max_risk_micropoints"] += operator.max_risk_micropoints
         totals["max_cost_microunits"] += operator.max_cost_microunits
         totals["max_evidence_bytes"] += operator.max_evidence_bytes

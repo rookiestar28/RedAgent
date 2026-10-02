@@ -35,6 +35,7 @@ from redagent_platform.campaign_service.approval_contracts import (
     DenyAutonomousCampaignPlanV1,
 )
 from redagent_platform.campaign_service.planning.contracts import canonical_planning_bytes
+from redagent_platform.campaign_service.child_replan_contracts import CHILD_REQUEST_SCHEMA_VERSION, PrepareAutonomousCampaignChildV1
 
 
 _ETAG = re.compile(r'^"r172-([1-9][0-9]*)-([0-9a-f]{64})"$')
@@ -120,8 +121,9 @@ class AutonomousCampaignPlanPreviewData(_StrictModel):
     required_approvers: tuple[AutonomousCampaignPlanApproverData, ...]
     issued_at: datetime
     expires_at: datetime
-    execution_mode: Literal["plan_only", "owned_loopback_auto"] = "plan_only"
+    execution_mode: Literal["plan_only", "owned_loopback_auto", "bounded_replan"] = "plan_only"
     execution_bindings: tuple[dict[str, str | int | None], ...] = ()
+    child_lineage_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
 
 
 class AutonomousCampaignPlanPreviewResponse(_StrictModel):
@@ -131,6 +133,10 @@ class AutonomousCampaignPlanPreviewResponse(_StrictModel):
 class AutonomousCampaignApprovalRequest(_StrictModel):
     preview_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$")
     preview_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class CanonicalChildReplanRequest(_StrictModel):
+    expected_revision: int = Field(ge=1, le=2_147_483_647, strict=True)
 
 
 class AutonomousCampaignDenialRequest(AutonomousCampaignApprovalRequest):
@@ -174,10 +180,36 @@ def register_autonomous_campaign_approval_routes(
     require_guard: Callable[..., Callable[..., object]],
     api_error: Callable[[int, str, str], Exception],
 ) -> None:
+    @router.post(
+        "/api/v1/autonomous-campaigns/{campaign_id}/child-replan",
+        operation_id="prepare_autonomous_campaign_child",
+        response_model=AutonomousCampaignPlanPreviewResponse,
+        response_model_exclude_unset=True,
+    )
+    async def prepare_child(
+        payload: CanonicalChildReplanRequest,
+        request: Request,
+        response: Response,
+        campaign_id: str = Path(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9._:-]+$"),
+        guard: RequestGuard = Depends(require_guard("campaign:create", mutation=True, roe_required=True)),
+    ) -> object:
+        command = PrepareAutonomousCampaignChildV1(schema_version=CHILD_REQUEST_SCHEMA_VERSION,
+            tenant_id=guard.security.tenant_id, campaign_id=campaign_id, actor_user_id=guard.security.subject,
+            expected_revision=payload.expected_revision, idempotency_key=str(guard.idempotency_key),
+            correlation_id=guard.correlation_id, occurred_at=_now())
+        try:
+            result = await _service(request, api_error).prepare_child(command)
+        except ApplicationOutcomeError as exc:
+            _raise_api_error(exc, api_error)
+        response.headers["ETag"] = result.preview.etag
+        response.headers["Cache-Control"] = "no-store"
+        return {"data": _preview_payload(result.preview)}
+
     @router.get(
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-preview",
         operation_id="get_autonomous_campaign_plan_preview",
         response_model=AutonomousCampaignPlanPreviewResponse,
+        response_model_exclude_unset=True,
     )
     async def get_plan_preview(
         request: Request,
@@ -296,6 +328,8 @@ def _preview_payload(preview: AutonomousCampaignPlanPreviewV1) -> dict[str, obje
     payload = json.loads(canonical_planning_bytes(preview).decode("utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("plan_preview_projection_invalid")
+    if preview.child_lineage_sha256 is None:
+        payload.pop("child_lineage_sha256", None)
     payload["preview_sha256"] = preview.preview_sha256
     return payload
 

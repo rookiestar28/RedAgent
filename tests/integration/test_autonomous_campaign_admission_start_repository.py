@@ -102,6 +102,7 @@ class _Prepared:
     trusted_keys: dict[str, object]
     tenant: str
     campaign: str
+    approval_context: AutonomousCampaignApprovalContextV1 | None = None
 
 
 class _AdmissionContextProvider:
@@ -405,7 +406,7 @@ def _load_migration() -> ModuleType:
     return module
 
 
-async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, capability_key="zap-controlled-runtime@3", capability_manifest_sha256="1" * 64, now=NOW, validity_seconds=60, policy_revision="policy-a") -> _Prepared:
+async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, capability_key="zap-controlled-runtime@3", capability_manifest_sha256="1" * 64, now=NOW, validity_seconds=60, policy_revision="policy-a", bounded_manifest_sha256s=None) -> _Prepared:
     NOW = now
     engine, sessions = _database()
     suffix = uuid4().hex
@@ -501,6 +502,21 @@ async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, c
         current_authority = replace(current_authority, bounds=replace(current_authority.bounds,
             max_requests=20, max_rate_per_minute=60, max_concurrency=1, max_width=1,
             max_evidence_bytes=current_operator.max_evidence_bytes, max_data_bytes=current_operator.max_data_bytes))
+    if mode is AutonomousCampaignMode.BOUNDED_REPLAN:
+        from tests.unit.test_child_replan_subset import owned_planning_material
+        from redagent_platform.campaign_service.planning.owned_sequential import (
+            OWNED_SEQUENTIAL_VALIDATOR_VERSION, OWNED_SEQUENTIAL_VALIDATOR_SHA256,
+            plan_owned_sequential_attack_path, validate_owned_sequential_candidate_plan,
+        )
+        from redagent_platform.campaign_service.planning.contracts import ValidationLimitsV1
+
+        if set(bounded_manifest_sha256s or {}) != {"zap-controlled-runtime", "nuclei-trusted-runtime"}:
+            raise ValueError("bounded_fixture_exact_manifests_required")
+        current_domain, human, initial, _ = owned_planning_material()
+        current_domain = replace(current_domain, operators=tuple(replace(op, capability=replace(op.capability,
+            execution_manifest_sha256=bounded_manifest_sha256s[op.capability.capability_id])) for op in current_domain.operators))
+        current_authority = replace(current_authority, capability_ids=human.capability_ids,
+            objective_ids=human.objective_ids, success_condition_ids=human.success_condition_ids, bounds=human.bounds)
     approval_signature = sign_campaign_authority(
         current_authority,
         private_key,
@@ -514,13 +530,17 @@ async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, c
         authority=current_authority,
         approvals=(approval_signature,),
     )
-    planned = plan_attack_path(current_domain, current_authority, world(), search_limits())
+    planned = (plan_owned_sequential_attack_path(current_domain, current_authority, initial, search_limits())
+               if mode is AutonomousCampaignMode.BOUNDED_REPLAN
+               else plan_attack_path(current_domain, current_authority, world(), search_limits()))
     assert planned.revision is not None
-    certificate = validate_candidate_plan(
+    validator = (validate_owned_sequential_candidate_plan if mode is AutonomousCampaignMode.BOUNDED_REPLAN else validate_candidate_plan)
+    fixture_limits = ValidationLimitsV1(2, 1, 32) if mode is AutonomousCampaignMode.BOUNDED_REPLAN else limits()
+    certificate = validator(
         planned.revision.candidate_plan,
         current_domain,
         current_authority,
-        limits=limits(),
+        limits=fixture_limits,
         validated_at=NOW + timedelta(seconds=2),
     )
     current_lifecycle = lifecycle(
@@ -548,16 +568,18 @@ async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, c
         campaign_id=campaign,
         signed_authority=signed,
         authority_lifecycle=current_lifecycle,
-        execution_bindings=(_full_binding(capability),) if mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO else (),
+        execution_bindings=(tuple(sorted((_full_binding(op.capability) for op in current_domain.operators), key=lambda item: item.capability_id))
+            if mode is AutonomousCampaignMode.BOUNDED_REPLAN else (_full_binding(capability),) if mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO else ()),
     )
     current_trusted_key = trusted_key(private_key, approver_id=approver)
     application_service = AutonomousCampaignApplicationService(
         repository,
+        mode=mode,
         approval_context_provider=_ApprovalContextProvider(approval_context),
         trusted_approval_keys={"key-a": current_trusted_key},
-        validation_limits=limits(),
-        trusted_validator_version=VALIDATOR_VERSION,
-        trusted_validator_sha256=VALIDATOR_SHA256,
+        validation_limits=fixture_limits,
+        trusted_validator_version=OWNED_SEQUENTIAL_VALIDATOR_VERSION if mode is AutonomousCampaignMode.BOUNDED_REPLAN else VALIDATOR_VERSION,
+        trusted_validator_sha256=OWNED_SEQUENTIAL_VALIDATOR_SHA256 if mode is AutonomousCampaignMode.BOUNDED_REPLAN else VALIDATOR_SHA256,
     )
     staged = await application_service.stage_plan(stage)
     approved = await application_service.approve_plan(
@@ -617,6 +639,7 @@ async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, c
             context_provider=context_provider,
             context=context,
             trusted_keys=trusted_keys,
+            owned_sequential=mode is AutonomousCampaignMode.BOUNDED_REPLAN,
         ),
         command=command,
         context_provider=context_provider,
@@ -624,11 +647,13 @@ async def _prepare_approved_campaign(*, mode=AutonomousCampaignMode.PLAN_ONLY, c
         trusted_keys=trusted_keys,
         tenant=tenant,
         campaign=campaign,
+        approval_context=approval_context,
     )
 
 
 def _admission_service(
-    *, sessions, repository, context_provider, context, trusted_keys, policy_provider=None, lease_seconds=60
+    *, sessions, repository, context_provider, context, trusted_keys, policy_provider=None, lease_seconds=60,
+    owned_sequential=False, child_lineage_verifier=None,
 ):
     def _store_factory(command, bundle, current_context):
         return PostgresAutonomousCampaignAdmissionStartStore(
@@ -636,8 +661,11 @@ def _admission_service(
             command=command,
             bundle=bundle,
             context=current_context,
+            child_lineage_verifier=child_lineage_verifier,
         )
 
+    from redagent_platform.campaign_service.planning.contracts import ValidationLimitsV1
+    from redagent_platform.campaign_service.planning.owned_sequential import OWNED_SEQUENTIAL_VALIDATOR_VERSION, OWNED_SEQUENTIAL_VALIDATOR_SHA256
     return AutonomousCampaignAdmissionStartService(
         source=repository,
         context_provider=context_provider,
@@ -650,9 +678,9 @@ def _admission_service(
             trusted_bundle_sha256=context.signed_authority.authority.policy_bundle_sha256,
         ),
         trusted_keys=trusted_keys,
-        validation_limits=limits(),
-        trusted_validator_version=VALIDATOR_VERSION,
-        trusted_validator_sha256=VALIDATOR_SHA256,
+        validation_limits=ValidationLimitsV1(2, 1, 32) if owned_sequential else limits(),
+        trusted_validator_version=OWNED_SEQUENTIAL_VALIDATOR_VERSION if owned_sequential else VALIDATOR_VERSION,
+        trusted_validator_sha256=OWNED_SEQUENTIAL_VALIDATOR_SHA256 if owned_sequential else VALIDATOR_SHA256,
         lease_seconds=lease_seconds,
     )
 async def _count(session, table_name: str, tenant: str) -> int:

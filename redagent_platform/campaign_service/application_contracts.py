@@ -15,6 +15,11 @@ class AutonomousCampaignMode(str, Enum):
     DISABLED = "disabled"
     PLAN_ONLY = "plan_only"
     OWNED_LOOPBACK_AUTO = "owned_loopback_auto"
+    BOUNDED_REPLAN = "bounded_replan"
+
+
+def is_owned_execution_mode(mode: AutonomousCampaignMode) -> bool:
+    return mode in (AutonomousCampaignMode.OWNED_LOOPBACK_AUTO, AutonomousCampaignMode.BOUNDED_REPLAN)
 
 
 class AutonomousCampaignLifecycle(str, Enum):
@@ -236,7 +241,7 @@ class CreateAutonomousCampaignIntentV1:
 
     def __post_init__(self) -> None:
         _schema(self.schema_version)
-        if not isinstance(self.mode, AutonomousCampaignMode) or self.mode not in (AutonomousCampaignMode.PLAN_ONLY, AutonomousCampaignMode.OWNED_LOOPBACK_AUTO):
+        if not isinstance(self.mode, AutonomousCampaignMode) or self.mode not in (AutonomousCampaignMode.PLAN_ONLY, AutonomousCampaignMode.OWNED_LOOPBACK_AUTO, AutonomousCampaignMode.BOUNDED_REPLAN):
             raise ValueError("application_mode_invalid")
         for name, value, maximum in (
             ("tenant_id", self.tenant_id, 64),

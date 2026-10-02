@@ -17,12 +17,12 @@ def test_r172_additive_schema_is_current_rls_protected_and_append_only() -> None
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "migrations"))
     scripts = ScriptDirectory.from_config(config)
-    assert scripts.get_heads() == ["0032_owned_execution_mode"]
+    assert scripts.get_heads() == ["0033_bounded_child_replanning"]
     assert scripts.get_revision("0030_autonomous_plan_approval").down_revision == (
         "0029_autonomous_campaign_app"
     )
     assert DatabaseSettings.__dataclass_fields__["expected_revision"].default == (
-        "0032_owned_execution_mode"
+        "0033_bounded_child_replanning"
     )
     assert {
         "autonomous_campaign_plan_previews",

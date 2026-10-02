@@ -35,7 +35,7 @@ from redagent_platform.campaign_service.dag_effect_transition_store import (
     PostgresDagEffectTransitionStore,
 )
 from redagent_platform.campaign_service.dag_execution_activity import DagExecutionActivity
-from redagent_platform.campaign_service.application_contracts import AutonomousCampaignMode, load_autonomous_campaign_mode
+from redagent_platform.campaign_service.application_contracts import AutonomousCampaignMode, load_autonomous_campaign_mode, is_owned_execution_mode
 from redagent_platform.campaign_service.dag_execution_activity_store import (
     PostgresDagExecutionActivityStateOwner,
 )
@@ -77,6 +77,8 @@ from redagent_platform.orchestration.gateway import TemporalOrchestrationGateway
 from redagent_platform.evidence_service.config import load_evidence_settings
 from redagent_platform.evidence_service.runtime import build_evidence_backend
 from redagent_platform.evidence_service.service import EvidenceService
+from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
+from redagent_platform.campaign_service.owned_dag_cleanup import OwnedDagCleanupVerifier, PostgresOwnedDagCleanupVerifier
 from redagent_platform.policy_service.config import load_policy_settings
 from redagent_platform.policy_service.runtime import build_policy_provider
 
@@ -93,12 +95,15 @@ def build_dag_execution_temporal_activities(
     signing_key_id: str,
     actor_user_id: str = "redagent-dag-worker",
     owned_execution_enabled: bool = False,
+    child_lineage_verifier: ChildLineageVerifier | None = None,
+    owned_cleanup_verifier: OwnedDagCleanupVerifier | None = None,
 ) -> DagExecutionTemporalActivities:
     state = PostgresDagExecutionActivityStateOwner(
         sessions,
         actor_user_id=actor_user_id,
         correlation_prefix="dag-frontier",
         owned_execution_enabled=owned_execution_enabled,
+        child_lineage_verifier=child_lineage_verifier,
     )
     authority = DagEffectAuthorityGate(
         PostgresDagEffectAuthorityStateOwner(
@@ -106,6 +111,7 @@ def build_dag_execution_temporal_activities(
             actor_user_id=actor_user_id,
             correlation_prefix="dag-authority",
             owned_execution_enabled=owned_execution_enabled,
+            child_lineage_verifier=child_lineage_verifier,
         ),
         resolver,
         lifecycle,
@@ -138,6 +144,7 @@ def build_dag_execution_temporal_activities(
         sessions,
         containment,
         correlation_prefix="dag-containment",
+        owned_cleanup_verifier=owned_cleanup_verifier,
     )
     return DagExecutionTemporalActivities(state, application, containment_owner)
 
@@ -145,6 +152,7 @@ def build_dag_execution_temporal_activities(
 def build_stock_campaign_dag_factory(
     workspace: Path,
     env: Mapping[str, str],
+    *, child_lineage_verifier: ChildLineageVerifier | None = None,
 ):
     """Build the stock DAG Activity graph only for explicitly enabled owned-loopback mode."""
     mode = load_dag_execution_mode(env)
@@ -213,7 +221,7 @@ def build_stock_campaign_dag_factory(
             evidence_service=EvidenceService(sessions, evidence_backend),
             actor_user_id="redagent-dag-worker",
             kms_reference=kms_reference,
-            owned_execution=(load_autonomous_campaign_mode(env) is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO),
+            owned_execution=(is_owned_execution_mode(load_autonomous_campaign_mode(env))),
         )
         return build_dag_execution_temporal_activities(
             sessions=sessions,
@@ -224,7 +232,10 @@ def build_stock_campaign_dag_factory(
             containment=PostgresActivityContainmentOwner(sessions),
             signing_key=signing_key,
             signing_key_id=signing_key_id,
-            owned_execution_enabled=(load_autonomous_campaign_mode(env) is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO),
+            owned_execution_enabled=(is_owned_execution_mode(load_autonomous_campaign_mode(env))),
+            child_lineage_verifier=child_lineage_verifier,
+            owned_cleanup_verifier=(PostgresOwnedDagCleanupVerifier(evidence_backend)
+                if load_autonomous_campaign_mode(env) is AutonomousCampaignMode.BOUNDED_REPLAN else None),
         )
 
     setattr(factory, "_redagent_temporal_readiness_factory", True)

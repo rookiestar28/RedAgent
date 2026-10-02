@@ -21,6 +21,7 @@ from redagent_platform.campaign_service.admission_start_relay_store import (
 )
 from redagent_platform.campaign_service.relay import WorkflowStartGateway
 from redagent_platform.campaign_service.relay_runtime import RelayTenantSource
+from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
 
 
 class ClaimingAutonomousCampaignStartBridgeRepository(Protocol):
@@ -156,6 +157,7 @@ def postgres_admission_start_bridge_relay_repository_factory(
     sessions: async_sessionmaker[AsyncSession],
     *,
     instance_id: str,
+    child_lineage_verifier: ChildLineageVerifier | None = None,
 ) -> Callable[[str], PostgresAutonomousCampaignStartBridgeRelayRepository]:
     stable_instance = _required("start_bridge_relay_instance", instance_id, 32)
 
@@ -166,6 +168,7 @@ def postgres_admission_start_bridge_relay_repository_factory(
             tenant_id=tenant_id,
             actor_user_id="redagent-start-bridge-relay",
             correlation_prefix=f"start-bridge-{stable_instance}-{suffix}",
+            child_lineage_verifier=child_lineage_verifier,
         )
 
     return factory

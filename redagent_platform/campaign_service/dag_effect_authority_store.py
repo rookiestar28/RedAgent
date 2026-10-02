@@ -16,9 +16,7 @@ from redagent_platform.campaign_service.admission_contracts import (
     CampaignBudgetVectorV1,
     CampaignReservationState,
 )
-from redagent_platform.campaign_service.admission_repository import (
-    CampaignAdmissionRepository,
-)
+from redagent_platform.campaign_service.child_admission import transition_repository_for_run
 from redagent_platform.campaign_service.authority_envelope import (
     CampaignAuthorityLifecycleState,
     CampaignAuthorityLifecycleV2,
@@ -37,6 +35,7 @@ from redagent_platform.campaign_service.planning.contracts import (
 from redagent_platform.campaign_service.service import EffectDispatchCommand
 from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.owned_execution_store import assert_owned_execution_current
+from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
 from redagent_platform.policy_service.contracts import (
     PolicyDecision,
     PolicyDecisionInput,
@@ -59,9 +58,11 @@ class PostgresDagEffectAuthorityStateOwner:
         actor_user_id: str,
         correlation_prefix: str,
         owned_execution_enabled: bool = False,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
     ) -> None:
         self._sessions = session_factory
         self._owned_execution_enabled = owned_execution_enabled
+        self._child_lineage_verifier = child_lineage_verifier
         self._actor_user_id = _required(
             "dag_authority_store_actor", actor_user_id, 64
         )
@@ -81,6 +82,7 @@ class PostgresDagEffectAuthorityStateOwner:
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"{self._correlation_prefix}-read-{suffix}",
                 owned_execution_enabled=self._owned_execution_enabled,
+                child_lineage_verifier=self._child_lineage_verifier,
             ).read(command, now=now)
 
     async def observe_lifecycle(
@@ -98,6 +100,7 @@ class PostgresDagEffectAuthorityStateOwner:
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"{self._correlation_prefix}-observe-{suffix}",
                 owned_execution_enabled=self._owned_execution_enabled,
+                child_lineage_verifier=self._child_lineage_verifier,
             ).observe_lifecycle(material, lifecycle, now=now)
 
     async def commit_pre_io(
@@ -117,6 +120,7 @@ class PostgresDagEffectAuthorityStateOwner:
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"{self._correlation_prefix}-preio-{suffix}",
                 owned_execution_enabled=self._owned_execution_enabled,
+                child_lineage_verifier=self._child_lineage_verifier,
             ).commit_pre_io(
                 material,
                 decision=decision,
@@ -135,12 +139,14 @@ class _Repository:
         actor_user_id: str,
         correlation_id: str,
         owned_execution_enabled: bool = False,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
     ) -> None:
         self.session = session
         self.tenant_id = tenant_id
         self.actor_user_id = actor_user_id
         self.correlation_id = correlation_id
         self.owned_execution_enabled = owned_execution_enabled
+        self.child_lineage_verifier = child_lineage_verifier
 
     async def read(
         self, command: EffectDispatchCommand, *, now: datetime
@@ -168,7 +174,8 @@ class _Repository:
             node_id=str(effect["node_id"]),
         )
         payload = effect["effect_intent_payload"]
-        await assert_owned_execution_current(self.session, run, now=now, enabled=self.owned_execution_enabled)
+        await assert_owned_execution_current(self.session, run, now=now, enabled=self.owned_execution_enabled,
+                                             child_lineage_verifier=self.child_lineage_verifier)
         binding = payload.get("binding") if isinstance(payload, dict) else None
         if (
             not isinstance(payload, dict)
@@ -351,7 +358,8 @@ class _Repository:
             runs.c.tenant_id == self.tenant_id, runs.c.id == material.execution_run_id
         ).with_for_update())).mappings().one()
         # CRITICAL: this locked check is after fresh policy and immediately before runner I/O.
-        await assert_owned_execution_current(self.session, current_run, now=now, enabled=self.owned_execution_enabled)
+        await assert_owned_execution_current(self.session, current_run, now=now, enabled=self.owned_execution_enabled,
+                                             child_lineage_verifier=self.child_lineage_verifier)
         decision.assert_current(
             request, required_revision=material.policy_bundle_revision, now=now
         )
@@ -463,12 +471,14 @@ class _Repository:
             raise DagEffectAuthorityConflict("dag_pre_io_capacity_exhausted")
 
         if reservation["reservation_state"] == "reserved":
-            await CampaignAdmissionRepository(
+            budget_owner = await transition_repository_for_run(
                 self.session,
-                tenant_id=self.tenant_id,
+                run=run,
                 actor_user_id=self.actor_user_id,
                 correlation_id=self.correlation_id,
-            ).transition_reservation(
+                now=now,
+            )
+            await budget_owner.transition_reservation(
                 reservation_id=material.reservation_id,
                 target=CampaignReservationState.HELD,
                 effect_started=True,

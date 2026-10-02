@@ -211,12 +211,17 @@ class AutonomousCampaignPlanPreviewV1:
     expires_at: datetime
     execution_mode: AutonomousCampaignMode = AutonomousCampaignMode.PLAN_ONLY
     execution_bindings: tuple[CapabilityBindingKeyV1, ...] = ()
+    child_lineage_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if self.schema_version != PLAN_PREVIEW_SCHEMA_VERSION:
             raise ValueError("plan_preview_schema_unsupported")
         if not isinstance(self.execution_mode, AutonomousCampaignMode) or self.execution_mode is AutonomousCampaignMode.DISABLED:
             raise ValueError("plan_preview_execution_mode_invalid")
+        if self.child_lineage_sha256 is not None:
+            _sha256("plan_preview_child_lineage_sha256", self.child_lineage_sha256)
+            if self.execution_mode is not AutonomousCampaignMode.BOUNDED_REPLAN:
+                raise ValueError("plan_preview_child_lineage_mode_invalid")
         if not isinstance(self.execution_bindings, tuple) or any(not isinstance(item, CapabilityBindingKeyV1) for item in self.execution_bindings):
             raise ValueError("plan_preview_execution_bindings_invalid")
         for name, maximum in (
@@ -304,6 +309,9 @@ class AutonomousCampaignPlanPreviewV1:
     @property
     def preview_sha256(self) -> str:
         payload = asdict(self)
+        # CRITICAL: omit absent child lineage so existing approvals retain their exact digest.
+        if self.child_lineage_sha256 is None:
+            payload.pop("child_lineage_sha256")
         # CRITICAL: old plan-only approval digests remain valid; auto authority is explicit.
         if self.execution_mode is AutonomousCampaignMode.PLAN_ONLY:
             payload.pop("execution_mode")

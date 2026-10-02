@@ -13,9 +13,9 @@ from redagent_platform.campaign_service.admission_contracts import (
     PlanAdmissionReceiptV1,
 )
 from redagent_platform.campaign_service.admission_repository import (
-    CampaignAdmissionRepository,
     _receipt_from_payload,
 )
+from redagent_platform.campaign_service.child_admission import transition_repository_for_run
 from redagent_platform.campaign_service.admission_start_contracts import (
     ADMISSION_START_BRIDGE_EVENT_TYPE,
     AutonomousCampaignAdmissionStartState,
@@ -30,13 +30,15 @@ from redagent_platform.campaign_service.admission_start_store import (
     _transition_application,
 )
 from redagent_platform.campaign_service.application_contracts import (
+    is_owned_execution_mode,
+    AutonomousCampaignMode,
     AutonomousCampaignApplicationStateV1,
     AutonomousCampaignLifecycle,
-    AutonomousCampaignMode,
 )
 from redagent_platform.campaign_service.application_repository import (
     _state_from_row,
     _verified_receipt_from_payload,
+    _verified_preview_from_payload,
 )
 from redagent_platform.campaign_service.approval_contracts import (
     AutonomousCampaignApprovalReceiptV1,
@@ -51,6 +53,7 @@ from redagent_platform.orchestration.admission_start_gateway import (
 )
 from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.owned_execution_store import emit_owned_execution_start
+from redagent_platform.campaign_service.child_lineage import ChildLineageConflict, ChildLineageVerifier, require_current_child_lineage
 
 
 _ACK_OPERATION = "autonomous_campaign.start_bridge.acknowledge.v1"
@@ -80,8 +83,10 @@ class CampaignAdmissionStartBridgeRelayRepository:
         tenant_id: str,
         actor_user_id: str,
         correlation_id: str,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
     ) -> None:
         self.session = session
+        self._child_lineage_verifier = child_lineage_verifier
         self.tenant_id = _required("start_bridge_relay_tenant", tenant_id, 64)
         self.actor_user_id = _required("start_bridge_relay_actor", actor_user_id, 64)
         self.correlation_id = _required(
@@ -336,7 +341,24 @@ class CampaignAdmissionStartBridgeRelayRepository:
             },
             occurred_at=occurred_at,
         )
-        if bound.application.mode is AutonomousCampaignMode.OWNED_LOOPBACK_AUTO:
+        if is_owned_execution_mode(bound.application.mode):
+            if bound.application.mode is AutonomousCampaignMode.BOUNDED_REPLAN:
+                previews = metadata.tables["autonomous_campaign_plan_previews"]
+                preview_row = (await self.session.execute(select(previews).where(
+                    previews.c.tenant_id == self.tenant_id, previews.c.application_id == bound.application.campaign_id,
+                    previews.c.id == bound.approval_receipt.preview_id,
+                ))).mappings().one_or_none()
+                if preview_row is None:
+                    raise AdmissionStartBridgeRelayConflict("child_start_preview_missing")
+                preview = _verified_preview_from_payload(preview_row["preview_payload"], str(preview_row["preview_sha256"]))
+                if preview.preview_sha256 != bound.approval_receipt.preview_sha256:
+                    raise AdmissionStartBridgeRelayConflict("child_start_preview_binding_mismatch")
+                try:
+                    await require_current_child_lineage(preview=preview, tenant_id=self.tenant_id,
+                        campaign_id=bound.application.campaign_id, now=occurred_at,
+                        verifier=self._child_lineage_verifier, session=self.session)
+                except (ChildLineageConflict, ValueError) as exc:
+                    raise AdmissionStartBridgeRelayConflict("child_start_lineage_not_current") from exc
             # CRITICAL: only this confirmed exact approval emits the prepared DAG once.
             # The bridge workflow itself remains effectless for all existing histories.
             await emit_owned_execution_start(self.session, bound.execution_run, now=occurred_at)
@@ -840,12 +862,14 @@ class CampaignAdmissionStartBridgeRelayRepository:
             if expired
             else CampaignReservationState.RELEASED
         )
-        await CampaignAdmissionRepository(
+        budget_owner = await transition_repository_for_run(
             self.session,
-            tenant_id=self.tenant_id,
+            run=bound.execution_run,
             actor_user_id=self.actor_user_id,
             correlation_id=self.correlation_id,
-        ).transition_reservation(
+            now=occurred_at,
+        )
+        await budget_owner.transition_reservation(
             reservation_id=str(bound.start["reservation_id"]),
             target=target_reservation,
             effect_started=False,
@@ -1012,8 +1036,10 @@ class PostgresAutonomousCampaignStartBridgeRelayRepository:
         tenant_id: str,
         actor_user_id: str,
         correlation_prefix: str,
+        child_lineage_verifier: ChildLineageVerifier | None = None,
     ) -> None:
         self._sessions = sessions
+        self._child_lineage_verifier = child_lineage_verifier
         self._tenant_id = _required("start_bridge_relay_tenant", tenant_id, 64)
         self._actor_user_id = _required("start_bridge_relay_actor", actor_user_id, 64)
         self._correlation_prefix = _required(
@@ -1101,6 +1127,7 @@ class PostgresAutonomousCampaignStartBridgeRelayRepository:
             tenant_id=self._tenant_id,
             actor_user_id=self._actor_user_id,
             correlation_id=f"{self._correlation_prefix}-{phase}",
+            child_lineage_verifier=self._child_lineage_verifier,
         )
 
 

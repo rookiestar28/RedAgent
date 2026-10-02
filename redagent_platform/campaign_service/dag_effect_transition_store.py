@@ -13,9 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from redagent_platform.campaign_service.admission_contracts import (
     CampaignReservationState,
 )
-from redagent_platform.campaign_service.admission_repository import (
-    CampaignAdmissionRepository,
-)
+from redagent_platform.campaign_service.child_admission import transition_repository_for_run
 from redagent_platform.campaign_service.dag_execution_contracts import (
     DagNodeState,
     DagRunState,
@@ -245,12 +243,14 @@ class PostgresDagEffectTransitionStore:
             now=now,
         )
         if terminal:
-            await CampaignAdmissionRepository(
+            budget_owner = await transition_repository_for_run(
                 session,
-                tenant_id=command.tenant_id,
+                run=run,
                 actor_user_id=self._actor_user_id,
                 correlation_id=f"{self._correlation_prefix}-consume-{command.effect_id[-12:]}",
-            ).transition_reservation(
+                now=now,
+            )
+            await budget_owner.transition_reservation(
                 reservation_id=str(run["reservation_id"]),
                 target=CampaignReservationState.CONSUMED,
                 effect_started=True,

@@ -214,11 +214,14 @@ class CampaignPlanAdmissionService:
         trusted_validator_version: str,
         trusted_validator_sha256: str,
         lease_seconds: int = 60,
+        owned_sequential: bool = False,
     ) -> None:
         if not isinstance(policy, AdmissionPolicyAdapter) or not isinstance(validation_limits, ValidationLimitsV1):
             raise ValueError("plan_admission_service_dependency_invalid")
         if type(lease_seconds) is not int or not 1 <= lease_seconds <= 300:
             raise ValueError("plan_admission_lease_seconds_invalid")
+        if type(owned_sequential) is not bool:
+            raise ValueError("plan_admission_profile_invalid")
         self.policy = policy
         self.store = store
         self.trusted_keys = dict(trusted_keys)
@@ -226,6 +229,7 @@ class CampaignPlanAdmissionService:
         self.trusted_validator_version = trusted_validator_version
         self.trusted_validator_sha256 = trusted_validator_sha256
         self.lease_seconds = lease_seconds
+        self.owned_sequential = owned_sequential
 
     async def admit_plan(
         self,
@@ -345,7 +349,10 @@ class CampaignPlanAdmissionService:
                 idempotency_key=idempotency_key,
                 context=denial_context,
             )
-        recomputed = validate_candidate_plan(
+        # CRITICAL: only the server-selected closed mode may use peak accounting; certificate labels do not select semantics.
+        from redagent_platform.campaign_service.planning.owned_sequential import validate_owned_sequential_candidate_plan
+        validator = validate_owned_sequential_candidate_plan if self.owned_sequential else validate_candidate_plan
+        recomputed = validator(
             revision.candidate_plan,
             domain,
             authority,

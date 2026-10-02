@@ -34,6 +34,18 @@ from redagent_platform.campaign_service.planning.search_contracts import (
     PlannerSearchLimitsV1,
 )
 from redagent_platform.campaign_service.planning.validation import validate_candidate_plan
+from redagent_platform.campaign_service.planning.owned_sequential import (
+    OWNED_SEQUENTIAL_PLANNER_SHA256,
+    OWNED_SEQUENTIAL_PLANNER_VERSION,
+    OWNED_SEQUENTIAL_VALIDATOR_SHA256,
+    OWNED_SEQUENTIAL_VALIDATOR_VERSION,
+    derive_owned_sequential_search_limits,
+    plan_owned_sequential_attack_path,
+    validate_owned_sequential_candidate_plan,
+)
+from redagent_platform.campaign_service.child_replan_contracts import prove_canonical_child_subset
+from redagent_platform.campaign_service.dag_execution_contracts import DagRunState
+from redagent_platform.campaign_service.trusted_observations import OwnedCompletionSourceV1
 from redagent_platform.campaign_service.replanning_contracts import (
     REPLAN_PROPOSAL_SCHEMA_VERSION,
     REPLAN_RESULT_SCHEMA_VERSION,
@@ -107,6 +119,72 @@ def prepare_bounded_replan(
     residual_budget: CampaignBudgetVectorV1,
     now: datetime,
 ) -> BoundedReplanResultV1:
+    return _prepare_bounded_replan(
+        request=request, parent_revision=parent_revision, parent_admission_receipt=parent_admission_receipt,
+        authority=authority, lifecycle=lifecycle, domain=domain, residual_budget=residual_budget, now=now,
+    )
+
+
+def prepare_owned_bounded_replan(
+    *, request: ReplanRequestV1, parent_revision: AttackPathDagRevisionV1,
+    parent_admission_receipt: PlanAdmissionReceiptV1, authority: CampaignAuthorityEnvelopeV2,
+    lifecycle: CampaignAuthorityLifecycleV2, domain: PlanningDomainV1,
+    residual_budget: CampaignBudgetVectorV1, now: datetime,
+    parent_completion_source: OwnedCompletionSourceV1 | None = None,
+) -> BoundedReplanResultV1:
+    parent_admission_at = now
+    if parent_completion_source is not None:
+        source = parent_completion_source
+        if (not isinstance(source, OwnedCompletionSourceV1) or source.tenant_id != request.tenant_id
+                or source.campaign_id != request.campaign_id or source.authority_sha256 != authority.authority_sha256
+                or source.parent_revision_sha256 != parent_revision.revision_sha256 or source.domain_sha256 != domain.domain_sha256
+                or source.plan_sha256 != parent_revision.candidate_plan.plan_sha256
+                or source.snapshot.state not in {DagRunState.COMPLETED, DagRunState.CONTAINED}
+                or source.snapshot.current_node_id is not None or source.verified_at > now
+                or source.effect_receipt.completed_at is None or source.effect_receipt.completed_at > now
+                or not parent_admission_receipt.issued_at <= source.effect_receipt.started_at <= source.effect_receipt.completed_at < parent_admission_receipt.expires_at
+                or len(request.observation_history.trusted_observations) != 1):
+            return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_historical_parent_source_invalid")
+        observation = request.observation_history.trusted_observations[0]
+        if (observation.source_execution_run_id != source.snapshot.execution_run_id or observation.source_node_id != source.node_id
+                or observation.candidate.observed_at != source.effect_receipt.completed_at
+                or observation.candidate.source_result_sha256 != source.effect_receipt.receipt_sha256
+                or observation.candidate.evidence_sha256 != source.effect_receipt.receipt_sha256):
+            return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_historical_parent_observation_invalid")
+        parent_admission_at = source.effect_receipt.completed_at
+    result = _prepare_bounded_replan(
+        request=request, parent_revision=parent_revision, parent_admission_receipt=parent_admission_receipt,
+        authority=authority, lifecycle=lifecycle, domain=domain, residual_budget=residual_budget, now=now,
+        _owned_sequential=True,
+        _parent_admission_at=parent_admission_at,
+    )
+    if result.proposal is None:
+        return result
+    observations = request.observation_history.trusted_observations
+    completed_node_ids: list[str] = []
+    for observation in observations:
+        if observation.source_node_id is None:
+            return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_strict_parent_subset_required")
+        completed_node_ids.append(observation.source_node_id)
+    try:
+        prove_canonical_child_subset(
+            parent=parent_revision, child=result.proposal.child_revision, domain=domain,
+            completed_parent_node_ids=tuple(completed_node_ids),
+            observed_values=tuple(FactValueV1(o.candidate.fact_id, o.candidate.value) for o in observations),
+            observation_history_sha256=request.observation_history.history_sha256,
+        )
+    except ValueError:
+        return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_strict_parent_subset_required")
+    return result
+
+
+def _prepare_bounded_replan(
+    *, request: ReplanRequestV1, parent_revision: AttackPathDagRevisionV1,
+    parent_admission_receipt: PlanAdmissionReceiptV1, authority: CampaignAuthorityEnvelopeV2,
+    lifecycle: CampaignAuthorityLifecycleV2, domain: PlanningDomainV1,
+    residual_budget: CampaignBudgetVectorV1, now: datetime, _owned_sequential: bool = False,
+    _parent_admission_at: datetime | None = None,
+) -> BoundedReplanResultV1:
     if (
         not isinstance(request, ReplanRequestV1)
         or not isinstance(parent_revision, AttackPathDagRevisionV1)
@@ -118,7 +196,25 @@ def prepare_bounded_replan(
     ):
         raise ValueError("replan_input_invalid")
     _aware(now)
-    search_limits = derive_replan_search_limits(authority)
+    if _parent_admission_at is not None:
+        _aware(_parent_admission_at)
+        if not _owned_sequential or _parent_admission_at > now:
+            raise ValueError("replan_historical_parent_clock_forbidden")
+    parent_admission_at = now if _parent_admission_at is None else _parent_admission_at
+    if _owned_sequential and (
+        parent_revision.planner_version != OWNED_SEQUENTIAL_PLANNER_VERSION
+        or parent_revision.planner_sha256 != OWNED_SEQUENTIAL_PLANNER_SHA256
+        or parent_admission_receipt.validator_version != OWNED_SEQUENTIAL_VALIDATOR_VERSION
+        or parent_admission_receipt.validator_sha256 != OWNED_SEQUENTIAL_VALIDATOR_SHA256
+    ):
+        return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_owned_profile_binding_mismatch")
+    if _owned_sequential:
+        try:
+            search_limits = derive_owned_sequential_search_limits(domain, authority)
+        except ValueError:
+            return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_owned_profile_invalid")
+    else:
+        search_limits = derive_replan_search_limits(authority)
     if (
         request.parent_revision_id != parent_revision.revision_id
         or request.parent_revision_sha256 != parent_revision.revision_sha256
@@ -138,7 +234,8 @@ def prepare_bounded_replan(
         or parent_admission_receipt.plan_sha256 != parent_revision.candidate_plan.plan_sha256
         or parent_admission_receipt.authority_sha256 != parent_revision.authority_sha256
         or parent_admission_receipt.domain_sha256 != parent_revision.domain_sha256
-        or not parent_admission_receipt.issued_at <= now < parent_admission_receipt.expires_at
+        # CRITICAL: only the sealed owned-source wrapper may supply historical completion; ordinary replanning needs a current parent grant.
+        or not parent_admission_receipt.issued_at <= parent_admission_at < parent_admission_receipt.expires_at
     ):
         # CRITICAL: a same-campaign receipt for another plan is not parent execution authority.
         return _result(
@@ -172,9 +269,21 @@ def prepare_bounded_replan(
             return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_observation_binding_mismatch")
         if observation.promoted_at > now or now >= candidate.expires_at:
             return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_observation_expired")
+        if _owned_sequential and (
+            (now - candidate.observed_at).total_seconds() > 120
+            or (candidate.expires_at - candidate.observed_at).total_seconds() > 120
+            or candidate.expires_at > authority.expires_at
+        ):
+            return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_owned_observation_freshness_invalid")
 
     initial_state = _observation_state(parent_revision.candidate_plan.initial_state, history.trusted_observations)
-    planned = plan_attack_path(domain, authority, initial_state, search_limits)
+    if _owned_sequential:
+        try:
+            planned = plan_owned_sequential_attack_path(domain, authority, initial_state, search_limits)
+        except ValueError:
+            return _result(request, ReplanOutcome.MANUAL_REVIEW_REQUIRED, "replan_owned_profile_invalid")
+    else:
+        planned = plan_attack_path(domain, authority, initial_state, search_limits)
     if planned.outcome is not AttackPathPlannerOutcome.PLAN_FOUND or planned.revision is None:
         return _result(request, ReplanOutcome.NO_PLAN, f"replan_{planned.outcome.value}")
     child_revision = _bind_child_revision(
@@ -183,7 +292,8 @@ def prepare_bounded_replan(
         observation_history_sha256=history.history_sha256,
     )
     search_receipt = replace(planned.receipt, found_revision_sha256=child_revision.revision_sha256)
-    validation_limits = ValidationLimitsV1(
+    # CRITICAL: closed profile predicate checks use the fixed semantic ceiling, not a node/retry count.
+    validation_limits = ValidationLimitsV1(2, 1, 32) if _owned_sequential else ValidationLimitsV1(
         max_nodes=authority.bounds.max_nodes,
         max_edges=authority.bounds.max_nodes,
         max_state_transitions=min(
@@ -191,7 +301,8 @@ def prepare_bounded_replan(
             authority.bounds.max_nodes * (authority.bounds.max_retries_per_node + 1),
         ),
     )
-    certificate = validate_candidate_plan(
+    validator = validate_owned_sequential_candidate_plan if _owned_sequential else validate_candidate_plan
+    certificate = validator(
         child_revision.candidate_plan,
         domain,
         authority,

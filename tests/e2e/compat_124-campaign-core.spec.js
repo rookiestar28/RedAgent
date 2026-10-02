@@ -108,6 +108,39 @@ test("R162 campaign operations renders server truth and keeps export unavailable
   await expect(page.getByRole("main")).not.toContainText(/campaign-server-generated|node-internal|target-internal|operator-internal/i);
 });
 
+test("strict-subset child proposal displays evidence provenance and requires fresh approval", async ({ page }) => {
+  const operations = campaignOperations();
+  operations.observations[0].fact = "ZAP passive profile completed";
+  operations.plan.parent_revision_present = true;
+  operations.revisions[0].substitution_count = 0;
+  operations.preparation_state = "awaiting_approval";
+  operations.execution.state = "contained";
+  await campaignRoutes(page, async () => {}, { operations });
+  await page.goto("/campaigns");
+  await page.getByRole("button", { name: "View current status" }).click();
+  await expect(page.getByText("ZAP passive profile completed")).toBeVisible();
+  await page.getByText("Evidence provenance", { exact: true }).click();
+  await expect(page.getByText(operations.observations[0].provenance_sha256, { exact: true })).toBeVisible();
+  await expect(page.getByText(/child proposal needs a new exact approval and admission/i)).toBeVisible();
+  await expect(page.getByText("1 invalidated · 1 retained · 0 substitution")).toBeVisible();
+  await expect(page.getByRole("button", { name: /start|approve|dispatch/i })).toHaveCount(0);
+  await expect(page.getByRole("main").getByLabel(/facts|producer|budget|observation|counter|proof/i)).toHaveCount(0);
+});
+
+test("strict-subset child expired observation stays visible without approval or dispatch", async ({ page }) => {
+  const operations = campaignOperations();
+  operations.observations[0].freshness = "expired";
+  operations.validation = { result: "invalid", reason: "child_lineage_not_current", counterexample_codes: ["stale-observation-denied"] };
+  operations.execution.state = "manual_review_required";
+  await campaignRoutes(page, async () => {}, { operations });
+  await page.goto("/campaigns");
+  await page.getByRole("button", { name: "View current status" }).click();
+  const observation = page.locator("article").filter({ has: page.getByRole("heading", { name: "Observations", exact: true }) });
+  await expect(observation).toContainText("Expired");
+  await expect(page.getByText("Stale observation denied")).toBeVisible();
+  await expect(page.getByRole("button", { name: /start|approve|dispatch/i })).toHaveCount(0);
+});
+
 test("R162 missing inspect authorization fails closed with actionable feedback", async ({ page }) => {
   await campaignRoutes(page, async () => {}, {
     operationsError: {

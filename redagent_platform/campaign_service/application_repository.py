@@ -1551,6 +1551,7 @@ def _preview_from_payload(payload: object) -> AutonomousCampaignPlanPreviewV1:
     actions = _stored_list("actions", payload.get("actions"))
     approvers = _stored_list("required_approvers", payload.get("required_approvers"))
     return AutonomousCampaignPlanPreviewV1(
+        child_lineage_sha256=payload.get("child_lineage_sha256"),
         execution_mode=AutonomousCampaignMode(str(payload.get("execution_mode", "plan_only"))),
         execution_bindings=tuple(CapabilityBindingKeyV1(**item) for item in payload.get("execution_bindings", [])),
         schema_version=str(payload["schema_version"]),
@@ -1669,6 +1670,8 @@ def _json_payload(value: object) -> dict[str, object]:
     normalized = json.loads(canonical_planning_bytes(value).decode("utf-8"))
     if not isinstance(normalized, dict):
         raise ValueError("approval_persistence_payload_invalid")
+    if isinstance(value, AutonomousCampaignPlanPreviewV1) and value.child_lineage_sha256 is None:
+        normalized.pop("child_lineage_sha256", None)
     return normalized
 
 

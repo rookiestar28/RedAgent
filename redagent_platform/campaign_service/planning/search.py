@@ -179,6 +179,8 @@ def _search_attack_path(
     authority: CampaignAuthorityEnvelopeV2,
     initial_state: WorldStateV1,
     limits: PlannerSearchLimitsV1,
+    *,
+    _owned_peak_rate: bool = False,
 ) -> AttackPathPlannerResultV1:
     metrics = _Metrics()
     tick_limit = min(
@@ -351,7 +353,7 @@ def _search_attack_path(
                     first_bound_reason = first_bound_reason or "authority_graph_bound_exhausted"
                     metrics.prune("authority_graph_bound_exhausted")
                     continue
-                resources = _add_resources(current.resources, action.operator)
+                resources = _add_resources(current.resources, action.operator, _owned_peak_rate=_owned_peak_rate)
                 if not _resources_within_authority(resources, authority):
                     hit_bound = True
                     first_bound_reason = first_bound_reason or "authority_resource_bound_exhausted"
@@ -760,11 +762,12 @@ def _apply_effects(
     return WorldStateV1(tuple(FactValueV1(fact_id, value) for fact_id, value in sorted(values.items())))
 
 
-def _add_resources(current: _Resources, operator: CapabilityOperatorV1) -> _Resources:
+def _add_resources(current: _Resources, operator: CapabilityOperatorV1, *, _owned_peak_rate: bool = False) -> _Resources:
     return _Resources(
         duration_seconds=current.duration_seconds + operator.max_duration_seconds,
         requests=current.requests + operator.max_requests,
-        rate_per_minute=current.rate_per_minute + operator.max_rate_per_minute,
+        rate_per_minute=(max(current.rate_per_minute, operator.max_rate_per_minute)
+                         if _owned_peak_rate else current.rate_per_minute + operator.max_rate_per_minute),
         concurrency=max(current.concurrency, operator.concurrency_weight),
         retries_per_node=max(current.retries_per_node, operator.max_retries),
         risk_micropoints=current.risk_micropoints + operator.max_risk_micropoints,
