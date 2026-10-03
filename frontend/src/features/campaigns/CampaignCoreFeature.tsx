@@ -428,7 +428,9 @@ function AutonomousCampaignJourney({ client, availability, intent, status, onSta
   const gatesClear = Boolean(status && status.attention.length === 0
     && !["denied", "revoked", "expired", "unavailable"].includes(status.operations.authority.state));
   const childGatesClear = Boolean(status && status.attention.every((reason) => reason === "evidence_pending")
-    && !["denied", "revoked", "expired", "unavailable"].includes(status.operations.authority.state));
+    // CRITICAL: an expired parent admission cannot transfer authority, but must not hide child
+    // preparation. The server rechecks current campaign scope; the child needs fresh human gates.
+    && !["denied", "revoked", "unavailable"].includes(status.operations.authority.state));
   const mayDecide = Boolean(gatesClear && scopeCurrent && status && preview && status.preview_etag && !status.preview_expired
     && status.lifecycle_state === "AWAITING_APPROVAL" && availability.preparation_available);
   const mayAdmit = Boolean(gatesClear && scopeCurrent && status && status.mode !== "plan_only" && status.lifecycle_state === "APPROVED"
@@ -501,7 +503,7 @@ function AutonomousCampaignJourney({ client, availability, intent, status, onSta
 }
 
 function ImmutablePlanSummary({ preview, targetLabel, objectiveLabel }: {
-  preview: AutonomousCampaignPreview; targetLabel: string; objectiveLabel?: string | null;
+  preview: AutonomousCampaignPreview; targetLabel: string; objectiveLabel?: string | null | undefined;
 }) {
   return <article className="campaign-operations__panel campaign-plan-summary">
     <h3>Immutable plan</h3>

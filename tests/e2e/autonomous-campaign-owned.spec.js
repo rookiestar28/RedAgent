@@ -30,7 +30,9 @@ test("normal owned intent, fresh human gates, native stop and current results", 
   };
   const refresh = () => page.getByRole("button", { name: "Refresh current status", exact: true }).click();
   const confirm = async (action, label) => {
-    await page.getByRole("button", { name: action, exact: true }).click();
+    const trigger = page.getByRole("button", { name: action, exact: true });
+    await expect(trigger).toBeVisible();
+    await trigger.click();
     const dialog = page.getByRole("dialog", { name: label, exact: true });
     await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
     await dialog.getByRole("button", { name: label, exact: true }).click();

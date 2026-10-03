@@ -186,7 +186,13 @@ class ObservedHttpAdmission(AutonomousCampaignAdmissionStartService):
 class ObservedOperatorStatus(PostgresAutonomousCampaignOperatorOwner):
     async def read_status(self, **kwargs):
         try:
-            return await super().read_status(**kwargs)
+            status = await super().read_status(**kwargs)
+            observation = (status["lifecycle_state"], status["operations"]["authority"]["state"], tuple(status["attention"]))
+            if observation != getattr(self, "last_observation", None):
+                print(json.dumps({"native_operator_state": observation[0], "admission_authority_state": observation[1],
+                    "attention": observation[2]}), flush=True)
+                self.last_observation = observation
+            return status
         except Exception as error:
             code = str(error)
             print(json.dumps({"native_operator_status_error": type(error).__name__,

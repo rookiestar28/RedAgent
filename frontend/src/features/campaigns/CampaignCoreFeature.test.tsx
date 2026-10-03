@@ -586,8 +586,8 @@ async function prepareNormal(api: CampaignCoreClient) {
 
 describe("normal staged Campaign Core journey", () => {
   it.each(["policy_denied", "authority_revoked", "budget_exhausted", "unknown_capability",
-    "kill_switch_active", "manual_review_required", "reconciliation_required", "operator_native_source_changed"])
-  ("blocks new gates for server attention %s while preserving recovery", async (reason) => {
+    "kill_switch_active", "manual_review_required", "reconciliation_required", "operator_native_source_changed"])(
+    "blocks new gates for server attention %s while preserving recovery", async (reason) => {
     const api = normalClient();
     const user = await prepareNormal(api);
     const blocked = normalStatus("APPROVED", 4);
@@ -633,6 +633,7 @@ describe("normal staged Campaign Core journey", () => {
     const user = await prepareNormal(api);
     const terminal = normalStatus("EVIDENCE_PENDING", 7, "bounded_replan");
     terminal.operations.execution.state = "contained";
+    terminal.operations.authority.state = "expired";
     terminal.result.evidence_state = "pending";
     vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(terminal);
     await user.click(screen.getByRole("button", { name: "Refresh current status" }));
