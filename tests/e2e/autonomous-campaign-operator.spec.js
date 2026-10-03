@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
 // Only the opt-in test server has an identity issuer/synthetic signed authority.
 // All campaign mutations below cross the stock HTTP guards and native owners.
@@ -11,13 +13,21 @@ let fixture;
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ request }) => {
-  child = spawn(".venv/Scripts/python.exe", ["-m", "tests.integration.operator_browser_server"], {
-    cwd: process.cwd(), windowsHide: true,
+  const root = process.cwd();
+  // Match the OS gate's local venv; a Windows path causes ENOENT on Ubuntu.
+  const python = process.platform === "win32"
+    ? path.join(root, ".venv", "Scripts", "python.exe")
+    : path.join(root, ".venv-wsl", "bin", "python");
+  if (!existsSync(python)) throw new Error(`project_local_python_missing: ${python}`);
+  child = spawn(python, ["-m", "tests.integration.operator_browser_server"], {
+    cwd: root, windowsHide: true, shell: false,
     env: { ...process.env, REDAGENT_OPERATOR_BROWSER_TEST: "plan-only-v1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
   child.stderr.on("data", (value) => { output += value.toString(); });
+  // Await spawn with error rejection before polling; ENOENT otherwise escapes setup.
+  await once(child, "spawn");
   await expect(async () => {
     if (child.exitCode !== null) throw new Error(`Owned test API exited: ${output}`);
     const response = await request.get(`${backend}/__test_fixture__`);
@@ -28,9 +38,11 @@ test.beforeAll(async ({ request }) => {
 });
 
 test.afterAll(async ({ request }) => {
-  if (child?.exitCode === null) {
+  if (child?.pid && child.exitCode === null) {
+    // Subscribe before stop: the child can exit before the HTTP response resolves.
+    const exited = once(child, "exit");
     await request.post(`${backend}/__test_fixture__/stop`);
-    await once(child, "exit");
+    await exited;
   }
 });
 
