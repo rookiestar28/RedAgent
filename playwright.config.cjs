@@ -1,4 +1,5 @@
-const { defineConfig } = require("@playwright/test");
+// CRITICAL: backend validation reads this config before npm ci. A runtime
+// Playwright import would hide port denials behind MODULE_NOT_FOUND in cold CI.
 
 const requestedPort = process.env.REDAGENT_E2E_PORT ?? "4173";
 if (!/^\d{4,5}$/.test(requestedPort) || Number(requestedPort) < 1024 || Number(requestedPort) > 65535) {
@@ -9,7 +10,8 @@ if (!/^\d{4,5}$/.test(requestedPort) || Number(requestedPort) < 1024 || Number(r
 const e2ePort = Number(requestedPort);
 const e2eUrl = `http://127.0.0.1:${e2ePort}`;
 
-module.exports = defineConfig({
+/** @type {import('@playwright/test').PlaywrightTestConfig} */
+module.exports = {
   testDir: "tests/e2e",
   timeout: 30_000,
   use: {
@@ -23,4 +25,4 @@ module.exports = defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 30_000
   }
-});
+};

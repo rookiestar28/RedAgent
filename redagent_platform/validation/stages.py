@@ -416,13 +416,26 @@ class StageRunner:
     def _drain_stream(stream: io.BufferedReader | None, destination: bytearray) -> None:
         if stream is None:
             return
+        marker = b"... diagnostic capture truncated ...\n"
+        retained = 65536 - len(marker)
+        head_budget = retained // 2
+        tail_budget = retained - head_budget
         while True:
-            chunk = stream.read(8192)
-            if not chunk:
+            line = stream.readline(32769)
+            if not line:
                 return
-            remaining = 65536 - len(destination)
-            if remaining > 0:
-                destination.extend(chunk[:remaining])
+            # CRITICAL: capture only complete lines. A byte-cut tail can retain
+            # a credential fragment after discarding its assignment/header label.
+            if len(line) > 32768:
+                while line and not line.endswith(b"\n"):
+                    line = stream.readline(32769)
+                line = marker
+            destination.extend(line)
+            if len(destination) > 65536:
+                head_end = destination.rfind(b"\n", 0, head_budget) + 1
+                tail_start = destination.find(b"\n", len(destination) - tail_budget)
+                tail = destination[tail_start + 1:] if tail_start >= 0 else bytearray()
+                destination[:] = destination[:head_end] + marker + tail
 
     @staticmethod
     def _create_windows_kill_job() -> int | None:
@@ -655,7 +668,9 @@ class StageRunner:
         return False
 
     def _redact_diagnostic(self, value: str) -> str:
-        bounded = value[:4096]
+        # CRITICAL: redact before excerpting. Cutting first can expose a partial
+        # credential and discard the terminal test failure behind progress output.
+        bounded = value
         root_values = {
             str(self._repository_root),
             str(self._repository_root).replace("\\", "/"),
@@ -679,7 +694,13 @@ class StageRunner:
             r"\1<redacted>",
             bounded,
         )
-        return bounded.strip()
+        bounded = bounded.strip()
+        if len(bounded) > 4096:
+            marker = "\n... diagnostic truncated; retained head and tail ...\n"
+            retained = 4096 - len(marker)
+            head_size = retained // 2
+            return bounded[:head_size] + marker + bounded[-(retained - head_size):]
+        return bounded
 
 
 def load_stage_registry(path: Path) -> StageRegistry:

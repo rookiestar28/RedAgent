@@ -491,6 +491,51 @@ def test_runner_redacts_common_assignment_json_cloud_and_connection_credentials(
         assert secret not in diagnostic
 
 
+# Keep payloads out of case IDs; Windows caps PYTEST_CURRENT_TEST at 32767 characters.
+@pytest.mark.parametrize("progress", (b"x" * 100_000, b"progress-line\n" * 10_000), ids=("oversized-line", "many-lines"))
+def test_stream_capture_retains_bounded_head_and_terminal_summary(progress: bytes) -> None:
+    buffer = bytearray()
+    StageRunner._drain_stream(io.BytesIO(b"diagnostic-head\n" + progress + b"\nterminal-failure-summary"), buffer)
+    assert len(buffer) <= 65536
+    assert buffer.startswith(b"diagnostic-head\n")
+    assert buffer.endswith(b"terminal-failure-summary")
+    assert b"truncated" in buffer
+
+
+def test_stream_cut_cannot_expose_unlabelled_credential_fragment() -> None:
+    buffer = bytearray()
+    stream = io.BytesIO(b"progress\n" * 9000 + b"api_token=" + b"synthetic-fragment-" * 6000 + b"\nterminal-summary")
+    StageRunner._drain_stream(stream, buffer)
+    diagnostic = StageRunner(ROOT, {})._redact_diagnostic(buffer.decode())
+    assert "synthetic-fragment" not in diagnostic
+    assert "terminal-summary" in diagnostic
+    assert len(buffer) <= 65536
+
+
+def test_diagnostic_redacts_before_preserving_bounded_head_and_tail() -> None:
+    runner = StageRunner(ROOT, inherited_environment={"PATH": "bounded"})
+    sensitive = "synthetic-sensitive-" * 400
+    text = "diagnostic-head\n" + "x" * 3000 + " api_token=" + sensitive + "\n" + "y" * 20_000 + "\nterminal-failure-summary"
+    diagnostic = runner._redact_diagnostic(text)
+    assert len(diagnostic) <= 4096
+    assert diagnostic.startswith("diagnostic-head")
+    assert diagnostic.endswith("terminal-failure-summary")
+    assert "truncated" in diagnostic
+    assert "synthetic-sensitive" not in diagnostic
+
+
+def test_failed_stage_preserves_summary_after_verbose_progress(capsys: pytest.CaptureFixture[str]) -> None:
+    code = "import sys; print('progress-head'); print('x'*100000); print('terminal-failure-summary'); sys.exit(1)"
+    stage = Stage(id="verbose-failure", argv=("python", "-c", code), gates=("G1",), timeout_seconds=30)
+    result = StageRunner(ROOT, inherited_environment={"PATH": "bounded"}).run(stage)
+    diagnostic = capsys.readouterr().err
+    assert result.status == "failed"
+    assert "progress-head" in diagnostic
+    assert "terminal-failure-summary" in diagnostic
+    assert "truncated" in diagnostic
+    assert len(diagnostic) <= 4200
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows suspended creation and Job assignment path")
 def test_runner_does_not_execute_child_before_successful_job_assignment(
     tmp_path: Path,
@@ -564,4 +609,6 @@ def test_runner_stream_capture_is_memory_bounded() -> None:
 
     StageRunner._drain_stream(io.BytesIO(b"x" * 200_000), destination)
 
-    assert len(destination) == 65_536
+    assert 0 < len(destination) <= 65_536
+    assert b"truncated" in destination
+    assert b"x" not in destination

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 
@@ -57,6 +58,74 @@ def _git(repo: Path, *arguments: str) -> str:
         text=True,
     )
     return completed.stdout.strip()
+
+
+def test_public_checkout_matches_reviewed_residual_inventory() -> None:
+    # CRITICAL: helper-only tests miss stale inventory on otherwise green full gates.
+    counts = VALIDATOR.validate(check_commit_message=False)
+    assert all(count >= 0 for count in counts.values())
+
+
+@pytest.fixture
+def curated_public_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    repo = tmp_path / "curated-public-source"
+    repo.mkdir()
+    _git(repo, "init", "--quiet")
+    _git(repo, "config", "user.name", "Public Inventory Test")
+    _git(repo, "config", "user.email", "inventory@example.invalid")
+    source = repo / "config" / "compat-runtime.json"
+    source.parent.mkdir()
+    source.write_text(json.dumps({"identifier": "r" + "999"}) + "\n", encoding="utf-8")
+    _git(repo, "add", "--", "config/compat-runtime.json")
+    _git(repo, "commit", "--quiet", "-m", "public compatibility fixture")
+    manifest = repo / "config" / "public-release-residuals.json"
+    monkeypatch.setattr(VALIDATOR, "ROOT", repo)
+    monkeypatch.setattr(VALIDATOR, "MANIFEST", manifest)
+    monkeypatch.setattr(VALIDATOR, "MANIFEST_RELATIVE", manifest.relative_to(repo).as_posix())
+    observations = VALIDATOR.collect_observations()
+    payload = {"schema": "redagent.public-release-residuals/v1"}
+    payload.update({section: [{**row, "reason": "public compatibility fixture"} for row in rows] for section, rows in observations.items()})
+    manifest.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    return repo
+
+
+def test_curated_inventory_accepts_exact_public_bytes(curated_public_repo: Path) -> None:
+    assert VALIDATOR.validate(check_commit_message=True)["allowed_content_residuals"] == 1
+
+
+@pytest.mark.parametrize("drift", ("addition", "count", "hash", "missing", "reason", "private-path", "private-content"))
+def test_curated_inventory_rejects_unreviewed_drift(curated_public_repo: Path, drift: str) -> None:
+    repo = curated_public_repo
+    source = repo / "config" / "compat-runtime.json"
+    manifest = VALIDATOR.MANIFEST
+    if drift == "addition":
+        (repo / "unreviewed.txt").write_text("r" + "998\n", encoding="utf-8")
+    elif drift == "count":
+        source.write_text(json.dumps({"identifier": "r" + "999", "duplicate": "r" + "999"}), encoding="utf-8")
+    elif drift == "hash":
+        source.write_text(source.read_text(encoding="utf-8") + " ", encoding="utf-8")
+    elif drift in {"missing", "reason"}:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        if drift == "missing":
+            payload["allowed_content_residuals"] = []
+        else:
+            payload["allowed_content_residuals"][0]["reason"] = ""
+        manifest.write_text(json.dumps(payload), encoding="utf-8")
+    elif drift == "private-path":
+        (repo / ("ROA" + "DMAP.md")).write_text("private fixture", encoding="utf-8")
+    else:
+        source.write_text("private path /" + "ROA" + "DMAP.md", encoding="utf-8")
+    expected = {
+        "addition": "public_residual_inventory_drift",
+        "count": "public_residual_binding_drift",
+        "hash": "public_residual_binding_drift",
+        "missing": "public_residual_inventory_drift",
+        "reason": "public_residual_binding_drift",
+        "private-path": "forbidden_public_path",
+        "private-content": "forbidden_public_content",
+    }[drift]
+    with pytest.raises(VALIDATOR.PublicReleaseValidationError, match=expected):
+        VALIDATOR.validate(check_commit_message=False)
 
 
 def test_public_residual_bytes_accept_only_head_equivalent_utf8_crlf(tmp_path: Path) -> None:
