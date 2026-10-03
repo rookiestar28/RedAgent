@@ -23,6 +23,7 @@ import httpx
 import pytest
 from sqlalchemy import func, select, text, update
 from temporalio.client import Client
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.worker import Replayer, Worker
 
 from redagent_platform.campaign_service.application_contracts import ApplicationPlanInvalid, AutonomousCampaignMode
@@ -370,6 +371,7 @@ async def _execute(prepared, capability, backend, lineage, client, policy, *, st
         activities._state = stopper
     queue = "owned-child-" + suffix
     handle = None
+    bridge_handle = None
     async with Worker(client, task_queue=queue, workflows=[AutonomousCampaignStartBridgeWorkflow, CampaignDagExecutionWorkflow],
                           activities=[activities.reconcile, activities.dispatch, activities.contain]):
         try:
@@ -393,6 +395,8 @@ async def _execute(prepared, capability, backend, lineage, client, policy, *, st
             bridge = PostgresAutonomousCampaignStartBridgeRelayRepository(prepared.sessions, tenant_id=prepared.tenant,
                 actor_user_id=prepared.command.actor_user_id, correlation_prefix="owned-child-bridge", child_lineage_verifier=lineage)
             claim = (await bridge.claim_admission_start_bridges(claim_owner="owned-child-bridge", now=datetime.now(timezone.utc), lease_seconds=30, limit=1))[0]
+            assert admitted.workflow_id is not None
+            bridge_handle = client.get_workflow_handle(admitted.workflow_id)
             await AutonomousCampaignStartBridgeRelay(repository=bridge,
                 gateway=AutonomousCampaignStartBridgeTemporalGateway(client, task_queue=queue)).deliver(claim, now=datetime.now(timezone.utc))
             relay = PostgresDagWorkflowRelayRepository(prepared.sessions, tenant_id=prepared.tenant,
@@ -426,16 +430,31 @@ async def _execute(prepared, capability, backend, lineage, client, policy, *, st
             assert result.state is expected, json.dumps({"state": result.state.value, "dispatch_failures": dispatcher.failures})
             history = await handle.fetch_history()
         finally:
-            if handle is not None:
-                await _execution_diagnostics(prepared, admitted.execution_run_id)
-            if stopper is not None:
-                stopper.release.set()
-            if handle is not None:
-                description = await handle.describe()
-                if description.status.name == "RUNNING":
-                    await handle.signal("stop", DagStopSignalV1(DAG_EXECUTION_SCHEMA_VERSION, "owned-child-final-cleanup",
-                        prepared.command.actor_user_id, hashlib.sha256(b"owned-child-final-cleanup").hexdigest()))
-                    await asyncio.wait_for(handle.result(), timeout=120)
+            try:
+                if handle is not None:
+                    await _execution_diagnostics(prepared, admitted.execution_run_id)
+                if stopper is not None:
+                    stopper.release.set()
+                if handle is not None:
+                    description = await handle.describe()
+                    if description.status.name == "RUNNING":
+                        await handle.signal("stop", DagStopSignalV1(DAG_EXECUTION_SCHEMA_VERSION, "owned-child-final-cleanup",
+                            prepared.command.actor_user_id, hashlib.sha256(b"owned-child-final-cleanup").hexdigest()))
+                        await asyncio.wait_for(handle.result(), timeout=120)
+            finally:
+                # CRITICAL: worker shutdown never closes the inert admission bridge. Pin and close
+                # only this fixture's exact run, or disposable DB removal leaves a running Workflow.
+                if bridge_handle is not None:
+                    try:
+                        description = await bridge_handle.describe()
+                    except RPCError as error:
+                        if error.status is not RPCStatusCode.NOT_FOUND:
+                            raise
+                    else:
+                        exact_bridge = client.get_workflow_handle(bridge_handle.id, run_id=description.run_id)
+                        if description.status.name == "RUNNING":
+                            await exact_bridge.terminate(reason="Owned fixture teardown: inert admission bridge")
+                        assert (await exact_bridge.describe()).status.name != "RUNNING"
     await Replayer(workflows=[CampaignDagExecutionWorkflow]).replay_workflow(history)
     return admitted, history
 
