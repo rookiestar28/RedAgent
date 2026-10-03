@@ -942,14 +942,14 @@
       "count": 26,
       "path": "frontend/cli/compat_124-study.test.ts",
       "reason": "compatibility contract identifier",
-      "sha256": "e60b442b683f25f5514872b153911e0f22e42b37c30dfa88721c23776d07d5bb",
+      "sha256": "4bd4a6ecdd730de56044022756e5f92e0b635ec5a1a26ccfbfed2d95b85d6d41",
       "token": "R124"
     },
     {
       "count": 13,
       "path": "frontend/cli/compat_124-study.test.ts",
       "reason": "compatibility contract identifier",
-      "sha256": "e60b442b683f25f5514872b153911e0f22e42b37c30dfa88721c23776d07d5bb",
+      "sha256": "4bd4a6ecdd730de56044022756e5f92e0b635ec5a1a26ccfbfed2d95b85d6d41",
       "token": "r124"
     },
     {

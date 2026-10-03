@@ -178,49 +178,54 @@ describe("compat_124 representative study CLI boundary", () => {
     },
   );
 
-  it("allows only the exact untracked evidence and rejects a source change after template generation", async () => {
-    const repository = await createStudyTestRepository();
-    const output = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    try {
-      const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
-        cwd: repository,
-        windowsHide: true,
-      });
-      const evidence = buildR124RepresentativeStudyTemplate(
-        stdout.trim(),
-        "2026-08-25T00:00:00.000Z",
-      );
-      evidence.participants.forEach((participant) => { participant.experienceConfirmed = true; });
-      evidence.outcomes.forEach((outcome) => {
-        outcome.taskSuccess = true;
-        outcome.completedUnassisted = true;
-        outcome.unsafeInterpretation = false;
-        outcome.topLevelActivations = 1;
-        outcome.destinationActivations = 2;
-      });
-      await mkdir(join(repository, ".local", "validation"), { recursive: true });
-      await writeFile(
-        join(repository, ".local", "validation", "results.json"),
-        `${JSON.stringify(evidence)}\n`,
-        "utf8",
-      );
-      await expect(runR124StudyCli([".local/validation/results.json"], repository)).resolves.toBe(0);
-
-      await writeFile(join(repository, "other-untracked.txt"), "unexpected\n", "utf8");
-      await expect(runR124StudyCli([".local/validation/results.json"], repository))
-        .rejects.toThrow("r124_study_workspace_dirty");
-      await rm(join(repository, "other-untracked.txt"), { force: true });
-
-      await writeFile(join(repository, "tracked.txt"), "next revision\n", "utf8");
-      await execFileAsync("git", ["add", "tracked.txt"], { cwd: repository, windowsHide: true });
-      await execFileAsync("git", [
-        "-c", "user.name=compat_124 Test", "-c", "user.email=compat_124@example.invalid",
-        "commit", "--quiet", "-m", "next revision",
-      ], { cwd: repository, windowsHide: true });
-      await expect(runR124StudyCli([".local/validation/results.json"], repository)).resolves.toBe(1);
-    } finally {
-      output.mockRestore();
-      await removeStudyTestRepository(repository);
-    }
-  });
+  // Keep native Git contracts separate; combining them can exhaust the 5s Windows budget.
+  it.each(["exact-evidence", "other-untracked", "changed-source"] as const)(
+    "enforces the %s native Git evidence contract",
+    async (scenario) => {
+      const repository = await createStudyTestRepository();
+      const output = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+      try {
+        const { stdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+          cwd: repository,
+          windowsHide: true,
+        });
+        const evidence = buildR124RepresentativeStudyTemplate(
+          stdout.trim(),
+          "2026-08-25T00:00:00.000Z",
+        );
+        evidence.participants.forEach((participant) => { participant.experienceConfirmed = true; });
+        evidence.outcomes.forEach((outcome) => {
+          outcome.taskSuccess = true;
+          outcome.completedUnassisted = true;
+          outcome.unsafeInterpretation = false;
+          outcome.topLevelActivations = 1;
+          outcome.destinationActivations = 2;
+        });
+        await mkdir(join(repository, ".local", "validation"), { recursive: true });
+        await writeFile(
+          join(repository, ".local", "validation", "results.json"),
+          `${JSON.stringify(evidence)}\n`,
+          "utf8",
+        );
+        if (scenario === "exact-evidence") {
+          await expect(runR124StudyCli([".local/validation/results.json"], repository)).resolves.toBe(0);
+        } else if (scenario === "other-untracked") {
+          await writeFile(join(repository, "other-untracked.txt"), "unexpected\n", "utf8");
+          await expect(runR124StudyCli([".local/validation/results.json"], repository))
+            .rejects.toThrow("r124_study_workspace_dirty");
+        } else {
+          await writeFile(join(repository, "tracked.txt"), "next revision\n", "utf8");
+          await execFileAsync("git", ["add", "tracked.txt"], { cwd: repository, windowsHide: true });
+          await execFileAsync("git", [
+            "-c", "user.name=compat_124 Test", "-c", "user.email=compat_124@example.invalid",
+            "commit", "--quiet", "-m", "next revision",
+          ], { cwd: repository, windowsHide: true });
+          await expect(runR124StudyCli([".local/validation/results.json"], repository)).resolves.toBe(1);
+        }
+      } finally {
+        output.mockRestore();
+        await removeStudyTestRepository(repository);
+      }
+    },
+  );
 });
