@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -14,10 +15,21 @@ from redagent_platform.api.app import create_app
 
 
 WORKSPACE = Path(__file__).resolve().parents[2]
-EXPECTED_ROUTE_COUNT = 143
+EXPECTED_ROUTE_COUNT = 149
 EXPECTED_ROUTE_MANIFEST_SHA256 = (
+    "cb9100a20b4b5ce488effe543c59e033b402af04e4ea5b4bf049cb978b6e6ff6"  # pragma: allowlist secret
+)
+PRE_OPERATOR_ROUTE_MANIFEST_SHA256 = (
     "75288256548652828b1401063abf8502889fb0ea251b5ff2c9064f4a1da628c8"  # pragma: allowlist secret
 )
+OPERATOR_ROUTE_IDS = {
+    "get_autonomous_campaign_operator_availability",
+    "get_autonomous_campaign_operator_status",
+    "create_autonomous_campaign_operator_intent",
+    "prepare_autonomous_campaign_operator_plan",
+    "stop_autonomous_campaign_operator",
+    "revoke_autonomous_campaign_operator",
+}
 EXPECTED_SCHEMA_EXPORT_COUNT = 337
 EXPECTED_SCHEMA_EXPORT_SHA256 = (
     "29feb59872549e4dd93c71c108d35aa353b975f66e7eabf4b7e6ba1035f5a807"  # pragma: allowlist secret
@@ -109,6 +121,20 @@ def test_r131_composed_route_manifest_is_behaviorally_frozen() -> None:
 
     assert len(manifest) == EXPECTED_ROUTE_COUNT
     assert hashlib.sha256(encoded).hexdigest() == EXPECTED_ROUTE_MANIFEST_SHA256
+
+    legacy = deepcopy([item for item in manifest if item["operation_id"] not in OPERATOR_ROUTE_IDS])
+    assert len(legacy) == 143
+    assert {
+        item["operation_id"] for item in manifest if item["operation_id"] in OPERATOR_ROUTE_IDS
+    } == OPERATOR_ROUTE_IDS
+    catalog = next(item for item in legacy if item["operation_id"] == "list_r124_campaigns")
+    assert catalog["methods"] == ["GET"]
+    assert catalog["dependencies"][0]["closure"]["safety_preserving"] is True
+    # IMPORTANT: only the read-only catalog gains disabled-safe recovery access. Preserve every
+    # other predecessor route/guard field; this normalization must never cover a mutation route.
+    catalog["dependencies"][0]["closure"]["safety_preserving"] = False
+    legacy_encoded = json.dumps(legacy, sort_keys=True, separators=(",", ":"), default=str).encode()
+    assert hashlib.sha256(legacy_encoded).hexdigest() == PRE_OPERATOR_ROUTE_MANIFEST_SHA256
 
 
 def test_r131_app_factory_contains_no_inline_route_body() -> None:
