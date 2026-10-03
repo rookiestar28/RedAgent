@@ -19,6 +19,7 @@ from redagent_platform.campaign_service.approval_contracts import (
 from redagent_platform.campaign_service.operator_contracts import (
     AutonomousCampaignRootPlanSource, AutonomousCampaignRootPlanMaterialV1,
     AutonomousCampaignOperatorRecoveryV1, AutonomousCampaignOperatorStopCommitV1,
+    AutonomousCampaignOperatorNativeOwner, AutonomousCampaignOperatorStopGateway,
 )
 from redagent_platform.campaign_service.planning.contracts import (
     ValidationLimitsV1, ValidationResult, canonical_planning_sha256,
@@ -39,7 +40,8 @@ class AutonomousCampaignOperatorService:
         self, selections: CampaignCoreService, application: AutonomousCampaignApplicationService,
         *, root_plan_source: AutonomousCampaignRootPlanSource | None = None,
         validation_limits: ValidationLimitsV1 | None = None,
-        native_owner: object | None = None, stop_gateway: object | None = None,
+        native_owner: AutonomousCampaignOperatorNativeOwner | None = None,
+        stop_gateway: AutonomousCampaignOperatorStopGateway | None = None,
         create_enabled: bool = True,
     ) -> None:
         if not isinstance(selections, CampaignCoreService) or not isinstance(application, AutonomousCampaignApplicationService):
@@ -130,6 +132,9 @@ class AutonomousCampaignOperatorService:
         if action == "revoke":
             mutation = await _await_repository(self._native_owner.request_revoke(command))
         else:
+            gateway = self._stop_gateway
+            if gateway is None:
+                raise ApplicationDependencyUnavailable("operator_recovery_owner_unavailable")
             commit = await _await_repository(self._native_owner.request_stop(command))
             if not isinstance(commit, AutonomousCampaignOperatorStopCommitV1):
                 raise ApplicationDependencyUnavailable("operator_stop_commit_invalid")
@@ -139,7 +144,7 @@ class AutonomousCampaignOperatorService:
                 # CRITICAL: commit the durable pre-I/O stop flag before signaling. Unknown delivery
                 # must leave stop visible and must never imply containment or complete cleanup.
                 try:
-                    await self._stop_gateway.stop_campaign_dag(commit.workflow_id, DagStopSignalV1(
+                    await gateway.stop_campaign_dag(commit.workflow_id, DagStopSignalV1(
                         DAG_EXECUTION_SCHEMA_VERSION, commit.signal_id, principal_id, command.reason_sha256,
                     ), run_id=commit.workflow_run_id)
                     signal_status = "acknowledged"

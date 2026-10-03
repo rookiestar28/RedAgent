@@ -13,6 +13,7 @@ from redagent_platform.campaign_service.application_contracts import (
 from redagent_platform.campaign_service.approval_contracts import AutonomousCampaignApprovalContextV1
 from redagent_platform.campaign_service.planning.contracts import PlanningDomainV1, WorldStateV1, canonical_planning_sha256
 from redagent_platform.campaign_service.planning.search_contracts import PlannerSearchLimitsV1
+from redagent_platform.campaign_service.dag_execution_contracts import DagStopSignalV1
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,3 +93,23 @@ class AutonomousCampaignOperatorStopCommitV1:
             not isinstance(self.workflow_run_id, str) or not 1 <= len(self.workflow_run_id) <= 100
         ):
             raise ValueError("operator_stop_workflow_run_invalid")
+
+
+class AutonomousCampaignOperatorNativeOwner(Protocol):
+    async def read_status(
+        self, *, tenant_id: str, campaign_id: str, principal_id: str, now: datetime,
+    ) -> dict[str, object]: ...
+
+    async def request_revoke(
+        self, command: AutonomousCampaignOperatorRecoveryV1,
+    ) -> AutonomousCampaignMutationResultV1: ...
+
+    async def request_stop(
+        self, command: AutonomousCampaignOperatorRecoveryV1,
+    ) -> AutonomousCampaignOperatorStopCommitV1: ...
+
+
+class AutonomousCampaignOperatorStopGateway(Protocol):
+    async def stop_campaign_dag(
+        self, workflow_id: str, request: DagStopSignalV1, *, run_id: str | None = None,
+    ) -> None: ...

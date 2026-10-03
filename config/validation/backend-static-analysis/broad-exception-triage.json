@@ -14,7 +14,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-32b55780-c08b8b7d-719998e5-7460f5f0-43f9c18e-de774b36-d83df747-46e41c3e",
-      "line": 594,
+      "line": 631,
       "occurrence": 1,
       "path": "redagent_platform/campaign_service/application_service.py",
       "rationale": "The application boundary preserves typed domain outcomes and translates any otherwise-unclassified repository failure to the closed dependency-unavailable outcome."
@@ -842,7 +842,7 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-b1ce3612-818dae53-525199d1-7a2f320b-1564930d-93e62ce1-05bf74f2-d8e7a1d0",
-      "line": 57,
+      "line": 72,
       "occurrence": 1,
       "path": "redagent_platform/orchestration/dag_execution_gateway.py",
       "rationale": "A start RPC failure preserves an unknown outcome for query-only convergence; query failures remain unavailable except exact SDK NOT_FOUND."
@@ -851,10 +851,19 @@
       "classification": "must_reraise",
       "exception": "Exception",
       "fingerprint": "ast-v1-9bf953ce-6aed1455-9ea85169-836c6574-b148e03b-578f03b0-a65c922b-d81a973d",
-      "line": 77,
+      "line": 92,
       "occurrence": 1,
       "path": "redagent_platform/orchestration/dag_execution_gateway.py",
       "rationale": "A start RPC failure preserves an unknown outcome for query-only convergence; query failures remain unavailable except exact SDK NOT_FOUND."
+    },
+    {
+      "classification": "must_reraise",
+      "exception": "Exception",
+      "fingerprint": "ast-v1-e9ed00ab-e0a6f06f-4b896116-da5d9c2f-adce2f14-090ad3c6-a64657c6-5b500ec8",
+      "line": 48,
+      "occurrence": 1,
+      "path": "redagent_platform/orchestration/dag_execution_gateway.py",
+      "rationale": "After the native durable stop flag commits, any signal-delivery failure is translated to a typed unknown outcome; acknowledgement never proves cleanup and retry never resends the original stop."
     },
     {
       "classification": "legitimate_cleanup",

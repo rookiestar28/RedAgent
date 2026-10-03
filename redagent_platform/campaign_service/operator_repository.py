@@ -70,6 +70,10 @@ class PostgresAutonomousCampaignOperatorOwner:
             replay = await _read_idempotency_payload(session, tenant_id=command.tenant_id, operation=_STOP_OPERATION,
                                                     idempotency_key=command.idempotency_key, request_sha256=command.request_sha256)
             if replay is not None:
+                # CRITICAL: persisted replay must remain an object; malformed stored JSON cannot
+                # become a transport error or an unverified acknowledgement of the original stop.
+                if not isinstance(replay, dict):
+                    raise ApplicationBindingConflict("operator_stop_replay_binding_invalid")
                 mutation = _result_from_payload(replay["mutation"], replayed=True)
                 if mutation.application.tenant_id != command.tenant_id or mutation.application.campaign_id != command.campaign_id or mutation.application.aggregate_revision != command.expected_revision + 1:
                     raise ApplicationBindingConflict("operator_stop_replay_binding_invalid")
@@ -126,7 +130,7 @@ class PostgresAutonomousCampaignOperatorOwner:
             await session.execute(update(applications).where(
                 applications.c.tenant_id == command.tenant_id, applications.c.id == command.campaign_id,
             ).values(aggregate_revision=successor.aggregate_revision, version=applications.c.version + 1, updated_at=command.occurred_at))
-            event_payload = {"reason_sha256": command.reason_sha256, "execution_run_id": str(run["id"]), "signal_id": signal_id}
+            event_payload: dict[str, object] = {"reason_sha256": command.reason_sha256, "execution_run_id": str(run["id"]), "signal_id": signal_id}
             audit_id, event_id = await _record_lifecycle_event(
                 session, state=successor, operation=_STOP_OPERATION, correlation_id=command.correlation_id,
                 actor_user_id=command.actor_user_id, request_sha256=command.request_sha256, event_type=_STOP_EVENT,
@@ -169,7 +173,7 @@ class PostgresAutonomousCampaignOperatorOwner:
                 preview_row["preview_payload"], str(preview_row["preview_sha256"]),
             )
             if preview is not None and (
-                preview.tenant_id != tenant_id or preview.campaign_id != campaign_id
+                preview_row is None or preview.tenant_id != tenant_id or preview.campaign_id != campaign_id
                 or preview.preview_id != preview_row["id"]
                 or preview.application_revision != int(preview_row["application_revision"])
                 or preview.application_revision > state.aggregate_revision
@@ -186,7 +190,8 @@ class PostgresAutonomousCampaignOperatorOwner:
                 approval_row["receipt_payload"], str(approval_row["receipt_sha256"]),
             )
             if approval is not None and (
-                approval.preview_sha256 != preview.preview_sha256 or approval.preview_id != preview.preview_id
+                preview is None or approval_row is None
+                or approval.preview_sha256 != preview.preview_sha256 or approval.preview_id != preview.preview_id
                 or approval.tenant_id != tenant_id or approval.campaign_id != campaign_id
                 or approval.application_revision != preview.application_revision + 1
                 or approval.application_revision > state.aggregate_revision
@@ -232,7 +237,7 @@ class PostgresAutonomousCampaignOperatorOwner:
                     "lineage_sha256": str(child["lineage_sha256"]),
                     "preview_id": str(child["preview_id"]),
                 }
-                if start is not None and preview.child_lineage_sha256 is not None:
+                if start is not None and preview is not None and preview.child_lineage_sha256 is not None:
                     settlement = await _exact(session, "campaign_child_capacity_settlements", tenant_id, str(child["settlement_id"]))
                     parent = await _exact(session, "campaign_execution_runs", tenant_id, str(child["parent_execution_run_id"]))
                     if settlement is None or parent is None:

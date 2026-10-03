@@ -172,6 +172,16 @@ async def _stop_scenario():
         with pytest.raises(ApplicationTransitionConflict, match="operator_run_terminal"):
             await owner.request_stop(replace(command, expected_revision=command.expected_revision + 1,
                                             idempotency_key="new-terminal-stop"))
+        async with prepared.sessions() as session, session.begin():
+            await _set_tenant(session, prepared.tenant)
+            records = metadata.tables["idempotency_records"]
+            await session.execute(update(records).where(
+                records.c.tenant_id == prepared.tenant,
+                records.c.operation == "autonomous_campaign.operator.stop.v1",
+                records.c.idempotency_key == command.idempotency_key,
+            ).values(response_body=[]))
+        with pytest.raises(ApplicationBindingConflict, match="operator_stop_replay_binding_invalid"):
+            await owner.request_stop(command)
     finally:
         await prepared.engine.dispose()
 

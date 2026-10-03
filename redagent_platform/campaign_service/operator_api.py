@@ -151,20 +151,21 @@ def register_autonomous_campaign_operator_routes(
         guard: RequestGuard = Depends(require_guard("campaign:read", safety_preserving=True)),
     ) -> object:
         del guard
-        service = getattr(request.app.state, "autonomous_campaign_operator_service", None)
-        configured = isinstance(service, AutonomousCampaignOperatorService)
+        raw_service = getattr(request.app.state, "autonomous_campaign_operator_service", None)
+        service = raw_service if isinstance(raw_service, AutonomousCampaignOperatorService) else None
+        configured = service is not None
         core = getattr(request.app.state, "r124_campaign_core_service", None)
         response.headers["Cache-Control"] = "no-store"
         return {"data": {
             "canonical_configured": configured,
-            "create_available": configured and service.creation_available,
-            "preparation_available": configured and service.preparation_available,
-            "status_available": configured and service.status_available,
-            "stop_available": configured and service.stop_available,
-            "revoke_available": configured and service.revoke_available,
-            "mode": service.mode.value if configured else "disabled",
+            "create_available": service is not None and service.creation_available,
+            "preparation_available": service is not None and service.preparation_available,
+            "status_available": service is not None and service.status_available,
+            "stop_available": service is not None and service.stop_available,
+            "revoke_available": service is not None and service.revoke_available,
+            "mode": service.mode.value if service is not None else "disabled",
             "legacy_available": isinstance(core, CampaignCoreService) and core.creation_enabled,
-            "reason": ("ready" if configured and service.creation_available else
+            "reason": ("ready" if service is not None and service.creation_available else
                        "operator_creation_unavailable" if configured else "operator_owner_not_configured"),
         }}
 

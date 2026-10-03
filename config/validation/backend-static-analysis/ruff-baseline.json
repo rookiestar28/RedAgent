@@ -1590,66 +1590,6 @@
       "count": 13
     },
     {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F821",
-      "message": "Undefined name `import_records`",
-      "count": 3
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F821",
-      "message": "Undefined name `imports`",
-      "count": 6
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F821",
-      "message": "Undefined name `issues`",
-      "count": 6
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F821",
-      "message": "Undefined name `occurrences`",
-      "count": 3
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F821",
-      "message": "Undefined name `retests`",
-      "count": 5
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F841",
-      "message": "Local variable `import_records` is assigned to but never used",
-      "count": 1
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F841",
-      "message": "Local variable `imports` is assigned to but never used",
-      "count": 1
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F841",
-      "message": "Local variable `issues` is assigned to but never used",
-      "count": 1
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F841",
-      "message": "Local variable `occurrences` is assigned to but never used",
-      "count": 1
-    },
-    {
-      "path": "redagent_platform/campaign_service/status.py",
-      "code": "F841",
-      "message": "Local variable `retests` is assigned to but never used",
-      "count": 1
-    },
-    {
       "path": "redagent_platform/cloud_connectors/emulator.py",
       "code": "F401",
       "message": "`dataclasses.field` imported but unused",
