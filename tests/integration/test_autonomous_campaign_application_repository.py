@@ -20,6 +20,7 @@ from redagent_platform.campaign_service.application_contracts import (
     ApplicationIdempotencyConflict,
     ApplicationRevisionConflict,
     AutonomousCampaignLifecycle,
+    AutonomousCampaignNativeRootV1,
     CreateAutonomousCampaignIntentV1,
     RevokeAutonomousCampaignIntentV1,
 )
@@ -45,6 +46,118 @@ def test_r171_concurrent_create_replay_has_one_authoritative_event() -> None:
 
 def test_r171_populated_downgrade_guard_is_rls_independent_for_non_bypass_owner() -> None:
     asyncio.run(_non_bypass_owner_downgrade_guard_scenario())
+
+
+def test_operator_native_root_is_atomic_effect_free_and_concurrently_replayable() -> None:
+    asyncio.run(_operator_native_root_scenario())
+
+
+@pytest.mark.parametrize("mutation", ["engagement", "target", "roe", "inactive"])
+def test_operator_native_root_rejects_current_owner_drift_without_partial_intent(mutation: str) -> None:
+    asyncio.run(_operator_native_root_scenario(mutation=mutation))
+
+
+def test_operator_native_root_rolls_back_with_application_audit_failure(monkeypatch) -> None:
+    asyncio.run(_operator_native_root_scenario(monkeypatch=monkeypatch))
+
+
+def test_operator_native_root_replay_inactive_principal_is_denied_inside_native_transaction():
+    asyncio.run(_operator_native_root_scenario(replay_inactive=True))
+
+
+async def _operator_native_root_scenario(*, mutation=None, monkeypatch=None, replay_inactive=False) -> None:
+    from redagent_platform.persistence.repository import ControlPlaneRepository
+
+    engine, sessions = _database()
+    suffix = uuid4().hex
+    tenant = f"tenant-operator-{suffix}"
+    try:
+        actor, engagement, target = await _bootstrap(sessions, tenant=tenant, suffix=suffix)
+        roe_id = f"roe-{suffix}"
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant)
+            await session.execute(insert(metadata.tables["tenant_memberships"]).values(
+                id=f"membership-{suffix}", user_id=actor, tenant_id=tenant,
+                status="inactive" if mutation == "inactive" else "active",
+                generation=1, last_validated_at=NOW, version=1, created_at=NOW, updated_at=NOW,
+            ))
+            owner = ControlPlaneRepository(
+                session, tenant_id=tenant, actor_user_id=actor, correlation_id=f"root-{suffix}",
+            )
+            await owner.create_roe_version(
+                roe_version_id=roe_id, engagement_id=engagement, revision=1,
+                document={"scope": ["owned-loopback"], "active_testing": True},
+                policy_reference_id=f"policy-{suffix}", policy_name="owned-loopback",
+                policy_version="1", idempotency_key=f"roe-{suffix}", occurred_at=NOW,
+            )
+            if mutation != "roe":
+                await owner.approve_roe_version(
+                    roe_version_id=roe_id, approval_id=f"approval-{suffix}",
+                    expected_version=1, idempotency_key=f"approve-{suffix}", occurred_at=NOW,
+                )
+        command = replace(
+            _create_command(tenant=tenant, actor=actor, engagement=engagement, target=target, suffix=suffix),
+            native_root=AutonomousCampaignNativeRootV1(
+                name="Assess HTTP security posture",
+                engagement_revision=2 if mutation == "engagement" else 1,
+                target_revision=2 if mutation == "target" else 1,
+                roe_revision=1,
+            ),
+        )
+        repository = PostgresAutonomousCampaignApplicationRepository(sessions)
+        if monkeypatch is not None:
+            import redagent_platform.campaign_service.application_repository as application_repository
+
+            async def fail_audit(*_args, **_kwargs):
+                raise RuntimeError("operator_audit_failed")
+
+            monkeypatch.setattr(application_repository, "_record_mutation", fail_audit)
+            with pytest.raises(RuntimeError, match="operator_audit_failed"):
+                await repository.create_intent(command)
+        elif mutation is not None:
+            with pytest.raises(ApplicationBindingConflict):
+                await repository.create_intent(command)
+        else:
+            first, second = await asyncio.gather(
+                repository.create_intent(command), repository.create_intent(command),
+            )
+            assert sorted((first.replayed, second.replayed)) == [False, True]
+            assert first.application == second.application
+            with pytest.raises(ApplicationIdempotencyConflict):
+                await repository.create_intent(replace(
+                    command, native_root=replace(command.native_root, name="Verify X-Content-Type-Options"),
+                ))
+            if replay_inactive:
+                async with sessions() as session, session.begin():
+                    await _set_tenant(session, tenant)
+                    memberships = metadata.tables["tenant_memberships"]
+                    await session.execute(update(memberships).where(
+                        memberships.c.tenant_id == tenant, memberships.c.user_id == actor,
+                    ).values(status="inactive"))
+                with pytest.raises(ApplicationBindingConflict, match="operator_principal_inactive"):
+                    await repository.create_intent(command)
+        async with sessions() as session, session.begin():
+            await _set_tenant(session, tenant)
+            expected = 1 if mutation is None and monkeypatch is None else 0
+            campaigns = metadata.tables["campaigns"]
+            root = (await session.execute(select(campaigns).where(
+                campaigns.c.tenant_id == tenant, campaigns.c.id == command.campaign_id,
+            ))).mappings().one_or_none()
+            assert (root is not None) == bool(expected)
+            if root is not None:
+                assert root["roe_version_id"] == roe_id
+                assert root["intent_sha256"] == command.intent_sha256
+                assert root["status"] == "intent_created"
+                assert root["workflow_run_id"] is None
+                assert root["aggregate_sequence"] == 0
+            for table_name in ("autonomous_campaign_applications", "autonomous_campaign_application_events"):
+                assert await _count(session, metadata.tables[table_name], tenant) == expected
+            outbox = metadata.tables["outbox_events"]
+            assert await session.scalar(select(func.count()).select_from(outbox).where(
+                outbox.c.tenant_id == tenant, outbox.c.aggregate_id == command.campaign_id,
+            )) == 0
+    finally:
+        await engine.dispose()
 
 
 async def _lifecycle_scenario() -> None:

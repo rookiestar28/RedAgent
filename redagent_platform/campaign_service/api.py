@@ -154,6 +154,7 @@ class CampaignCoreSummaryData(_StrictModel):
     authority_state: str = Field(min_length=1, max_length=64)
     attention_reason: str | None = Field(default=None, max_length=100)
     aggregate_sequence: int = Field(ge=1)
+    operator_kind: Literal["legacy", "canonical"] = "legacy"
 
 
 class CampaignCoreSummaryPageResponse(_StrictModel):
@@ -652,7 +653,7 @@ def build_campaign_router(
         request: Request,
         limit: int = Query(default=50, ge=1, le=50),
         cursor: str | None = Query(default=None, max_length=200),
-        guard=Depends(require_guard("campaign:read")),
+        guard=Depends(require_guard("campaign:read", safety_preserving=True)),
     ) -> object:
         try:
             return await core_service(request).list_campaigns(

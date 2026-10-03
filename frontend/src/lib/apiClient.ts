@@ -130,6 +130,15 @@ export type R124Attention = components["schemas"]["R124AttentionData"];
 export type R124CampaignAggregate = components["schemas"]["R124CampaignAggregateData"];
 export type R124CampaignInspector = components["schemas"]["R124CampaignInspectorData"];
 export type CampaignOperations = components["schemas"]["CampaignOperationsData"];
+export type AutonomousCampaignAvailability = components["schemas"]["AutonomousCampaignOperatorAvailabilityData"];
+export type AutonomousCampaignIntent = components["schemas"]["AutonomousCampaignIntentData"];
+export type AutonomousCampaignStatus = components["schemas"]["AutonomousCampaignOperatorStatusData"];
+export type AutonomousCampaignPreview = components["schemas"]["AutonomousCampaignPlanPreviewData"];
+export type AutonomousCampaignDecision = components["schemas"]["AutonomousCampaignApprovalDecisionData"];
+export type AutonomousCampaignAdmission = components["schemas"]["AutonomousCampaignAdmissionStartData"];
+export type AutonomousCampaignRecovery = components["schemas"]["AutonomousCampaignOperatorRecoveryData"];
+type AutonomousCampaignApprovalRequest = components["schemas"]["AutonomousCampaignApprovalRequest"];
+type AutonomousCampaignAdmissionRequest = components["schemas"]["AutonomousCampaignAdmissionStartRequest"];
 
 export type PageResult<T> = {
   readonly data: readonly T[];
@@ -1194,6 +1203,67 @@ export function createConsoleClient(options: ClientOptions = {}) {
         params: { header: mutationHeaders("console:r124-campaign-start:1", idempotencyKey) },
       });
       return unwrap(result).data;
+    },
+
+    async getAutonomousCampaignAvailability(): Promise<AutonomousCampaignAvailability> {
+      return unwrap(await client.GET("/api/v1/campaign-core/operator-availability")).data;
+    },
+
+    async createAutonomousCampaignIntent(payload: R124CampaignStart, idempotencyKey: string): Promise<AutonomousCampaignIntent> {
+      return unwrap(await client.POST("/api/v1/autonomous-campaigns", {
+        body: payload, params: { header: mutationHeaders("console:campaign-intent:1", idempotencyKey) },
+      })).data;
+    },
+
+    async getAutonomousCampaignStatus(campaignId: string): Promise<AutonomousCampaignStatus> {
+      return unwrap(await client.GET("/api/v1/autonomous-campaigns/{campaign_id}", {
+        params: { path: { campaign_id: campaignId } },
+      })).data;
+    },
+
+    async prepareAutonomousCampaignPlan(campaignId: string, expectedRevision: number, etag: string,
+      idempotencyKey: string): Promise<AutonomousCampaignPreview> {
+      return unwrap(await client.POST("/api/v1/autonomous-campaigns/{campaign_id}/prepare-plan", {
+        body: { expected_revision: expectedRevision }, params: { path: { campaign_id: campaignId },
+          header: { ...mutationHeaders("console:campaign-plan:1", idempotencyKey), "If-Match": etag } },
+      })).data;
+    },
+
+    async decideAutonomousCampaignPlan(action: "approve" | "deny", campaignId: string,
+      payload: AutonomousCampaignApprovalRequest, etag: string, idempotencyKey: string): Promise<AutonomousCampaignDecision> {
+      const params = { path: { campaign_id: campaignId },
+        header: { ...mutationHeaders(`console:campaign-${action}:1`, idempotencyKey), "If-Match": etag } };
+      return action === "approve"
+        ? unwrap(await client.POST("/api/v1/autonomous-campaigns/{campaign_id}/plan-approval", { body: payload, params })).data
+        : unwrap(await client.POST("/api/v1/autonomous-campaigns/{campaign_id}/plan-denial", {
+          body: { ...payload, reason_code: "operator_denied" }, params,
+        })).data;
+    },
+
+    async admitAutonomousCampaign(campaignId: string, payload: AutonomousCampaignAdmissionRequest,
+      etag: string, idempotencyKey: string): Promise<AutonomousCampaignAdmission> {
+      return unwrap(await client.POST("/api/v1/autonomous-campaigns/{campaign_id}/admission-start", {
+        body: payload, params: { path: { campaign_id: campaignId },
+          header: { ...mutationHeaders("console:campaign-admission:1", idempotencyKey), "If-Match": etag } },
+      })).data;
+    },
+
+    async prepareAutonomousCampaignChild(campaignId: string, expectedRevision: number, roeVersionId: string,
+      idempotencyKey: string): Promise<AutonomousCampaignPreview> {
+      return unwrap(await client.POST("/api/v1/autonomous-campaigns/{campaign_id}/child-replan", {
+        body: { expected_revision: expectedRevision }, params: { path: { campaign_id: campaignId },
+          header: { ...mutationHeaders("console:campaign-child:1", idempotencyKey), "X-RedAgent-ROE-Version": roeVersionId } },
+      })).data;
+    },
+
+    async recoverAutonomousCampaign(action: "stop" | "revoke", campaignId: string, expectedRevision: number,
+      etag: string, reason: string, idempotencyKey: string): Promise<AutonomousCampaignRecovery> {
+      const params = { path: { campaign_id: campaignId },
+        header: { ...mutationHeaders(`console:campaign-${action}:1`, idempotencyKey), "If-Match": etag } };
+      const body = { expected_revision: expectedRevision, reason };
+      return action === "stop"
+        ? unwrap(await client.POST("/api/v1/autonomous-campaigns/{campaign_id}/stop", { body, params })).data
+        : unwrap(await client.POST("/api/v1/autonomous-campaigns/{campaign_id}/revoke", { body, params })).data;
     },
 
     async listCampaignCoreCampaigns(limit = 50, cursor?: string): Promise<R124CampaignSummaryPage> {

@@ -63,6 +63,7 @@ from redagent_platform.campaign_service.planning.contracts import canonical_plan
 from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.child_lineage import ChildLineageVerifier
 from redagent_platform.campaign_service.child_admission import CanonicalChildAdmissionRepository
+from redagent_platform.campaign_service.operator_scope import assert_operator_scope_current
 
 
 _ADMISSION_START_OPERATION = "autonomous_campaign.admission_start.v1"
@@ -500,6 +501,9 @@ class PostgresAutonomousCampaignAdmissionStartStore:
             .mappings()
             .one_or_none()
         )
+        if application_row is None:
+            raise ApplicationPlanInvalid("admission_start_approval_rows_missing")
+        await assert_operator_scope_current(session, tenant_id=self._command.tenant_id, campaign_id=self._command.campaign_id)
         approval_row = (
             (
                 await session.execute(

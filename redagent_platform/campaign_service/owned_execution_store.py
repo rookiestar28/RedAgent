@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from redagent_platform.campaign_service.application_contracts import (
     is_owned_execution_mode,
+    ApplicationBindingConflict,
     AutonomousCampaignLifecycle,
 )
 from redagent_platform.campaign_service.application_repository import (
@@ -33,6 +34,7 @@ from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.child_lineage import (
     ChildLineageConflict, ChildLineageVerifier, require_current_child_lineage,
 )
+from redagent_platform.campaign_service.operator_scope import assert_operator_scope_current
 
 
 async def assert_owned_execution_current(
@@ -48,6 +50,10 @@ async def assert_owned_execution_current(
     if row is None:
         return
     current = _state_from_row(row)
+    try:
+        await assert_operator_scope_current(session, tenant_id=run["tenant_id"], campaign_id=run["campaign_id"])
+    except ApplicationBindingConflict as exc:
+        raise OwnedExecutionDenied(str(exc)) from exc
     if not enabled or not is_owned_execution_mode(current.mode):
         raise OwnedExecutionDenied("owned_execution_mode_denied")
     if current.lifecycle_state not in {AutonomousCampaignLifecycle.EXECUTION_QUEUED, AutonomousCampaignLifecycle.RUNNING, AutonomousCampaignLifecycle.RECONCILIATION_REQUIRED}:

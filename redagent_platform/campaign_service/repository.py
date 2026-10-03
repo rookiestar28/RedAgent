@@ -380,6 +380,7 @@ async def campaign_core_principal_is_active(
     tenant_id: str,
     principal_id: str,
     now: datetime,
+    lock: bool = False,
 ) -> bool:
     if principal_id.startswith("service:"):
         service_identity_id = principal_id.removeprefix("service:")
@@ -399,7 +400,7 @@ async def campaign_core_principal_is_active(
         return row is not None
     users = metadata.tables["users"]
     memberships = metadata.tables["tenant_memberships"]
-    row = await session.scalar(
+    statement = (
         select(users.c.id)
         .join(
             memberships,
@@ -417,6 +418,9 @@ async def campaign_core_principal_is_active(
         )
         .limit(1)
     )
+    if lock:
+        statement = statement.with_for_update(read=True, of=memberships)
+    row = await session.scalar(statement)
     return row is not None
 
 

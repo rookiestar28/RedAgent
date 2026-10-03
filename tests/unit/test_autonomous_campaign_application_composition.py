@@ -94,6 +94,11 @@ def test_application_exposes_current_plan_decision_start_and_child_routes() -> N
     paths = create_app(test_issuer_enabled=True).openapi()["paths"]
     autonomous = {path for path in paths if "autonomous" in path}
     assert autonomous == {
+        "/api/v1/autonomous-campaigns",
+        "/api/v1/autonomous-campaigns/{campaign_id}",
+        "/api/v1/autonomous-campaigns/{campaign_id}/prepare-plan",
+        "/api/v1/autonomous-campaigns/{campaign_id}/stop",
+        "/api/v1/autonomous-campaigns/{campaign_id}/revoke",
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-preview",
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-approval",
         "/api/v1/autonomous-campaigns/{campaign_id}/plan-denial",
@@ -101,6 +106,7 @@ def test_application_exposes_current_plan_decision_start_and_child_routes() -> N
         "/api/v1/autonomous-campaigns/{campaign_id}/child-replan",
     }
     assert "/api/v1/campaign-core/campaigns" in paths
+    assert "/api/v1/campaign-core/operator-availability" in paths
     assert "/api/v1/internal/r123/qualification" in paths
 
 

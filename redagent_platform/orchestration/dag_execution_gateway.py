@@ -12,6 +12,7 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
     DAG_EXECUTION_SCHEMA_VERSION,
     DagExecutionSnapshotV1,
     DagWorkflowInputV1,
+    DagStopSignalV1,
     dag_workflow_request_sha256,
     deterministic_dag_workflow_id,
 )
@@ -26,12 +27,26 @@ from redagent_platform.campaign_service.relay import (
 from redagent_platform.orchestration.dag_execution_workflow import (
     CampaignDagExecutionWorkflow,
 )
+from redagent_platform.orchestration.gateway import OrchestrationUnavailable
 
 
 class DagExecutionTemporalStartGateway:
     def __init__(self, client: Any, *, task_queue: str) -> None:
         self._client = client
         self._task_queue = _required("task_queue", task_queue, 100)
+
+    async def stop_campaign_dag(self, workflow_id: str, request: DagStopSignalV1, *, run_id: str | None = None) -> None:
+        normalized_id = _required("workflow_id", workflow_id, 100)
+        if not isinstance(request, DagStopSignalV1):
+            raise ValueError("dag_stop_request_invalid")
+        if run_id is not None:
+            _required("workflow_run_id", run_id, 100)
+        try:
+            # IMPORTANT: native owner selects the exact workflow/run after durable stop commits.
+            # Signal acceptance is only a delivery observation; cleanup remains workflow-owned.
+            await self._client.get_workflow_handle(normalized_id, run_id=run_id).signal("stop", request)
+        except Exception as exc:
+            raise OrchestrationUnavailable("dag_temporal_stop_outcome_unknown") from exc
 
     async def start(
         self, *, workflow_id: str, request_sha256: str, payload: dict[str, object]

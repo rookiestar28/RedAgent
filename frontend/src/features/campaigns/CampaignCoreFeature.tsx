@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type RefObject } from "react";
+import { createPortal } from "react-dom";
 
 import {
   ConsoleApiError,
@@ -10,6 +11,10 @@ import {
   type R124CampaignSummaryPage,
   type R124AttentionPage,
   type R124CampaignStart,
+  type AutonomousCampaignAvailability,
+  type AutonomousCampaignIntent,
+  type AutonomousCampaignStatus,
+  type AutonomousCampaignPreview,
 } from "../../lib/apiClient";
 
 
@@ -20,14 +25,28 @@ export type CampaignCoreClient = Pick<ReturnType<typeof createConsoleClient>,
   | "startCampaignCore"
   | "getCampaignCoreCampaign"
   | "recoverCampaignCore"
+  | "getAutonomousCampaignAvailability"
+  | "createAutonomousCampaignIntent"
+  | "getAutonomousCampaignStatus"
+  | "prepareAutonomousCampaignPlan"
+  | "decideAutonomousCampaignPlan"
+  | "admitAutonomousCampaign"
+  | "prepareAutonomousCampaignChild"
+  | "recoverAutonomousCampaign"
 >;
 
-export type CampaignReadClient = Pick<ReturnType<typeof createConsoleClient>,
+type NativeCampaignClient = Pick<ReturnType<typeof createConsoleClient>,
+  | "getAutonomousCampaignStatus" | "prepareAutonomousCampaignPlan" | "decideAutonomousCampaignPlan"
+  | "admitAutonomousCampaign" | "prepareAutonomousCampaignChild" | "recoverAutonomousCampaign"
+>;
+
+export type CampaignReadClient = NativeCampaignClient & Pick<ReturnType<typeof createConsoleClient>,
   | "listCampaignCoreCampaigns"
   | "getCampaignCoreCampaign"
   | "getCampaignOperations"
   | "listCampaignCoreAttention"
   | "recoverCampaignCore"
+  | "getAutonomousCampaignAvailability"
 >;
 
 type Props = {
@@ -62,13 +81,25 @@ export function CampaignCoreFeature({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const startIdempotencyKey = useRef<string | null>(null);
+  const [availability, setAvailability] = useState<AutonomousCampaignAvailability | null>(null);
+  const [nativeIntent, setNativeIntent] = useState<AutonomousCampaignIntent | null>(null);
+  const [nativeStatus, setNativeStatus] = useState<AutonomousCampaignStatus | null>(null);
+  const preparationKeys = useRef(new Map<string, string>());
+  const canonical = availability?.canonical_configured === true;
 
   useEffect(() => {
     if (!createEnabled) return;
     let active = true;
-    client.listCampaignCoreEngagementOptions()
-      .then((page) => { if (active) setEngagements(page); })
-      .catch((cause: unknown) => { if (active) setError(projectError(cause)); });
+    client.getAutonomousCampaignAvailability()
+      .then(async (value) => {
+        if (!active) return;
+        setAvailability(value);
+        if (value.canonical_configured ? value.create_available && value.preparation_available : value.legacy_available) {
+          const page = await client.listCampaignCoreEngagementOptions();
+          if (active) setEngagements(page);
+        }
+      })
+      .catch((cause: unknown) => { if (active) setError(`Campaign entry is unavailable. ${projectError(cause)}`); });
     return () => { active = false; };
   }, [client, createEnabled]);
 
@@ -76,7 +107,9 @@ export function CampaignCoreFeature({
     () => engagements?.data.filter(({ eligible }) => !eligible) ?? [],
     [engagements],
   );
-  const ready = Boolean(engagement && target && objective && risk && !busy);
+  const entryAvailable = Boolean(availability && (canonical
+    ? availability.create_available && availability.preparation_available : availability.legacy_available));
+  const ready = Boolean(entryAvailable && engagement && target && objective && risk && !busy);
 
   if (!createEnabled) {
     return <section className="work-panel campaign-core" aria-labelledby="campaign-core-disabled-title">
@@ -132,6 +165,20 @@ export function CampaignCoreFeature({
         risk_profile: risk,
       };
       startIdempotencyKey.current ??= campaignStartKey();
+      if (canonical) {
+        const intent = await client.createAutonomousCampaignIntent(payload, startIdempotencyKey.current);
+        setNativeIntent(intent);
+        const current = await client.getAutonomousCampaignStatus(intent.campaign_id);
+        setNativeStatus(current);
+        if (current.lifecycle_state === "INTENT_CREATED") {
+          const fingerprint = nativeStageFingerprint("prepare", current);
+          if (!preparationKeys.current.has(fingerprint)) preparationKeys.current.set(fingerprint, campaignStartKey());
+          await client.prepareAutonomousCampaignPlan(current.campaign_id, current.aggregate_revision,
+            current.etag, preparationKeys.current.get(fingerprint)!);
+          setNativeStatus(await client.getAutonomousCampaignStatus(intent.campaign_id));
+        }
+        return;
+      }
       const started = await client.startCampaignCore(payload, startIdempotencyKey.current);
       setMutation(started);
       setCampaign(await client.getCampaignCoreCampaign(started.campaign_id));
@@ -140,6 +187,13 @@ export function CampaignCoreFeature({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (nativeIntent && availability) {
+    return <AutonomousCampaignJourney client={client} availability={availability} intent={nativeIntent}
+      status={nativeStatus} onStatus={(value) => { setNativeStatus(value); setError(null); }} initialError={error} initialBusy={busy}
+      mutationKeysRef={preparationKeys}
+      targetLabel={targets?.data.find((item) => item.binding === target)?.label ?? "Authorized target"} />;
   }
 
   async function recover(action: "stop" | "revoke") {
@@ -191,11 +245,13 @@ export function CampaignCoreFeature({
 
   return <section className="work-panel campaign-core" aria-labelledby="campaign-core-title">
     <span className="eyebrow">Unified objective-to-retest core</span>
-    <h2 id="campaign-core-title">Start an authorized campaign</h2>
+    <h2 id="campaign-core-title">{canonical ? "Prepare an authorized campaign" : "Start an authorized campaign"}</h2>
     <p>Selections are resolved against current authority. Internal identifiers and transport idempotency are never operator input.</p>
     {error && <p className="inline-error" role="alert">{error}</p>}
-    {!engagements && !error && <p role="status">Loading authorized engagements…</p>}
-    <form onSubmit={(event) => void start(event)}>
+    {!availability && !error && <p role="status">Checking current operator availability…</p>}
+    {availability && !entryAvailable && <p role="status">Campaign preparation is unavailable: {human(availability.reason)}. Status and recovery remain available.</p>}
+    {entryAvailable && !engagements && !error && <p role="status">Loading authorized engagements…</p>}
+    {entryAvailable && <form onSubmit={(event) => void start(event)}>
       <label>Authorized engagement
         <select value={engagement} onChange={(event) => void selectEngagement(event.target.value)} disabled={!engagements || busy}>
           <option value="">Select engagement</option>
@@ -211,7 +267,8 @@ export function CampaignCoreFeature({
       <label>Objective
         <select value={objective} onChange={(event) => { onActivation?.("objective"); startIdempotencyKey.current = null; setObjective(event.target.value); }} disabled={!target || busy}>
           <option value="">Select objective</option>
-          {OBJECTIVES.map((item) => <option key={item} value={item}>{item}</option>)}
+          {OBJECTIVES.filter((item) => !canonical || item !== "Assess repository snapshot posture")
+            .map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
       </label>
       <label>Risk profile
@@ -220,14 +277,262 @@ export function CampaignCoreFeature({
           {eligible(risks?.data).map((option) => <option key={option.binding} value={option.binding}>{option.label}</option>)}
         </select>
       </label>
-      <button type="submit" disabled={!ready}>{busy ? "Starting…" : "Start authorized campaign"}</button>
-    </form>
+      <button type="submit" disabled={!ready}>{busy ? (canonical ? "Preparing…" : "Starting…")
+        : canonical ? "Prepare plan" : "Start authorized campaign"}</button>
+    </form>}
     {denied.length > 0 && <aside aria-label="Unavailable authorized resources">
       <h3>Unavailable</h3>
       <ul>{denied.map((option) => <li key={option.binding}>{option.label}: {human(option.unavailable_reason ?? "unavailable")}</li>)}</ul>
       <p>Refresh current authority or ask the engagement owner to resolve the displayed reason.</p>
     </aside>}
   </section>;
+}
+
+type NativeAction = "approve" | "deny" | "admit" | "stop" | "revoke" | "child";
+const NATIVE_ACTION_LABELS: Record<NativeAction, string> = {
+  approve: "Confirm plan approval", deny: "Confirm plan denial", admit: "Confirm admission and start",
+  stop: "Confirm containment request", revoke: "Confirm authority revocation", child: "Confirm child plan preparation",
+};
+
+function nativeStageFingerprint(action: string, snapshot: AutonomousCampaignStatus) {
+  return `${action}:${snapshot.campaign_id}:${snapshot.aggregate_revision}:${snapshot.preview?.preview_sha256 ?? "intent"}`;
+}
+
+function AutonomousCampaignJourney({ client, availability, intent, status, onStatus, targetLabel: fallbackTargetLabel, mutationKeysRef,
+  initialError = null, initialBusy = false }: {
+  client: NativeCampaignClient; availability: AutonomousCampaignAvailability; intent: AutonomousCampaignIntent;
+  status: AutonomousCampaignStatus | null; onStatus: (value: AutonomousCampaignStatus) => void;
+  targetLabel: string; initialError?: string | null; initialBusy?: boolean;
+  mutationKeysRef?: RefObject<Map<string, string>>;
+}) {
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<{ action: NativeAction; snapshot: AutonomousCampaignStatus } | null>(null);
+  const keys = useRef(new Map<string, string>());
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const cancelButton = useRef<HTMLButtonElement | null>(null);
+  const refreshButton = useRef<HTMLButtonElement | null>(null);
+  const dialogRoot = useRef<HTMLDivElement | null>(null);
+  const busy = working || initialBusy;
+  const preview = status?.preview;
+  const targetLabel = status?.target_label ?? fallbackTargetLabel;
+
+  useEffect(() => {
+    if (!confirmation || !dialogRoot.current) return;
+    // IMPORTANT: aria-modal describes a dialog but does not isolate background controls.
+    // The body portal lets us make each sibling inert, then restore its prior state on close.
+    const siblings = [...document.body.children].filter((element) => element !== dialogRoot.current);
+    const previous = siblings.map((element) => element.getAttribute("inert"));
+    siblings.forEach((element) => element.setAttribute("inert", ""));
+    cancelButton.current?.focus();
+    return () => siblings.forEach((element, index) => {
+      if (previous[index] === null) element.removeAttribute("inert");
+      else element.setAttribute("inert", previous[index]!);
+    });
+  }, [confirmation]);
+
+  function stageKey(action: string, snapshot: AutonomousCampaignStatus) {
+    // IMPORTANT: root preparation and persisted-intent recovery share the key for the same
+    // semantic stage. Replacing it after a lost response prevents exact native receipt replay.
+    const owner = mutationKeysRef?.current ?? keys.current;
+    const fingerprint = nativeStageFingerprint(action, snapshot);
+    if (!owner.has(fingerprint)) owner.set(fingerprint, campaignStartKey());
+    return owner.get(fingerprint)!;
+  }
+
+  function closeConfirmation() {
+    setConfirmation(null);
+    // IMPORTANT: restore focus after React commits the enabled trigger; a completed stage may
+    // remove that trigger, in which case current status refresh is the stable recovery control.
+    globalThis.setTimeout(() => {
+      if (trigger.current?.isConnected && !trigger.current.disabled) trigger.current.focus();
+      else refreshButton.current?.focus();
+    }, 0);
+  }
+
+  async function refresh() {
+    setWorking(true);
+    setError(null);
+    setConfirmation(null);
+    try { onStatus(await client.getAutonomousCampaignStatus(intent.campaign_id)); }
+    catch (cause) { setError(projectError(cause)); }
+    finally { setWorking(false); }
+  }
+
+  async function prepare() {
+    if (!status || status.lifecycle_state !== "INTENT_CREATED") return;
+    setWorking(true);
+    setError(null);
+    try {
+      await client.prepareAutonomousCampaignPlan(status.campaign_id, status.aggregate_revision, status.etag, stageKey("prepare", status));
+      onStatus(await client.getAutonomousCampaignStatus(status.campaign_id));
+    } catch (cause) { setError(projectError(cause)); }
+    finally { setWorking(false); }
+  }
+
+  function ask(action: NativeAction, button: HTMLButtonElement) {
+    if (!status || busy) return;
+    trigger.current = button;
+    setConfirmation({ action, snapshot: status });
+  }
+
+  async function confirm() {
+    if (!confirmation || busy) return;
+    const { action, snapshot } = confirmation;
+    setWorking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const key = stageKey(action, snapshot);
+      if (action === "approve" || action === "deny") {
+        if (!snapshot.preview || !snapshot.preview_etag) throw new Error("preview unavailable");
+        await client.decideAutonomousCampaignPlan(action, snapshot.campaign_id, {
+          preview_id: snapshot.preview.preview_id, preview_sha256: snapshot.preview.preview_sha256,
+        }, snapshot.preview_etag, key);
+      } else if (action === "admit") {
+        if (!snapshot.approval || !snapshot.approval_etag) throw new Error("approval unavailable");
+        await client.admitAutonomousCampaign(snapshot.campaign_id, {
+          approval_receipt_id: snapshot.approval.receipt_id, approval_receipt_sha256: snapshot.approval.receipt_sha256,
+        }, snapshot.approval_etag, key);
+      } else if (action === "child") {
+        await client.prepareAutonomousCampaignChild(snapshot.campaign_id, snapshot.aggregate_revision, snapshot.roe_version_id, key);
+      } else {
+        await client.recoverAutonomousCampaign(action, snapshot.campaign_id, snapshot.aggregate_revision, snapshot.etag,
+          action === "stop" ? "Operator requests safe containment of the current campaign." : "Operator revokes future campaign authority.", key);
+        if (action === "stop") setNotice("A stop request does not prove containment or cleanup. Refresh the native execution and result owners.");
+      }
+      onStatus(await client.getAutonomousCampaignStatus(snapshot.campaign_id));
+    } catch (cause) {
+      // CRITICAL: stale or uncertain mutations only refetch. Reusing a new revision automatically
+      // would apply an old human confirmation to a different plan or authority boundary.
+      try { onStatus(await client.getAutonomousCampaignStatus(snapshot.campaign_id)); }
+      catch { /* Keep the last snapshot visible; the failed read grants no new state. */ }
+      setError(`${projectError(cause)} Review the refreshed state and confirm again.`);
+    } finally {
+      setWorking(false);
+      closeConfirmation();
+    }
+  }
+
+  function dialogKeys(event: KeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape" && !busy) { event.preventDefault(); closeConfirmation(); return; }
+    if (event.key !== "Tab") return;
+    const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not([disabled])")];
+    const first = buttons[0], last = buttons.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+  }
+
+  const scopeCurrent = !status?.attention.includes("operator_native_source_changed");
+  const gatesClear = Boolean(status && status.attention.length === 0
+    && !["denied", "revoked", "expired", "unavailable"].includes(status.operations.authority.state));
+  const childGatesClear = Boolean(status && status.attention.every((reason) => reason === "evidence_pending")
+    && !["denied", "revoked", "expired", "unavailable"].includes(status.operations.authority.state));
+  const mayDecide = Boolean(gatesClear && scopeCurrent && status && preview && status.preview_etag && !status.preview_expired
+    && status.lifecycle_state === "AWAITING_APPROVAL" && availability.preparation_available);
+  const mayAdmit = Boolean(gatesClear && scopeCurrent && status && status.mode !== "plan_only" && status.lifecycle_state === "APPROVED"
+    && status.approval?.decision === "approved" && !status.approval.expired && !status.preview_expired
+    && status.approval_etag && availability.create_available);
+  const mayStop = Boolean(status && availability.stop_available
+    && ["start_pending", "running", "stopping", "reconciliation_required"].includes(status.operations.execution.state));
+  const mayRevoke = Boolean(status && availability.revoke_available
+    && ["INTENT_CREATED", "PLAN_VALIDATED", "AWAITING_APPROVAL", "APPROVED", "ADMITTED", "EXECUTION_QUEUED",
+      "RUNNING", "MANUAL_REVIEW_REQUIRED"].includes(status.lifecycle_state));
+  const mayChild = Boolean(childGatesClear && scopeCurrent && status && availability.preparation_available && status.mode === "bounded_replan" && !status.child
+    && ["EVIDENCE_PENDING", "FAILED_CONTAINED"].includes(status.lifecycle_state));
+
+  return <section className="work-panel campaign-core" aria-labelledby="native-campaign-title" aria-busy={busy}>
+    <span className="eyebrow">Authorized staged campaign</span>
+    <h2 id="native-campaign-title">{targetLabel}</h2>
+    <p role="status">{status ? human(status.lifecycle_state) : "Intent persisted; current status refresh required"}</p>
+    <dl className="record-grid">
+      <div><dt>Server mode</dt><dd>{human(status?.mode ?? intent.mode)}</dd></div>
+      <div><dt>Application revision</dt><dd>{status?.aggregate_revision ?? intent.aggregate_revision}</dd></div>
+      <div><dt>Cleanup</dt><dd>{human(status?.result.cleanup_state ?? "unavailable")}</dd></div>
+      <div><dt>Evidence</dt><dd>{human(status?.result.evidence_state ?? "unavailable")}</dd></div>
+    </dl>
+    {(error ?? initialError) && <p className="inline-error" role="alert">{error ?? initialError}</p>}
+    {notice && <p role="status">{notice}</p>}
+    {status?.attention.length ? <aside aria-label="Campaign attention"><h3>Attention required</h3>
+      <ul>{status.attention.map((reason) => <li key={reason}>{human(reason)}</li>)}</ul></aside> : null}
+    {!scopeCurrent && <p role="status">The authorized scope changed after intent creation. New approval and execution are blocked. Review current scope and create a new intent; containment and revocation remain available.</p>}
+    {status?.preview_expired && <p role="status">The preview has expired. Refresh current authority; approval and admission remain unavailable.</p>}
+    {status?.approval?.expired && <p role="status">Approval has expired. It cannot authorize another execution.</p>}
+    {status?.mode === "plan_only" && <p>PLAN_ONLY prepares and records human decisions with zero execution I/O.</p>}
+    {preview && <ImmutablePlanSummary preview={preview} targetLabel={targetLabel} objectiveLabel={status?.objective_label} />}
+    {status?.child && <p>Child revision {status.child.replan_sequence} requires its own exact approval and admission. Parent receipts do not transfer.</p>}
+    <div className="button-row">
+      <button ref={refreshButton} disabled={busy} onClick={() => void refresh()}>Refresh current status</button>
+      {scopeCurrent && status?.lifecycle_state === "INTENT_CREATED" && availability.preparation_available
+        && <button disabled={busy} onClick={() => void prepare()}>Prepare plan</button>}
+      {mayDecide && <><button disabled={busy} onClick={(event) => ask("approve", event.currentTarget)}>Approve plan</button>
+        <button disabled={busy} onClick={(event) => ask("deny", event.currentTarget)}>Deny plan</button></>}
+      {mayAdmit && <button disabled={busy} onClick={(event) => ask("admit", event.currentTarget)}>Admit and start</button>}
+      {mayStop && <button className="danger-action" disabled={busy} onClick={(event) => ask("stop", event.currentTarget)}>Request containment</button>}
+      {mayRevoke && <button disabled={busy} onClick={(event) => ask("revoke", event.currentTarget)}>Revoke future authority</button>}
+      {mayChild && <button disabled={busy} onClick={(event) => ask("child", event.currentTarget)}>Prepare child plan</button>}
+      <button disabled aria-describedby="native-export-reason">Export evidence</button>
+    </div>
+    <p id="native-export-reason">{status?.result.export_state === "unavailable_export_not_configured"
+      ? "The server verified the retained bundle. An authorized export owner is not configured."
+      : "Export is unavailable until the server verifies a retained bundle against an independent trust anchor."}</p>
+    {mayChild && <p>Child preparation rechecks trusted observations, cooldown and all bounds on the server. A denial requires refresh and a new confirmation.</p>}
+    {status && <CampaignOperationsWorkspace operations={status.operations} />}
+    {confirmation && createPortal(<div ref={dialogRoot} className="navigation-drawer-backdrop">
+      <section className="safety-dialog campaign-plan-dialog" role="dialog" aria-modal="true"
+        aria-label={NATIVE_ACTION_LABELS[confirmation.action]} onKeyDown={dialogKeys}>
+        <h2>{NATIVE_ACTION_LABELS[confirmation.action]}</h2>
+        <p>Confirm this exact application revision {confirmation.snapshot.aggregate_revision} for {confirmation.snapshot.target_label}.</p>
+        {confirmation.action === "approve" && confirmation.snapshot.preview
+          && <ImmutablePlanSummary preview={confirmation.snapshot.preview} targetLabel={confirmation.snapshot.target_label}
+            objectiveLabel={confirmation.snapshot.objective_label} />}
+        {confirmation.action === "admit" && <p>This separately requests current policy admission and bounded execution. Approval alone has not started a runner.</p>}
+        {confirmation.action === "stop" && <p>A stop request does not prove containment or cleanup. Native owners must report both.</p>}
+        {confirmation.action === "revoke" && <p>Revoke future authority. This does not prove that an active effect has stopped or cleaned up.</p>}
+        {confirmation.action === "child" && <p>Prepare one bounded child from the terminal parent. Review its new plan, then provide fresh approval and admission.</p>}
+        <div className="dialog-actions">
+          <button ref={cancelButton} disabled={busy} onClick={closeConfirmation}>Cancel</button>
+          <button disabled={busy} onClick={() => void confirm()}>{NATIVE_ACTION_LABELS[confirmation.action]}</button>
+        </div>
+      </section>
+    </div>, document.body)}
+  </section>;
+}
+
+function ImmutablePlanSummary({ preview, targetLabel, objectiveLabel }: {
+  preview: AutonomousCampaignPreview; targetLabel: string; objectiveLabel?: string | null;
+}) {
+  return <article className="campaign-operations__panel campaign-plan-summary">
+    <h3>Immutable plan</h3>
+    <dl className="record-grid">
+      <div><dt>Target</dt><dd>{targetLabel}</dd></div>
+      <div><dt>Objective</dt><dd>{objectiveLabel ?? "Server-defined objective"}</dd></div>
+      <div><dt>Plan revision</dt><dd>{preview.application_revision}</dd></div>
+      <div><dt>Independent validation</dt><dd>{preview.validation_result}</dd></div>
+      <div><dt>Validator</dt><dd>{preview.validator_version}</dd></div>
+      <div><dt>Expires</dt><dd>{formatTime(preview.expires_at)}</dd></div>
+      <div><dt>Approver roles</dt><dd>{preview.required_approvers.map((item) => item.role_id).join(", ")}</dd></div>
+    </dl>
+    <ol className="campaign-plan-actions">{preview.actions.map((action) => <li key={action.node_id}>
+      <strong>{human(action.capability_id)} · revision {action.capability_revision}</strong>
+      <p>{human(action.effect_class)} · {action.executable ? "Bounded execution" : "No executable effect"}</p>
+      <p>Maximum {action.max_duration_seconds} seconds, {action.max_requests} requests, {action.max_rate_per_minute} requests/minute,
+        concurrency {action.concurrency_weight}, retries {action.max_retries}.</p>
+      <p>Cleanup: {human(action.cleanup_mode)}. Evidence: at most {action.max_evidence_bytes} bytes; data: {action.max_data_bytes} bytes.</p>
+      <p>Risk maximum: {action.max_risk_micropoints} micropoints; cost maximum: {action.max_cost_microunits} microunits.</p>
+    </li>)}</ol>
+    <h4>Plan total bounds</h4>
+    <dl className="record-grid" aria-label="Plan total bounds">{Object.entries(preview.plan_budget).filter(([key]) => key !== "schema_version")
+      .map(([key, value]) => <div key={key}><dt>{human(key)}</dt><dd>{value}</dd></div>)}</dl>
+    <h4>Authorized campaign bounds</h4>
+    <dl className="record-grid" aria-label="Authorized campaign bounds">{Object.entries(preview.authorized_budget).filter(([key]) => key !== "schema_version")
+      .map(([key, value]) => <div key={key}><dt>{human(key)}</dt><dd>{value}</dd></div>)}</dl>
+    <p>Evidence requires retained native receipts, complete cleanup and independent bundle verification.</p>
+    <details><summary>Exact plan binding</summary>
+      <p className="campaign-plan-digest">Preview digest: <code>{preview.preview_sha256}</code></p>
+    </details>
+  </article>;
 }
 
 export function CampaignStatusFeature({
@@ -239,6 +544,8 @@ export function CampaignStatusFeature({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingAction, setPendingAction] = useState<"stop" | "revoke" | null>(null);
+  const [nativeSelected, setNativeSelected] = useState<{ status: AutonomousCampaignStatus;
+    availability: AutonomousCampaignAvailability; label: string } | null>(null);
   const selectedCampaignBinding = useRef<string | null>(null);
   const recoveryTrigger = useRef<HTMLButtonElement | null>(null);
   const confirmationButton = useRef<HTMLButtonElement | null>(null);
@@ -307,8 +614,22 @@ export function CampaignStatusFeature({
         <button type="button" onClick={() => {
           selectedCampaignBinding.current = campaign.campaign_id;
           setSelected(null);
+          setNativeSelected(null);
           setOperations(null);
+          setPendingAction(null);
           setError(null);
+          if (campaign.operator_kind === "canonical") {
+            // CRITICAL: the server catalog selects the owner. A failed native read cannot fall
+            // through to legacy strategy/effect rows and silently show a different campaign truth.
+            void Promise.all([client.getAutonomousCampaignStatus(campaign.campaign_id), client.getAutonomousCampaignAvailability()])
+              .then(([status, availability]) => {
+                if (selectedCampaignBinding.current !== campaign.campaign_id) return;
+                setNativeSelected({ status, availability, label: campaign.label });
+              }).catch((cause: unknown) => {
+                if (selectedCampaignBinding.current === campaign.campaign_id) setError(projectError(cause));
+              });
+            return;
+          }
           void Promise.all([
             client.getCampaignCoreCampaign(campaign.campaign_id),
             client.getCampaignOperations(campaign.campaign_id),
@@ -334,6 +655,15 @@ export function CampaignStatusFeature({
         setPendingAction(action);
       }}
     />}
+    {nativeSelected && <AutonomousCampaignJourney key={nativeSelected.status.campaign_id} client={client}
+      availability={nativeSelected.availability} targetLabel={nativeSelected.label} status={nativeSelected.status}
+      intent={{ campaign_id: nativeSelected.status.campaign_id, mode: nativeSelected.status.mode,
+        lifecycle_state: nativeSelected.status.lifecycle_state, aggregate_revision: nativeSelected.status.aggregate_revision,
+        etag: nativeSelected.status.etag, replayed: false }}
+      onStatus={(status) => {
+        if (selectedCampaignBinding.current !== status.campaign_id) return;
+        setNativeSelected((prior) => prior ? { ...prior, status } : null);
+      }} />}
     {pendingAction && <div className="campaign-recovery-dialog" role="dialog" aria-labelledby="campaign-recovery-dialog-title">
       <h3 id="campaign-recovery-dialog-title">
         {pendingAction === "stop" ? "Confirm containment request" : "Confirm future-authority revocation"}

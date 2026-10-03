@@ -276,6 +276,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/autonomous-campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Intent */
+        post: operations["create_autonomous_campaign_operator_intent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomous-campaigns/{campaign_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Current Status */
+        get: operations["get_autonomous_campaign_operator_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/autonomous-campaigns/{campaign_id}/admission-start": {
         parameters: {
             query?: never;
@@ -355,6 +389,57 @@ export interface paths {
         get: operations["get_autonomous_campaign_plan_preview"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomous-campaigns/{campaign_id}/prepare-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prepare Plan */
+        post: operations["prepare_autonomous_campaign_operator_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomous-campaigns/{campaign_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recover */
+        post: operations["revoke_autonomous_campaign_operator"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/autonomous-campaigns/{campaign_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recover */
+        post: operations["stop_autonomous_campaign_operator"];
         delete?: never;
         options?: never;
         head?: never;
@@ -475,6 +560,23 @@ export interface paths {
         put?: never;
         /** Stop R124 Campaign */
         post: operations["stop_r124_campaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaign-core/operator-availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Availability */
+        get: operations["get_autonomous_campaign_operator_availability"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3263,6 +3365,214 @@ export interface components {
             /** Reason Code */
             reason_code: string;
         };
+        /** AutonomousCampaignIntentData */
+        AutonomousCampaignIntentData: {
+            /** Aggregate Revision */
+            aggregate_revision: number;
+            /** Campaign Id */
+            campaign_id: string;
+            /** Etag */
+            etag: string;
+            /** Lifecycle State */
+            lifecycle_state: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "plan_only" | "owned_loopback_auto" | "bounded_replan";
+            /** Replayed */
+            replayed: boolean;
+        };
+        /** AutonomousCampaignIntentResponse */
+        AutonomousCampaignIntentResponse: {
+            data: components["schemas"]["AutonomousCampaignIntentData"];
+        };
+        /** AutonomousCampaignOperatorApprovalData */
+        AutonomousCampaignOperatorApprovalData: {
+            /** Application Revision */
+            application_revision: number;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "denied";
+            /** Expired */
+            expired: boolean;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Receipt Id */
+            receipt_id: string;
+            /** Receipt Sha256 */
+            receipt_sha256: string;
+        };
+        /** AutonomousCampaignOperatorAvailabilityData */
+        AutonomousCampaignOperatorAvailabilityData: {
+            /** Canonical Configured */
+            canonical_configured: boolean;
+            /** Create Available */
+            create_available: boolean;
+            /** Legacy Available */
+            legacy_available: boolean;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "disabled" | "plan_only" | "owned_loopback_auto" | "bounded_replan";
+            /** Preparation Available */
+            preparation_available: boolean;
+            /** Reason */
+            reason: string;
+            /** Revoke Available */
+            revoke_available: boolean;
+            /** Status Available */
+            status_available: boolean;
+            /** Stop Available */
+            stop_available: boolean;
+        };
+        /** AutonomousCampaignOperatorAvailabilityResponse */
+        AutonomousCampaignOperatorAvailabilityResponse: {
+            data: components["schemas"]["AutonomousCampaignOperatorAvailabilityData"];
+        };
+        /** AutonomousCampaignOperatorChildData */
+        AutonomousCampaignOperatorChildData: {
+            /** Lineage Sha256 */
+            lineage_sha256: string;
+            /** Parent Execution Run Id */
+            parent_execution_run_id: string;
+            /** Preview Id */
+            preview_id: string;
+            /**
+             * Replan Sequence
+             * @constant
+             */
+            replan_sequence: 1;
+        };
+        /** AutonomousCampaignOperatorRecoveryData */
+        AutonomousCampaignOperatorRecoveryData: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "stop" | "revoke";
+            /** Aggregate Revision */
+            aggregate_revision: number;
+            /** Campaign Id */
+            campaign_id: string;
+            /** Etag */
+            etag: string;
+            /** Execution Run Id */
+            execution_run_id: string | null;
+            /** Lifecycle State */
+            lifecycle_state: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "plan_only" | "owned_loopback_auto" | "bounded_replan";
+            /** Replayed */
+            replayed: boolean;
+            /**
+             * Signal Status
+             * @enum {string}
+             */
+            signal_status: "not_requested" | "acknowledged" | "unknown" | "not_repeated";
+            /** Stop Requested */
+            stop_requested: boolean;
+        };
+        /** AutonomousCampaignOperatorRecoveryRequest */
+        AutonomousCampaignOperatorRecoveryRequest: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Reason */
+            reason: string;
+        };
+        /** AutonomousCampaignOperatorRecoveryResponse */
+        AutonomousCampaignOperatorRecoveryResponse: {
+            data: components["schemas"]["AutonomousCampaignOperatorRecoveryData"];
+        };
+        /** AutonomousCampaignOperatorResultData */
+        AutonomousCampaignOperatorResultData: {
+            /**
+             * Cleanup State
+             * @enum {string}
+             */
+            cleanup_state: "not_started" | "incomplete" | "complete";
+            /** Effect Count */
+            effect_count: number;
+            /**
+             * Evidence State
+             * @enum {string}
+             */
+            evidence_state: "not_started" | "pending" | "retained_pending_verification" | "verified" | "verification_failed";
+            /**
+             * Export State
+             * @enum {string}
+             */
+            export_state: "unavailable_without_verified_bundle" | "unavailable_export_not_configured";
+            /** Verified Effect Count */
+            verified_effect_count: number;
+        };
+        /** AutonomousCampaignOperatorStartData */
+        AutonomousCampaignOperatorStartData: {
+            /** Admission Receipt Id */
+            admission_receipt_id: string;
+            /** Execution Run Id */
+            execution_run_id: string;
+            /** Reason Code */
+            reason_code: string | null;
+            /** Reservation Id */
+            reservation_id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "start_pending" | "execution_queued" | "reconciliation_required" | "manual_review_required" | "failed_before_io";
+        };
+        /** AutonomousCampaignOperatorStatusData */
+        AutonomousCampaignOperatorStatusData: {
+            /** Aggregate Revision */
+            aggregate_revision: number;
+            approval: components["schemas"]["AutonomousCampaignOperatorApprovalData"] | null;
+            /** Approval Etag */
+            approval_etag: string | null;
+            /** Attention */
+            attention: string[];
+            /** Campaign Id */
+            campaign_id: string;
+            child: components["schemas"]["AutonomousCampaignOperatorChildData"] | null;
+            /** Etag */
+            etag: string;
+            /** Lifecycle State */
+            lifecycle_state: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "plan_only" | "owned_loopback_auto" | "bounded_replan";
+            /** Objective Label */
+            objective_label?: string | null;
+            operations: components["schemas"]["CampaignOperationsData"];
+            preview: components["schemas"]["AutonomousCampaignPlanPreviewData"] | null;
+            /** Preview Etag */
+            preview_etag: string | null;
+            /** Preview Expired */
+            preview_expired: boolean;
+            result: components["schemas"]["AutonomousCampaignOperatorResultData"];
+            /** Roe Version Id */
+            roe_version_id: string;
+            start: components["schemas"]["AutonomousCampaignOperatorStartData"] | null;
+            /** Target Label */
+            target_label: string;
+        };
+        /** AutonomousCampaignOperatorStatusResponse */
+        AutonomousCampaignOperatorStatusResponse: {
+            data: components["schemas"]["AutonomousCampaignOperatorStatusData"];
+        };
         /** AutonomousCampaignPlanActionData */
         AutonomousCampaignPlanActionData: {
             /** Capability Id */
@@ -3414,6 +3724,11 @@ export interface components {
         /** AutonomousCampaignPlanPreviewResponse */
         AutonomousCampaignPlanPreviewResponse: {
             data: components["schemas"]["AutonomousCampaignPlanPreviewData"];
+        };
+        /** AutonomousCampaignPrepareRequest */
+        AutonomousCampaignPrepareRequest: {
+            /** Expected Revision */
+            expected_revision: number;
         };
         /** AutonomousCampaignReadinessData */
         AutonomousCampaignReadinessData: {
@@ -7508,6 +7823,12 @@ export interface components {
             campaign_id: string;
             /** Label */
             label: string;
+            /**
+             * Operator Kind
+             * @default legacy
+             * @enum {string}
+             */
+            operator_kind: "legacy" | "canonical";
             /** Status */
             status: string;
         };
@@ -9128,6 +9449,84 @@ export interface operations {
             };
         };
     };
+    create_autonomous_campaign_operator_intent: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R124CampaignStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignIntentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_autonomous_campaign_operator_status: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignOperatorStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admit_and_queue_autonomous_campaign: {
         parameters: {
             query?: never;
@@ -9324,6 +9723,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutonomousCampaignPlanPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prepare_autonomous_campaign_operator_plan: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutonomousCampaignPrepareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignPlanPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_autonomous_campaign_operator: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutonomousCampaignOperatorRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignOperatorRecoveryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_autonomous_campaign_operator: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutonomousCampaignOperatorRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignOperatorRecoveryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9642,6 +10170,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["R124CampaignMutationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_autonomous_campaign_operator_availability: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-RedAgent-Policy-Reference"?: string | null;
+                "X-RedAgent-ROE-Version"?: string | null;
+                "Idempotency-Key"?: string | null;
+                "X-RedAgent-Test-Subject"?: string | null;
+                "X-RedAgent-Test-Tenant"?: string | null;
+                "X-RedAgent-Test-Permissions"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutonomousCampaignOperatorAvailabilityResponse"];
                 };
             };
             /** @description Validation Error */

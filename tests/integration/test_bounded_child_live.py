@@ -347,7 +347,7 @@ async def _terminal_drift_proof(prepared, root, backend, monkeypatch):
                     authority=prepared.context.signed_authority.authority, lock_rows=False)
 
 
-async def _execute(prepared, capability, backend, lineage, client, policy, *, stop_before_second, runner_suffix, dispatcher, admit, previous_run=None):
+async def _execute(prepared, capability, backend, lineage, client, policy, *, stop_before_second, runner_suffix, dispatcher, admit, previous_run=None, worker_ready=None, request_stop=None):
     now, suffix = datetime.now(timezone.utc), runner_suffix
     authority = prepared.context.signed_authority.authority
     async with prepared.sessions() as session, session.begin():
@@ -374,6 +374,8 @@ async def _execute(prepared, capability, backend, lineage, client, policy, *, st
                           activities=[activities.reconcile, activities.dispatch, activities.contain]):
         try:
             # CRITICAL: worker startup is fixture preparation, before the unchanged fresh OPA-clipped admission lease begins.
+            if worker_ready is not None:
+                worker_ready.set()
             admitted = await admit()
             assert admitted.execution_run_id is not None, admitted.admission_receipt.reason_code
             if previous_run is not None:
@@ -412,8 +414,12 @@ async def _execute(prepared, capability, backend, lineage, client, policy, *, st
                     ready.cancel()
                     terminal.cancel()
                     await asyncio.gather(ready, terminal, return_exceptions=True)
-                await handle.signal("stop", DagStopSignalV1(DAG_EXECUTION_SCHEMA_VERSION, "owned-child-frontier-stop",
-                    prepared.command.actor_user_id, hashlib.sha256(b"controlled-stop-after-real-owned-parent-result").hexdigest()))
+                if request_stop is None:
+                    await handle.signal("stop", DagStopSignalV1(DAG_EXECUTION_SCHEMA_VERSION, "owned-child-frontier-stop",
+                        prepared.command.actor_user_id, hashlib.sha256(b"controlled-stop-after-real-owned-parent-result").hexdigest()))
+                else:
+                    # The normal operator test supplies an HTTP/UI stop; this observer grants no signal authority.
+                    await request_stop(admitted)
                 stopper.release.set()
             result = await asyncio.wait_for(handle.result(), timeout=120)
             expected = DagRunState.CONTAINED if stop_before_second else DagRunState.COMPLETED

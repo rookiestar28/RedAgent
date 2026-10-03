@@ -224,6 +224,56 @@ def assert_lifecycle_transition(
 
 
 @dataclass(frozen=True, slots=True)
+class PrepareAutonomousCampaignRootV1:
+    tenant_id: str
+    campaign_id: str
+    actor_user_id: str
+    expected_revision: int
+    idempotency_key: str
+    correlation_id: str
+    occurred_at: datetime
+
+    def __post_init__(self) -> None:
+        for name, maximum in (("tenant_id", 64), ("campaign_id", 64), ("actor_user_id", 64),
+                              ("idempotency_key", 200), ("correlation_id", 100)):
+            _identifier(name, getattr(self, name), maximum)
+        if type(self.expected_revision) is not int or self.expected_revision < 1:
+            raise ValueError("operator_prepare_revision_invalid")
+        _aware("occurred_at", self.occurred_at)
+
+    @property
+    def request_sha256(self) -> str:
+        from redagent_platform.campaign_service.planning.contracts import canonical_planning_sha256
+
+        return canonical_planning_sha256({
+            "schema": "redagent.operator-plan-preparation/v1", "tenant_id": self.tenant_id,
+            "campaign_id": self.campaign_id, "actor_user_id": self.actor_user_id,
+            "expected_revision": self.expected_revision,
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class AutonomousCampaignNativeRootV1:
+    """Server-resolved native ownership required only for normal operator intents."""
+
+    name: str
+    engagement_revision: int
+    target_revision: int
+    roe_revision: int
+
+    def __post_init__(self) -> None:
+        if self.name not in {
+            "Assess HTTP security posture", "Verify X-Content-Type-Options",
+            "Assess repository snapshot posture",
+        }:
+            raise ValueError("native_root_objective_invalid")
+        for field in ("engagement_revision", "target_revision", "roe_revision"):
+            value = getattr(self, field)
+            if type(value) is not int or value < 1:
+                raise ValueError(f"native_root_{field}_invalid")
+
+
+@dataclass(frozen=True, slots=True)
 class CreateAutonomousCampaignIntentV1:
     schema_version: str
     tenant_id: str
@@ -238,9 +288,12 @@ class CreateAutonomousCampaignIntentV1:
     correlation_id: str
     occurred_at: datetime
     mode: AutonomousCampaignMode = AutonomousCampaignMode.PLAN_ONLY
+    native_root: AutonomousCampaignNativeRootV1 | None = None
 
     def __post_init__(self) -> None:
         _schema(self.schema_version)
+        if self.native_root is not None and not isinstance(self.native_root, AutonomousCampaignNativeRootV1):
+            raise ValueError("native_root_binding_invalid")
         if not isinstance(self.mode, AutonomousCampaignMode) or self.mode not in (AutonomousCampaignMode.PLAN_ONLY, AutonomousCampaignMode.OWNED_LOOPBACK_AUTO, AutonomousCampaignMode.BOUNDED_REPLAN):
             raise ValueError("application_mode_invalid")
         for name, value, maximum in (

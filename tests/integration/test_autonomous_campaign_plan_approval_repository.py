@@ -18,6 +18,7 @@ from redagent_platform.campaign_service.application_contracts import (
     ApplicationBindingConflict,
     ApplicationIdempotencyConflict,
     AutonomousCampaignLifecycle,
+    PrepareAutonomousCampaignRootV1,
 )
 from redagent_platform.campaign_service.application_repository import (
     PostgresAutonomousCampaignApplicationRepository,
@@ -63,7 +64,11 @@ def test_r172_stage_restart_concurrent_approval_rls_and_immutable_evidence() -> 
     asyncio.run(_approval_scenario())
 
 
-async def _approval_scenario() -> None:
+def test_operator_root_preparation_retains_native_replay_and_rejects_tampered_copies() -> None:
+    asyncio.run(_approval_scenario(operator_preparation=True))
+
+
+async def _approval_scenario(*, operator_preparation=False) -> None:
     engine, sessions = _database()
     suffix = uuid4().hex
     tenant = f"tenant-r172-{suffix}"[:64]
@@ -124,7 +129,7 @@ async def _approval_scenario() -> None:
             current_domain,
             current_authority,
             limits=limits(),
-            validated_at=NOW + timedelta(seconds=2),
+            validated_at=NOW + timedelta(seconds=3 if operator_preparation else 2),
         )
         stage = StageAutonomousCampaignPlanV1(
             schema_version=PLAN_STAGE_SCHEMA_VERSION,
@@ -159,7 +164,52 @@ async def _approval_scenario() -> None:
             trusted_validator_version=VALIDATOR_VERSION,
             trusted_validator_sha256=VALIDATOR_SHA256,
         )
-        staged = await service.stage_plan(stage)
+        if operator_preparation:
+            from redagent_platform.campaign_service.operator_service import AutonomousCampaignOperatorService
+            from redagent_platform.campaign_service.operator_contracts import AutonomousCampaignRootPlanMaterialV1
+            from redagent_platform.campaign_service.operator_repository import PostgresAutonomousCampaignOperatorOwner
+            from redagent_platform.campaign_service.service import CampaignCoreService
+            from tests.unit.test_compat_124_campaign_service import Options, Starter
+
+            class Source:
+                reads = 0
+
+                async def read_root_plan(self, **_values):
+                    self.reads += 1
+                    assert self.reads == 1
+                    return AutonomousCampaignRootPlanMaterialV1(
+                        context=current_context, domain=current_domain,
+                        initial_state=world(), search_limits=search_limits(),
+                    )
+
+            source = Source()
+            options = Options()
+            options.engagements = (replace(options.engagements[0], resource_id=engagement),)
+            options.targets = (replace(options.targets[0], resource_id=target, parent_id=engagement),)
+            operator = AutonomousCampaignOperatorService(
+                CampaignCoreService(options, Starter()), service,
+                root_plan_source=source, validation_limits=limits(),
+                native_owner=PostgresAutonomousCampaignOperatorOwner(sessions),
+            )
+            preparation = PrepareAutonomousCampaignRootV1(
+                tenant_id=tenant, campaign_id=create.campaign_id, actor_user_id=actor,
+                expected_revision=1, idempotency_key=stage.idempotency_key,
+                correlation_id=stage.correlation_id, occurred_at=stage.occurred_at,
+            )
+            values = dict(
+                tenant_id=tenant, campaign_id=create.campaign_id, principal_id=actor,
+                expected_revision=1, idempotency_key=stage.idempotency_key,
+                correlation_id=stage.correlation_id, now=stage.occurred_at,
+            )
+            staged = await operator.prepare_plan(**values)
+            replay = await operator.prepare_plan(**values)
+            assert replay.replayed and replay.preview == staged.preview
+            assert source.reads == 1
+            with pytest.raises(ApplicationIdempotencyConflict):
+                await operator.prepare_plan(**{**values, "expected_revision": 3})
+            assert await repository.read_operator_plan_replay(replace(preparation, tenant_id=other_tenant)) is None
+        else:
+            staged = await service.stage_plan(stage)
         assert staged.application.lifecycle_state is AutonomousCampaignLifecycle.AWAITING_APPROVAL
         assert staged.application.aggregate_revision == 3
 
@@ -197,6 +247,9 @@ async def _approval_scenario() -> None:
             )
         with pytest.raises(ApplicationBindingConflict, match="plan_preview_replay_immutable_binding_mismatch"):
             await repository.stage_plan(stage, staged.preview)
+        if operator_preparation:
+            with pytest.raises(ApplicationBindingConflict):
+                await operator.prepare_plan(**values)
 
         approval = ApproveAutonomousCampaignPlanV1(
             schema_version=PLAN_APPROVE_SCHEMA_VERSION,

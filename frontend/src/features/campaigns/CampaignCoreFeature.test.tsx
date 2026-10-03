@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CampaignOperations } from "../../lib/apiClient";
+import { ConsoleApiError, type CampaignOperations, type AutonomousCampaignPreview,
+  type AutonomousCampaignStatus } from "../../lib/apiClient";
 
 import {
   CampaignAttentionFeature,
@@ -15,6 +16,12 @@ import {
 
 function client(): CampaignCoreClient {
   return {
+    getAutonomousCampaignAvailability: vi.fn().mockResolvedValue({ canonical_configured: false,
+      create_available: false, preparation_available: false, status_available: false, stop_available: false,
+      revoke_available: false, mode: "disabled", legacy_available: true, reason: "operator_owner_not_configured" }),
+    createAutonomousCampaignIntent: vi.fn(), getAutonomousCampaignStatus: vi.fn(),
+    prepareAutonomousCampaignPlan: vi.fn(), decideAutonomousCampaignPlan: vi.fn(),
+    admitAutonomousCampaign: vi.fn(), prepareAutonomousCampaignChild: vi.fn(), recoverAutonomousCampaign: vi.fn(),
     listCampaignCoreEngagementOptions: vi.fn().mockResolvedValue({
       data: [
         { binding: "opaque-eng-a", label: "Loopback alpha", revision: "1", freshness: "current", eligible: true },
@@ -140,6 +147,7 @@ describe("compat_124 portable campaign core", () => {
   it("presents bounded status truth without displaying the transport campaign identifier", async () => {
     const user = userEvent.setup();
     const readClient: CampaignReadClient = {
+      ...client(),
       listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
         data: [{
           campaign_id: "campaign-internal-hidden",
@@ -189,6 +197,7 @@ describe("compat_124 portable campaign core", () => {
     const user = userEvent.setup();
     const getCampaignOperations = vi.fn().mockResolvedValue(campaignOperations());
     const readClient = {
+      ...client(),
       listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
         data: [{
           campaign_id: "campaign-internal-hidden",
@@ -236,6 +245,7 @@ describe("compat_124 portable campaign core", () => {
     secondOperations.aggregate_version = 2;
     secondOperations.plan.nodes[0]!.capability = "Second campaign capability";
     const readClient = {
+      ...client(),
       listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
         data: [
           {
@@ -284,6 +294,7 @@ describe("compat_124 portable campaign core", () => {
     operations.authority.state = "revoked";
     operations.authority.kill_switch_epoch = 1;
     const readClient = {
+      ...client(),
       listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
         data: [{
           campaign_id: "campaign-internal-hidden",
@@ -311,6 +322,7 @@ describe("compat_124 portable campaign core", () => {
 
   it("shows governed recovery guidance for bounded attention categories", async () => {
     const readClient: CampaignReadClient = {
+      ...client(),
       listCampaignCoreCampaigns: vi.fn(),
       getCampaignCoreCampaign: vi.fn(),
       getCampaignOperations: vi.fn(),
@@ -502,3 +514,314 @@ function campaignOperations(): CampaignOperations {
     },
   };
 }
+
+function normalClient(mode: AutonomousCampaignStatus["mode"] = "owned_loopback_auto"): CampaignCoreClient {
+  const api = client();
+  vi.mocked(api.getAutonomousCampaignAvailability).mockResolvedValue({ canonical_configured: true,
+    create_available: true, preparation_available: true, status_available: true, stop_available: true,
+    revoke_available: true, mode, legacy_available: true, reason: "ready" });
+  vi.mocked(api.createAutonomousCampaignIntent).mockResolvedValue({ campaign_id: "server-native-campaign",
+    mode, lifecycle_state: "INTENT_CREATED", aggregate_revision: 1,
+    etag: '"server-intent-token"', replayed: false });
+  vi.mocked(api.prepareAutonomousCampaignPlan).mockResolvedValue(normalPreview(mode));
+  vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValueOnce(normalStatus("INTENT_CREATED", 1, mode))
+    .mockResolvedValue(normalStatus("AWAITING_APPROVAL", 3, mode));
+  return api;
+}
+
+function normalPreview(mode: AutonomousCampaignStatus["mode"] = "owned_loopback_auto"): AutonomousCampaignPreview {
+  const budget = { schema_version: "redagent.campaign-budget-vector/v1" as const, duration_seconds: 120,
+    requests: 20, rate_per_minute: 20, concurrency: 1, risk_micropoints: 10, cost_microunits: 20,
+    evidence_bytes: 4096, data_bytes: 4096 };
+  return { schema_version: "redagent.autonomous-campaign-plan-preview/v1", preview_id: "preview-native",
+    preview_sha256: "a".repeat(64), tenant_id: "tenant-native", campaign_id: "server-native-campaign",
+    engagement_id: "engagement-native", application_revision: 3, application_intent_sha256: "b".repeat(64),
+    source_binding_sha256: "c".repeat(64), signed_authority_sha256: "d".repeat(64), authority_sha256: "e".repeat(64),
+    domain_sha256: "f".repeat(64), plan_revision_id: "plan-native", plan_revision_sha256: "1".repeat(64),
+    plan_sha256: "2".repeat(64), objective_id: "objective-native", objective_sha256: "3".repeat(64),
+    target_id: "target-native", capability_ids: ["zap-controlled-runtime"], capability_set_sha256: "4".repeat(64),
+    effect_classes: ["owned_http_passive"], actions: [{ node_id: "node-native", order: 0,
+      operator_id: "operator-native", target_id: "target-native", capability_id: "zap-controlled-runtime",
+      capability_revision: 3, effect_class: "owned_http_passive", executable: true, max_duration_seconds: 120,
+      max_requests: 20, max_rate_per_minute: 20, concurrency_weight: 1, max_retries: 0, max_risk_micropoints: 10,
+      max_cost_microunits: 20, max_evidence_bytes: 4096, max_data_bytes: 4096, cleanup_mode: "receipt_required" }],
+    authorized_budget: budget, plan_budget: budget, certificate_sha256: "5".repeat(64), validator_version: "validator-v1",
+    validator_sha256: "6".repeat(64), validation_result: "valid", policy_revision: "policy-native",
+    policy_bundle_sha256: "7".repeat(64), lifecycle_epoch: 0, policy_revocation_epoch: 0,
+    roe_revocation_epoch: 0, kill_switch_epoch: 0, required_approvers: [{ principal_id: "approver-native", role_id: "operator" }],
+    issued_at: "2026-10-03T04:00:00Z", expires_at: "2026-10-03T04:02:00Z", execution_mode: mode,
+    execution_bindings: [], child_lineage_sha256: null };
+}
+
+function normalStatus(lifecycle = "AWAITING_APPROVAL", revision = 3,
+  mode: AutonomousCampaignStatus["mode"] = "owned_loopback_auto"): AutonomousCampaignStatus {
+  const operations = campaignOperations();
+  operations.execution = { ...operations.execution, state: "unavailable", stop_requested: false, frontier: {} };
+  operations.admission = { outcome: "unavailable", reason: "not_admitted", receipt_sha256: null };
+  operations.evidence = { ...operations.evidence, cleanup_state: "not_started", effect_count: 0, evidence_count: 0 };
+  return { campaign_id: "server-native-campaign", mode, lifecycle_state: lifecycle,
+    target_label: "HTTP fixture A",
+    aggregate_revision: revision, etag: `"server-current-${revision}"`, roe_version_id: "server-native-roe",
+    preview: lifecycle === "INTENT_CREATED" ? null : normalPreview(mode),
+    preview_etag: lifecycle === "INTENT_CREATED" ? null : '"server-preview-token"', preview_expired: false,
+    approval_etag: '"server-approval-token"', approval: lifecycle === "APPROVED" ? {
+      receipt_id: "approval-native", receipt_sha256: "8".repeat(64), decision: "approved", reason_code: "approved",
+      application_revision: 4, expires_at: "2026-10-03T04:02:00Z", expired: false } : null,
+    start: null, operations, result: { effect_count: 0, verified_effect_count: 0,
+      cleanup_state: "not_started", evidence_state: "not_started", export_state: "unavailable_without_verified_bundle" },
+    child: null, attention: [] };
+}
+
+async function prepareNormal(api: CampaignCoreClient) {
+  const user = userEvent.setup();
+  render(<CampaignCoreFeature client={api} />);
+  await user.selectOptions(await screen.findByLabelText("Authorized engagement"), "opaque-eng-a");
+  await user.selectOptions(await screen.findByLabelText("Authorized target"), "opaque-target-a");
+  await user.selectOptions(screen.getByLabelText("Objective"), "Assess HTTP security posture");
+  await user.selectOptions(await screen.findByLabelText("Risk profile"), "opaque-risk");
+  await user.click(screen.getByRole("button", { name: "Prepare plan" }));
+  await screen.findByRole("heading", { name: "Immutable plan" });
+  return user;
+}
+
+describe("normal staged Campaign Core journey", () => {
+  it.each(["policy_denied", "authority_revoked", "budget_exhausted", "unknown_capability",
+    "kill_switch_active", "manual_review_required", "reconciliation_required", "operator_native_source_changed"])
+  ("blocks new gates for server attention %s while preserving recovery", async (reason) => {
+    const api = normalClient();
+    const user = await prepareNormal(api);
+    const blocked = normalStatus("APPROVED", 4);
+    blocked.attention = [reason];
+    blocked.operations.execution.state = "running";
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(blocked);
+    await user.click(screen.getByRole("button", { name: "Refresh current status" }));
+    expect(screen.queryByRole("button", { name: "Admit and start" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Request containment" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Revoke future authority" })).toBeEnabled();
+    expect(screen.getByLabelText("Campaign attention")).toHaveTextContent(reason.replaceAll("_", " "));
+    blocked.lifecycle_state = "AWAITING_APPROVAL";
+    blocked.approval = null;
+    await user.click(screen.getByRole("button", { name: "Refresh current status" }));
+    expect(screen.queryByRole("button", { name: "Approve plan" })).toBeNull();
+    expect(api.decideAutonomousCampaignPlan).not.toHaveBeenCalled();
+    expect(api.admitAutonomousCampaign).not.toHaveBeenCalled();
+  });
+
+  it("isolates confirmation from background controls and shows objective and both total budgets", async () => {
+    const api = normalClient();
+    const awaiting = normalStatus();
+    awaiting.objective_label = "Assess HTTP security posture";
+    awaiting.preview = { ...normalPreview(), authorized_budget: { ...normalPreview().authorized_budget, requests: 100 } };
+    vi.mocked(api.getAutonomousCampaignStatus).mockReset()
+      .mockResolvedValueOnce(normalStatus("INTENT_CREATED", 1)).mockResolvedValue(awaiting);
+    const user = await prepareNormal(api);
+    const refresh = screen.getByRole("button", { name: "Refresh current status" });
+    await user.click(screen.getByRole("button", { name: "Approve plan" }));
+    const dialog = screen.getByRole("dialog", { name: "Confirm plan approval" });
+    expect(refresh.closest("[inert]")).not.toBeNull();
+    expect(dialog.closest("[inert]")).toBeNull();
+    expect(within(dialog).getByText("Assess HTTP security posture")).toBeVisible();
+    expect(within(dialog).getByLabelText("Authorized campaign bounds")).toHaveTextContent("100");
+    expect(within(dialog).getByLabelText("Plan total bounds")).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(refresh.closest("[inert]")).toBeNull();
+    expect(api.decideAutonomousCampaignPlan).not.toHaveBeenCalled();
+  });
+
+  it("prepares exactly one child with fresh human approval and no inherited parent admission", async () => {
+    const api = normalClient("bounded_replan");
+    const user = await prepareNormal(api);
+    const terminal = normalStatus("EVIDENCE_PENDING", 7, "bounded_replan");
+    terminal.operations.execution.state = "contained";
+    terminal.result.evidence_state = "pending";
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(terminal);
+    await user.click(screen.getByRole("button", { name: "Refresh current status" }));
+    await user.click(await screen.findByRole("button", { name: "Prepare child plan" }));
+    expect(api.prepareAutonomousCampaignChild).not.toHaveBeenCalled();
+    const child = normalStatus("AWAITING_APPROVAL", 9, "bounded_replan");
+    child.preview = { ...normalPreview("bounded_replan"), preview_id: "child-preview", application_revision: 9,
+      child_lineage_sha256: "9".repeat(64), actions: [{ ...normalPreview().actions[0]!, capability_id: "nuclei-trusted-runtime" }] };
+    child.preview_etag = '"server-child-preview-token"';
+    child.approval = null;
+    child.approval_etag = null;
+    child.child = { replan_sequence: 1, parent_execution_run_id: "parent-run-native",
+      lineage_sha256: "9".repeat(64), preview_id: "child-preview" };
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(child);
+    await user.click(screen.getByRole("button", { name: "Confirm child plan preparation" }));
+    await waitFor(() => expect(api.prepareAutonomousCampaignChild).toHaveBeenCalledWith("server-native-campaign", 7,
+      "server-native-roe", expect.any(String)));
+    expect(await screen.findByRole("button", { name: "Approve plan" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Admit and start" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Prepare child plan" })).toBeNull();
+    expect(api.decideAutonomousCampaignPlan).not.toHaveBeenCalled();
+    expect(api.admitAutonomousCampaign).not.toHaveBeenCalled();
+    expect(screen.getByText(/parent receipts do not transfer/i)).toBeVisible();
+  });
+
+  it("records an explicit PLAN_ONLY denial without any admission or execution", async () => {
+    const api = normalClient("plan_only");
+    const user = await prepareNormal(api);
+    await user.click(screen.getByRole("button", { name: "Deny plan" }));
+    expect(api.decideAutonomousCampaignPlan).not.toHaveBeenCalled();
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(normalStatus("DENIED", 4, "plan_only"));
+    await user.click(screen.getByRole("button", { name: "Confirm plan denial" }));
+    await waitFor(() => expect(api.decideAutonomousCampaignPlan).toHaveBeenCalledWith("deny", "server-native-campaign",
+      { preview_id: "preview-native", preview_sha256: "a".repeat(64) }, '"server-preview-token"', expect.any(String)));
+    expect(api.admitAutonomousCampaign).not.toHaveBeenCalled();
+    expect(api.startCampaignCore).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Admit and start" })).toBeNull();
+  });
+
+  it("reuses the exact preparation key after uncertain transport without falling back to legacy", async () => {
+    const api = normalClient();
+    vi.mocked(api.prepareAutonomousCampaignPlan).mockRejectedValueOnce(new Error("lost stage acknowledgement"))
+      .mockResolvedValue(normalPreview());
+    const user = userEvent.setup();
+    render(<CampaignCoreFeature client={api} />);
+    await user.selectOptions(await screen.findByLabelText("Authorized engagement"), "opaque-eng-a");
+    await user.selectOptions(await screen.findByLabelText("Authorized target"), "opaque-target-a");
+    await user.selectOptions(screen.getByLabelText("Objective"), "Assess HTTP security posture");
+    await user.selectOptions(await screen.findByLabelText("Risk profile"), "opaque-risk");
+    await user.click(screen.getByRole("button", { name: "Prepare plan" }));
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Prepare plan" }));
+    await screen.findByRole("heading", { name: "Immutable plan" });
+    const attempts = vi.mocked(api.prepareAutonomousCampaignPlan).mock.calls;
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]?.[3]).toBe(attempts[1]?.[3]);
+    expect(api.startCampaignCore).not.toHaveBeenCalled();
+    expect(api.createAutonomousCampaignIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes a server-listed canonical campaign with creation disabled and never reads legacy detail", async () => {
+    const api = normalClient();
+    const current = normalStatus("RUNNING", 6);
+    current.operations.execution.state = "running";
+    vi.mocked(api.getAutonomousCampaignStatus).mockReset().mockResolvedValue(current);
+    vi.mocked(api.getAutonomousCampaignAvailability).mockResolvedValue({ canonical_configured: true,
+      create_available: false, preparation_available: false, status_available: true, stop_available: true,
+      revoke_available: true, mode: "disabled", legacy_available: false, reason: "operator_creation_unavailable" });
+    const read: CampaignReadClient = { ...api, listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
+      data: [{ campaign_id: current.campaign_id, label: "Owned fixture campaign", status: "RUNNING",
+        authority_state: "requires_current_verification", attention_reason: null, aggregate_sequence: 6, operator_kind: "canonical" }],
+      page: { limit: 50, next_cursor: null } }), getCampaignOperations: vi.fn(), listCampaignCoreAttention: vi.fn() };
+    const user = userEvent.setup();
+    render(<CampaignStatusFeature client={read} />);
+    await user.click(await screen.findByRole("button", { name: "View current status" }));
+    expect(await screen.findByRole("heading", { name: "Immutable plan" })).toBeVisible();
+    expect(api.getCampaignCoreCampaign).not.toHaveBeenCalled();
+    expect(read.getCampaignOperations).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Request containment" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Prepare plan" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Admit and start" })).toBeNull();
+  });
+
+  it("keeps canonical status failure visible without adopting legacy results", async () => {
+    const api = normalClient();
+    vi.mocked(api.getAutonomousCampaignStatus).mockReset().mockRejectedValue(new Error("owner missing"));
+    const read: CampaignReadClient = { ...api, listCampaignCoreCampaigns: vi.fn().mockResolvedValue({
+      data: [{ campaign_id: "server-native-campaign", label: "Owned fixture campaign", status: "RUNNING",
+        authority_state: "requires_current_verification", attention_reason: null, aggregate_sequence: 6, operator_kind: "canonical" }],
+      page: { limit: 50, next_cursor: null } }), getCampaignOperations: vi.fn(), listCampaignCoreAttention: vi.fn() };
+    const user = userEvent.setup();
+    render(<CampaignStatusFeature client={read} />);
+    await user.click(await screen.findByRole("button", { name: "View current status" }));
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(api.getCampaignCoreCampaign).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Request containment" })).toBeNull();
+  });
+
+  it("prepares, previews and separately confirms exact approval and admission without legacy start", async () => {
+    const api = normalClient();
+    const user = await prepareNormal(api);
+    expect(api.startCampaignCore).not.toHaveBeenCalled();
+    expect(api.decideAutonomousCampaignPlan).not.toHaveBeenCalled();
+    expect(api.admitAutonomousCampaign).not.toHaveBeenCalled();
+    expect(screen.getByText("validator-v1")).toBeVisible();
+    expect(screen.getByText(/120 seconds/)).toBeVisible();
+    expect(screen.getAllByText(/receipt required/i).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Approve plan" }));
+    expect(screen.getByRole("dialog", { name: "Confirm plan approval" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(api.decideAutonomousCampaignPlan).not.toHaveBeenCalled();
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(normalStatus("APPROVED", 4));
+    await user.click(screen.getByRole("button", { name: "Confirm plan approval" }));
+    await waitFor(() => expect(api.decideAutonomousCampaignPlan).toHaveBeenCalledWith("approve",
+      "server-native-campaign", { preview_id: "preview-native", preview_sha256: "a".repeat(64) },
+      '"server-preview-token"', expect.any(String)));
+    await user.click(await screen.findByRole("button", { name: "Admit and start" }));
+    expect(api.admitAutonomousCampaign).not.toHaveBeenCalled();
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(normalStatus("EXECUTION_QUEUED", 6));
+    await user.click(screen.getByRole("button", { name: "Confirm admission and start" }));
+    await waitFor(() => expect(api.admitAutonomousCampaign).toHaveBeenCalledWith("server-native-campaign",
+      { approval_receipt_id: "approval-native", approval_receipt_sha256: "8".repeat(64) },
+      '"server-approval-token"', expect.any(String)));
+    expect(vi.mocked(api.decideAutonomousCampaignPlan).mock.calls[0]?.[4])
+      .not.toBe(vi.mocked(api.admitAutonomousCampaign).mock.calls[0]?.[3]);
+    expect(screen.getByRole("button", { name: "Export evidence" })).toBeDisabled();
+    expect(screen.queryByLabelText(/campaign id|target id|mode|proof|url/i)).toBeNull();
+  });
+
+  it("fails closed on unavailable canonical authority and never falls back to legacy", async () => {
+    const api = normalClient();
+    vi.mocked(api.getAutonomousCampaignAvailability).mockRejectedValue(new Error("owner unavailable"));
+    render(<CampaignCoreFeature client={api} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/unavailable/i);
+    expect(screen.queryByRole("button", { name: "Start authorized campaign" })).toBeNull();
+    expect(api.listCampaignCoreEngagementOptions).not.toHaveBeenCalled();
+    expect(api.startCampaignCore).not.toHaveBeenCalled();
+  });
+
+  it("refreshes a 409 approval and requires a new human confirmation", async () => {
+    const api = normalClient();
+    const user = await prepareNormal(api);
+    vi.mocked(api.decideAutonomousCampaignPlan).mockRejectedValue(new ConsoleApiError(
+      "application_revision_conflict", "Refresh before confirming again.", 409, null));
+    const changed = normalStatus("AWAITING_APPROVAL", 5);
+    changed.preview = { ...normalPreview(), preview_id: "preview-new", application_revision: 5 };
+    changed.preview_etag = '"server-new-preview-token"';
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(changed);
+    await user.click(screen.getByRole("button", { name: "Approve plan" }));
+    await user.click(screen.getByRole("button", { name: "Confirm plan approval" }));
+    await screen.findByRole("alert");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(api.decideAutonomousCampaignPlan).toHaveBeenCalledTimes(1);
+    expect(api.admitAutonomousCampaign).not.toHaveBeenCalled();
+    expect(screen.getByText(/review the refreshed state and confirm again/i)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Approve plan" }));
+    expect(api.decideAutonomousCampaignPlan).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps stop acknowledgement, incomplete cleanup and export unavailability distinct with keyboard recovery", async () => {
+    const api = normalClient();
+    const user = await prepareNormal(api);
+    const running = normalStatus("RUNNING", 6);
+    running.operations.execution.state = "running";
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(running);
+    await user.click(screen.getByRole("button", { name: "Refresh current status" }));
+    const trigger = await screen.findByRole("button", { name: "Request containment" });
+    await user.click(trigger);
+    await user.keyboard("{Escape}");
+    expect(api.recoverAutonomousCampaign).not.toHaveBeenCalled();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Confirm containment request" }));
+    await waitFor(() => expect(api.recoverAutonomousCampaign).toHaveBeenCalledWith("stop", "server-native-campaign",
+      6, '"server-current-6"', expect.stringContaining("containment"), expect.any(String)));
+    expect(screen.getByText(/a stop request does not prove containment or cleanup/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Export evidence" })).toBeDisabled();
+  });
+
+  it("does not offer approval for an expired preview or execution in PLAN_ONLY", async () => {
+    const api = normalClient();
+    const expired = normalStatus();
+    expired.preview_expired = true;
+    expired.mode = "plan_only";
+    vi.mocked(api.getAutonomousCampaignStatus).mockReset().mockResolvedValueOnce(normalStatus("INTENT_CREATED", 1))
+      .mockResolvedValue(expired);
+    await prepareNormal(api);
+    expect(screen.queryByRole("button", { name: "Approve plan" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Admit and start" })).toBeNull();
+    expect(screen.getByText(/preview has expired/i)).toBeVisible();
+  });
+});

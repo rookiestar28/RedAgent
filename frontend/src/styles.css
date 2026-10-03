@@ -152,6 +152,13 @@ th { color: var(--muted); }
 .campaign-operations { margin-top: 1.5rem; border-top: 1px solid var(--line-strong); padding-top: 1.5rem; }
 .campaign-recovery-dialog { margin-top: 1rem; border: 1px solid var(--danger); padding: 1rem; background: color-mix(in srgb, var(--danger) 7%, var(--surface)); }
 .campaign-recovery-dialog p { max-width: 65ch; color: var(--muted); line-height: 1.5; }
+.campaign-plan-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.campaign-plan-dialog .dialog-actions { flex-wrap: wrap; }
+.campaign-plan-summary { margin-block: 1rem; padding: 1rem; overflow-wrap: anywhere; }
+.campaign-plan-summary h3 { margin-bottom: 1rem; }
+.campaign-plan-actions { display: grid; gap: 1rem; padding-left: 1.25rem; }
+.campaign-plan-actions li { min-width: 0; }
+.campaign-plan-digest code { word-break: break-all; }
 .campaign-operations__header, .campaign-operations__panel-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
 .campaign-operations__summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; margin-top: 1rem; }
 .campaign-operations__summary article, .campaign-operations__panel { min-width: 0; border: 1px solid var(--line); background: var(--surface-soft); }

@@ -24,6 +24,7 @@ from redagent_platform.campaign_service.application_contracts import (
     AutonomousCampaignMode,
     AutonomousCampaignMutationResultV1,
     CreateAutonomousCampaignIntentV1,
+    PrepareAutonomousCampaignRootV1,
     RevokeAutonomousCampaignIntentV1,
     assert_lifecycle_transition,
 )
@@ -52,11 +53,13 @@ from redagent_platform.campaign_service.planning.contracts import (
 )
 from redagent_platform.persistence.models import metadata
 from redagent_platform.campaign_service.contracts import CapabilityBindingKeyV1
+from redagent_platform.campaign_service.operator_scope import current_operator_scope, assert_operator_scope_current
 
 
 _CREATE_OPERATION = "autonomous_campaign.application.create.v1"
 _REVOKE_OPERATION = "autonomous_campaign.application.revoke.v1"
 _STAGE_PLAN_OPERATION = "autonomous_campaign.plan.stage.v1"
+_OPERATOR_PREPARE_OPERATION = "autonomous_campaign.operator.prepare.v1"
 _APPROVE_PLAN_OPERATION = "autonomous_campaign.plan.approve.v1"
 _DENY_PLAN_OPERATION = "autonomous_campaign.plan.deny.v1"
 
@@ -80,6 +83,16 @@ class PostgresAutonomousCampaignApplicationRepository:
                     operation=_CREATE_OPERATION,
                     idempotency_key=command.idempotency_key,
                 )
+                if command.native_root is not None:
+                    from redagent_platform.campaign_service.repository import campaign_core_principal_is_active
+
+                    # CRITICAL: option resolution precedes this transaction. Recheck the native
+                    # principal before replay so a concurrent membership revocation cannot return intent state.
+                    if not await campaign_core_principal_is_active(
+                        session, tenant_id=command.tenant_id, principal_id=command.actor_user_id,
+                        now=command.occurred_at, lock=True,
+                    ):
+                        raise ApplicationBindingConflict("operator_principal_inactive")
                 replay = await _read_replay(
                     session,
                     tenant_id=command.tenant_id,
@@ -96,6 +109,12 @@ class PostgresAutonomousCampaignApplicationRepository:
                     engagement_id=command.engagement_id,
                     target_id=command.target_id,
                 )
+                native_scope = None
+                if command.native_root is not None:
+                    await _materialize_operator_native_root(session, command)
+                    native_scope = await current_operator_scope(session, tenant_id=command.tenant_id,
+                        engagement_id=command.engagement_id, target_id=command.target_id,
+                        objective_label=command.native_root.name, lock=True)
                 state = AutonomousCampaignApplicationStateV1(
                     schema_version=command.schema_version,
                     tenant_id=command.tenant_id,
@@ -146,6 +165,8 @@ class PostgresAutonomousCampaignApplicationRepository:
                         "intent_sha256": command.intent_sha256,
                         "source_binding_sha256": command.source_binding_sha256,
                         "mode": command.mode.value,
+                        **({"native_scope": native_scope, "native_scope_sha256": canonical_planning_sha256(native_scope)}
+                           if native_scope is not None else {}),
                     },
                     occurred_at=command.occurred_at,
                     response_status=201,
@@ -162,12 +183,26 @@ class PostgresAutonomousCampaignApplicationRepository:
             row = await _read_row(session, tenant_id=tenant_id, campaign_id=campaign_id)
         return None if row is None else _state_from_row(row)
 
-    async def revoke_intent(self, command: RevokeAutonomousCampaignIntentV1) -> AutonomousCampaignMutationResultV1:
+    async def revoke_intent(
+        self, command: RevokeAutonomousCampaignIntentV1, *, operator_request: bool = False,
+    ) -> AutonomousCampaignMutationResultV1:
         if not isinstance(command, RevokeAutonomousCampaignIntentV1):
             raise ValueError("revoke_intent_command_invalid")
+        if type(operator_request) is not bool:
+            raise ValueError("operator_revoke_configuration_invalid")
         request_sha256 = _semantic_request_sha256(command)
         async with self._sessions() as session, session.begin():
             await _tenant_context(session, command.tenant_id)
+            if operator_request:
+                from redagent_platform.campaign_service.repository import campaign_core_principal_is_active
+
+                # CRITICAL: recovery needs a current principal even for replay, but no fresh
+                # execution ROE/grant. Check and lock membership inside the same revoke transaction.
+                if not await campaign_core_principal_is_active(
+                    session, tenant_id=command.tenant_id, principal_id=command.actor_user_id,
+                    now=command.occurred_at, lock=True,
+                ):
+                    raise ApplicationBindingConflict("operator_principal_inactive")
             await _lock_idempotency(
                 session,
                 tenant_id=command.tenant_id,
@@ -182,6 +217,17 @@ class PostgresAutonomousCampaignApplicationRepository:
                 request_sha256=request_sha256,
             )
             if replay is not None:
+                if operator_request:
+                    if replay.application.tenant_id != command.tenant_id or replay.application.campaign_id != command.campaign_id or replay.application.aggregate_revision != command.expected_revision + 1 or replay.application.lifecycle_state is not AutonomousCampaignLifecycle.REVOKED:
+                        raise ApplicationBindingConflict("operator_revoke_replay_binding_invalid")
+                    await _verify_replay_lineage(
+                        session, state=replay.application, operation=_REVOKE_OPERATION,
+                        request_sha256=request_sha256, actor_user_id=command.actor_user_id,
+                        audit_id=replay.audit_id, event_id=replay.event_id,
+                        event_type="autonomous_campaign.intent.revoked.v1",
+                        previous_states=tuple(AutonomousCampaignLifecycle),
+                        event_payload={"reason_sha256": command.reason_sha256}, policy_reference=None,
+                    )
                 return replay
             await _assert_actor_binding(
                 session,
@@ -263,15 +309,32 @@ class PostgresAutonomousCampaignApplicationRepository:
         self,
         command: StageAutonomousCampaignPlanV1,
         preview: AutonomousCampaignPlanPreviewV1,
+        *, operator_request: PrepareAutonomousCampaignRootV1 | None = None,
     ) -> AutonomousCampaignPlanPreviewResultV1:
         if not isinstance(command, StageAutonomousCampaignPlanV1) or not isinstance(
             preview, AutonomousCampaignPlanPreviewV1
         ):
             raise ValueError("stage_plan_input_invalid")
+        if operator_request is not None and (
+            not isinstance(operator_request, PrepareAutonomousCampaignRootV1)
+            or any(getattr(operator_request, field) != getattr(command, field) for field in (
+                "tenant_id", "campaign_id", "actor_user_id", "expected_revision",
+                "idempotency_key", "correlation_id", "occurred_at",
+            ))
+        ):
+            raise ApplicationBindingConflict("operator_preparation_stage_binding_mismatch")
         request_sha256 = _approval_request_sha256(command)
         try:
             async with self._sessions() as session, session.begin():
                 await _tenant_context(session, command.tenant_id)
+                if operator_request is not None:
+                    await _lock_idempotency(
+                        session, tenant_id=command.tenant_id, operation=_OPERATOR_PREPARE_OPERATION,
+                        idempotency_key=command.idempotency_key,
+                    )
+                    operator_replay = await _read_operator_plan_replay(session, operator_request)
+                    if operator_replay is not None:
+                        return operator_replay
                 await _lock_idempotency(
                     session,
                     tenant_id=command.tenant_id,
@@ -285,6 +348,8 @@ class PostgresAutonomousCampaignApplicationRepository:
                     request_sha256=request_sha256,
                 )
                 if replay is not None:
+                    if operator_request is not None:
+                        raise ApplicationBindingConflict("operator_preparation_owner_missing")
                     return replay
                 await _assert_actor_binding(
                     session,
@@ -319,6 +384,7 @@ class PostgresAutonomousCampaignApplicationRepository:
                     or preview.execution_mode is not current.mode
                 ):
                     raise ApplicationBindingConflict("plan_preview_application_binding_mismatch")
+                await assert_operator_scope_current(session, tenant_id=command.tenant_id, campaign_id=command.campaign_id)
                 assert_lifecycle_transition(current.lifecycle_state, AutonomousCampaignLifecycle.PLAN_VALIDATED)
                 assert_lifecycle_transition(
                     AutonomousCampaignLifecycle.PLAN_VALIDATED,
@@ -417,9 +483,27 @@ class PostgresAutonomousCampaignApplicationRepository:
                     response_body=_plan_preview_result_payload(result),
                     occurred_at=command.occurred_at,
                 )
+                if operator_request is not None:
+                    await _record_idempotency(
+                        session, tenant_id=command.tenant_id, operation=_OPERATOR_PREPARE_OPERATION,
+                        idempotency_key=command.idempotency_key,
+                        request_sha256=operator_request.request_sha256, response_status=201,
+                        response_body={"stage_request_sha256": request_sha256,
+                                       "result": _plan_preview_result_payload(result)},
+                        occurred_at=command.occurred_at,
+                    )
             return result
         except IntegrityError as exc:
             raise ApplicationBindingConflict("autonomous_campaign_plan_persistence_conflict") from exc
+
+    async def read_operator_plan_replay(
+        self, command: PrepareAutonomousCampaignRootV1,
+    ) -> AutonomousCampaignPlanPreviewResultV1 | None:
+        if not isinstance(command, PrepareAutonomousCampaignRootV1):
+            raise ValueError("operator_preparation_command_invalid")
+        async with self._sessions() as session, session.begin():
+            await _tenant_context(session, command.tenant_id)
+            return await _read_operator_plan_replay(session, command)
 
     async def read_plan_preview(
         self,
@@ -612,6 +696,8 @@ class PostgresAutonomousCampaignApplicationRepository:
                     if receipt.decision is AutonomousCampaignApprovalDecision.APPROVED
                     else AutonomousCampaignLifecycle.DENIED
                 )
+                if target_state is AutonomousCampaignLifecycle.APPROVED:
+                    await assert_operator_scope_current(session, tenant_id=command.tenant_id, campaign_id=command.campaign_id)
                 assert_lifecycle_transition(current.lifecycle_state, target_state)
                 previews = metadata.tables["autonomous_campaign_plan_previews"]
                 preview_exists = await session.scalar(
@@ -710,6 +796,68 @@ class PostgresAutonomousCampaignApplicationRepository:
             return result
         except IntegrityError as exc:
             raise ApplicationBindingConflict("autonomous_campaign_approval_persistence_conflict") from exc
+
+
+async def _materialize_operator_native_root(
+    session: AsyncSession, command: CreateAutonomousCampaignIntentV1,
+) -> None:
+    root = command.native_root
+    if root is None:
+        raise ValueError("native_root_binding_required")
+    from redagent_platform.campaign_service.repository import campaign_core_principal_is_active
+
+    if not await campaign_core_principal_is_active(
+        session, tenant_id=command.tenant_id, principal_id=command.actor_user_id,
+        now=command.occurred_at, lock=True,
+    ):
+        raise ApplicationBindingConflict("operator_principal_inactive")
+    engagements = metadata.tables["engagements"]
+    targets = metadata.tables["targets"]
+    roe = metadata.tables["roe_versions"]
+    engagement = await session.scalar(select(engagements.c.version).where(
+        engagements.c.tenant_id == command.tenant_id,
+        engagements.c.id == command.engagement_id,
+    ).with_for_update(read=True))
+    target = await session.scalar(select(targets.c.version).where(
+        targets.c.tenant_id == command.tenant_id,
+        targets.c.id == command.target_id, targets.c.engagement_id == command.engagement_id,
+    ).with_for_update(read=True))
+    current_roe = (await session.execute(select(roe.c.id, roe.c.revision).where(
+        roe.c.tenant_id == command.tenant_id, roe.c.engagement_id == command.engagement_id,
+        roe.c.status == "approved",
+    ).order_by(roe.c.revision.desc()).limit(1).with_for_update(read=True))).mappings().one_or_none()
+    if (
+        engagement != root.engagement_revision or target != root.target_revision
+        or current_roe is None or current_roe["revision"] != root.roe_revision
+    ):
+        raise ApplicationBindingConflict("operator_native_source_changed")
+    approvals = metadata.tables["approvals"]
+    policies = metadata.tables["policy_references"]
+    for owner in (approvals, policies):
+        if await session.scalar(select(owner.c.id).where(
+            owner.c.tenant_id == command.tenant_id, owner.c.roe_version_id == current_roe["id"],
+        ).limit(1).with_for_update(read=True)) is None:
+            raise ApplicationBindingConflict("operator_current_roe_owner_missing")
+    campaigns = metadata.tables["campaigns"]
+    marker = f'intent-{hashlib.sha256(f"{command.tenant_id}:{command.campaign_id}".encode()).hexdigest()[:48]}'
+    existing = (await session.execute(select(campaigns).where(
+        campaigns.c.tenant_id == command.tenant_id, campaigns.c.id == command.campaign_id,
+    ).with_for_update())).mappings().one_or_none()
+    ownership = {
+        "engagement_id": command.engagement_id, "roe_version_id": str(current_roe["id"]),
+        "name": root.name, "intent_sha256": command.intent_sha256, "workflow_id": marker,
+    }
+    if existing is not None:
+        if any(existing[key] != value for key, value in ownership.items()):
+            raise ApplicationBindingConflict("operator_native_campaign_conflict")
+        return
+    # CRITICAL: native root and intent share this transaction; never emit a start/effect outbox here.
+    await session.execute(insert(campaigns).values(
+        id=command.campaign_id, **ownership, status="intent_created", workflow_run_id=None,
+        orchestration_revision=1, aggregate_sequence=0, replan_count=0,
+        tenant_id=command.tenant_id, version=1,
+        created_at=command.occurred_at, updated_at=command.occurred_at,
+    ))
 
 
 async def _assert_canonical_bindings(
@@ -915,6 +1063,38 @@ async def _read_replay(
     return _result_from_payload(row["response_body"], replayed=True)
 
 
+async def _read_operator_plan_replay(
+    session: AsyncSession, command: PrepareAutonomousCampaignRootV1,
+) -> AutonomousCampaignPlanPreviewResultV1 | None:
+    payload = await _read_idempotency_payload(
+        session, tenant_id=command.tenant_id, operation=_OPERATOR_PREPARE_OPERATION,
+        idempotency_key=command.idempotency_key, request_sha256=command.request_sha256,
+    )
+    if payload is None:
+        return None
+    try:
+        if not isinstance(payload, dict):
+            raise ValueError("operator_replay_copy_invalid")
+        stage_sha256 = payload["stage_request_sha256"]
+        if not isinstance(stage_sha256, str) or len(stage_sha256) != 64:
+            raise ValueError("operator_replay_stage_identity_invalid")
+        result = _plan_preview_result_from_payload(payload["result"], replayed=True)
+        original = await _read_idempotency_payload(
+            session, tenant_id=command.tenant_id, operation=_STAGE_PLAN_OPERATION,
+            idempotency_key=command.idempotency_key, request_sha256=stage_sha256,
+        )
+        if original != _plan_preview_result_payload(result):
+            raise ApplicationBindingConflict("operator_replay_stage_copy_mismatch")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ApplicationBindingConflict("operator_preparation_replay_copy_invalid") from exc
+    # CRITICAL: both replay copies must join the immutable preview and original stage audit/events.
+    await _verify_plan_preview_replay(
+        session, command=command, operation=_STAGE_PLAN_OPERATION,
+        request_sha256=stage_sha256, result=result,
+    )
+    return result
+
+
 async def _read_plan_preview_replay(
     session: AsyncSession,
     *,
@@ -1007,7 +1187,7 @@ async def _read_idempotency_payload(
 async def _verify_plan_preview_replay(
     session: AsyncSession,
     *,
-    command: StageAutonomousCampaignPlanV1,
+    command: StageAutonomousCampaignPlanV1 | PrepareAutonomousCampaignRootV1,
     operation: str,
     request_sha256: str,
     result: AutonomousCampaignPlanPreviewResultV1,
@@ -1018,18 +1198,25 @@ async def _verify_plan_preview_replay(
         campaign_id=command.campaign_id,
         preview_id=result.preview.preview_id,
     )
+    proof_mismatch = isinstance(command, StageAutonomousCampaignPlanV1) and (
+        preview.signed_authority_sha256 != command.signed_authority.signed_authority_sha256
+        or preview.authority_sha256 != command.signed_authority.authority.authority_sha256
+        or preview.domain_sha256 != command.domain.domain_sha256
+        or preview.plan_revision_sha256 != command.revision.revision_sha256
+        or preview.certificate_sha256 != command.certificate.certificate_sha256
+    )
     if (
         preview != result.preview
         or result.application.tenant_id != command.tenant_id
         or result.application.campaign_id != command.campaign_id
         or result.application.engagement_id != preview.engagement_id
         or result.application.aggregate_revision != preview.application_revision
+        or preview.application_revision != command.expected_revision + 2
         or result.application.lifecycle_state is not AutonomousCampaignLifecycle.AWAITING_APPROVAL
-        or preview.signed_authority_sha256 != command.signed_authority.signed_authority_sha256
-        or preview.authority_sha256 != command.signed_authority.authority.authority_sha256
-        or preview.domain_sha256 != command.domain.domain_sha256
-        or preview.plan_revision_sha256 != command.revision.revision_sha256
-        or preview.certificate_sha256 != command.certificate.certificate_sha256
+        or preview.application_intent_sha256 != result.application.intent_sha256
+        or preview.source_binding_sha256 != result.application.source_binding_sha256
+        or preview.execution_mode is not result.application.mode
+        or proof_mismatch
     ):
         raise ApplicationBindingConflict("plan_preview_replay_immutable_binding_mismatch")
     validated = replace(
@@ -1381,6 +1568,13 @@ def _semantic_request_sha256(
         }
         if command.mode is not AutonomousCampaignMode.PLAN_ONLY:
             payload["mode"] = command.mode.value
+        if command.native_root is not None:
+            payload["native_root"] = {
+                "name": command.native_root.name,
+                "engagement_revision": command.native_root.engagement_revision,
+                "target_revision": command.native_root.target_revision,
+                "roe_revision": command.native_root.roe_revision,
+            }
     else:
         payload = {
             "schema_version": command.schema_version,

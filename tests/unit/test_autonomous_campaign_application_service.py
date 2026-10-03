@@ -127,6 +127,15 @@ def test_disabled_mode_fails_before_persistence() -> None:
     assert repository.read_calls == 0
 
 
+def test_disabled_creation_preserves_explicit_current_state_read_for_operator_recovery() -> None:
+    repository = Repository()
+    service = AutonomousCampaignApplicationService(repository, mode=AutonomousCampaignMode.DISABLED)
+    state = asyncio.run(service.read_current_state(tenant_id="tenant-r171", campaign_id="campaign-r171"))
+    assert state == repository.state
+    assert repository.read_calls == 1
+    assert repository.create_calls == 0
+
+
 class DependencyFailureRepository(Repository):
     async def create_intent(self, command):
         raise OSError("driver detail must not cross the application boundary")

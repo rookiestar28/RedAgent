@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -122,6 +124,112 @@ class Recovery:
             "revision": values["expected_revision"] + 1,
             "replayed": False,
         })()
+
+
+def _operator_selections(service: CampaignCoreService) -> SimpleNamespace:
+    engagement = asyncio.run(service.list_engagement_options(
+        tenant_id="tenant-r124", principal_id="operator-r124", limit=50,
+        cursor=None, now=NOW,
+    ))["data"][0]["binding"]
+    target = asyncio.run(service.list_target_options(
+        tenant_id="tenant-r124", principal_id="operator-r124",
+        engagement_binding=engagement, limit=50, cursor=None, now=NOW,
+    ))["data"][0]["binding"]
+    risk = asyncio.run(service.list_risk_profile_options(
+        tenant_id="tenant-r124", principal_id="operator-r124",
+        engagement_binding=engagement, target_binding=target,
+        limit=50, cursor=None, now=NOW,
+    ))["data"][0]["binding"]
+    return SimpleNamespace(
+        engagement_binding=engagement, target_binding=target,
+        objective="Assess HTTP security posture", risk_profile=risk,
+    )
+
+
+def test_operator_selection_resolution_retains_native_bindings_without_dispatch() -> None:
+    options, starter = Options(), Starter()
+    service = CampaignCoreService(options, starter, create_enabled=False)
+    intent = _operator_selections(service)
+
+    resolved = asyncio.run(service.resolve_operator_intent(
+        intent, tenant_id="tenant-r124", principal_id="operator-r124", now=NOW,
+    ))
+
+    assert resolved.engagement == options.engagements[0]
+    assert resolved.target == options.targets[0]
+    assert resolved.request.engagement_id == "engagement-internal-1"
+    assert resolved.request.target_id == "target-internal-1"
+    assert resolved.request.objective_kind == "http_posture"
+    assert resolved.request.risk_profile == "tier1_passive"
+    assert starter.replay_calls == []
+    assert starter.calls == []
+
+
+def test_operator_recovery_scope_keeps_expired_roe_readable_but_cannot_prepare() -> None:
+    options, starter = Options(), Starter()
+    options.engagements = (replace(options.engagements[0], eligible=False, unavailable_reason="roe_expired"),)
+    options.targets = (replace(options.targets[0], eligible=False, unavailable_reason="roe_expired"),)
+    service = CampaignCoreService(options, starter)
+    values = dict(
+        tenant_id="tenant-r124", principal_id="operator-r124", now=NOW,
+        engagement_id="engagement-internal-1", target_id="target-internal-1",
+    )
+    with pytest.raises(ValueError, match="engagement_binding_ineligible"):
+        asyncio.run(service.resolve_application_scope(**values, require_eligible=True))
+    engagement, target = asyncio.run(service.resolve_application_scope(**values, require_eligible=False))
+    assert not engagement.eligible and not target.eligible
+    options.engagements = ()
+    with pytest.raises(ValueError, match="operator_application_scope_denied"):
+        asyncio.run(service.resolve_application_scope(**values, require_eligible=False))
+    assert starter.replay_calls == starter.calls == []
+
+
+@pytest.mark.parametrize("mutation,error", [
+    ("tenant", "engagement_binding_invalid"),
+    ("engagement_revision", "engagement_binding_invalid"),
+    ("target_revision", "target_binding_invalid"),
+    ("parent", "target_binding_parent_mismatch"),
+    ("target_ineligible", "target_binding_ineligible"),
+    ("objective", "objective_unsupported"),
+    ("target_class", "objective_target_class_mismatch"),
+    ("risk", "risk_profile_unsupported"),
+])
+def test_operator_selection_resolution_rejects_current_drift_without_dispatch(
+    mutation: str, error: str,
+) -> None:
+    options, starter = Options(), Starter()
+    service = CampaignCoreService(options, starter)
+    intent = _operator_selections(service)
+    tenant_id = "tenant-r124"
+    if mutation == "tenant":
+        tenant_id = "another-tenant"
+    elif mutation == "engagement_revision":
+        options.engagements = (replace(options.engagements[0], revision="8"),)
+    elif mutation == "target_revision":
+        options.targets = (replace(options.targets[0], revision="12"),)
+    elif mutation == "parent":
+        options.targets = (replace(options.targets[0], parent_id="different-engagement"),)
+        intent.target_binding = asyncio.run(service.list_target_options(
+            tenant_id=tenant_id, principal_id="operator-r124",
+            engagement_binding=intent.engagement_binding, limit=50, cursor=None, now=NOW,
+        ))["data"][0]["binding"]
+    elif mutation == "target_ineligible":
+        options.targets = (replace(
+            options.targets[0], eligible=False, unavailable_reason="policy_denied",
+        ),)
+    elif mutation == "objective":
+        intent.objective = "Run arbitrary command"
+    elif mutation == "target_class":
+        intent.objective = "Assess repository snapshot posture"
+    elif mutation == "risk":
+        intent.risk_profile = "tier1_passive"
+
+    with pytest.raises(ValueError, match=error):
+        asyncio.run(service.resolve_operator_intent(
+            intent, tenant_id=tenant_id, principal_id="operator-r124", now=NOW,
+        ))
+    assert starter.replay_calls == []
+    assert starter.calls == []
 
 
 def test_option_bindings_are_stable_non_identifying_and_ineligibility_is_visible() -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ipaddress
 import os
 from pathlib import Path
-from typing import Mapping
+from typing import Mapping, Callable, Awaitable
 
 from fastapi import FastAPI
 
@@ -21,6 +21,8 @@ from redagent_platform.campaign_service.qualification import (
 )
 from redagent_platform.campaign_service.registry import StrategyLoopMode, load_strategy_loop_mode
 from redagent_platform.campaign_service.status import CampaignStatusOwner
+from redagent_platform.campaign_service.operator_service import AutonomousCampaignOperatorService
+from redagent_platform.campaign_service.admission_start_service import AutonomousCampaignAdmissionStartService
 from redagent_platform.evidence_service.config import load_evidence_settings
 from redagent_platform.evidence_service.runtime import (
     EvidenceRuntimeError,
@@ -132,8 +134,22 @@ def build_runtime_app(
     r123_qualification_service: CampaignQualificationService | None = None,
     r123_status_service: CampaignStatusService | None = None,
     r123_campaign_status_owner: CampaignStatusOwner | None = None,
+    autonomous_campaign_operator_service_factory: (
+        Callable[[object], AutonomousCampaignOperatorService | Awaitable[AutonomousCampaignOperatorService]] | None
+    ) = None,
+    autonomous_campaign_admission_start_service_factory: (
+        Callable[[object], AutonomousCampaignAdmissionStartService | Awaitable[AutonomousCampaignAdmissionStartService]] | None
+    ) = None,
 ) -> FastAPI:
     values = dict(os.environ if env is None else env)
+    if autonomous_campaign_operator_service_factory is not None and (
+        load_strategy_loop_mode(values) is not StrategyLoopMode.DISABLED or any(owner is not None for owner in (
+            r123_qualification_service, r123_status_service, r123_campaign_status_owner,
+        ))
+    ):
+        raise ApiRuntimeError("autonomous_campaign_operator_runtime_services_ambiguous")
+    if autonomous_campaign_admission_start_service_factory is not None and autonomous_campaign_operator_service_factory is None:
+        raise ApiRuntimeError("autonomous_campaign_operator_factory_required")
     operator_shell_context = derive_operator_shell_context(values)
     selected_r123_status = r123_status_service or CampaignStatusService(
         StrategyLoopMode.DISABLED,
@@ -251,6 +267,8 @@ def build_runtime_app(
         r123_campaign_status_owner=r123_campaign_status_owner,
         r123_service_factory=r123_service_factory,
         autonomous_campaign_service_factory=autonomous_campaign_service_factory,
+        autonomous_campaign_operator_service_factory=autonomous_campaign_operator_service_factory,
+        autonomous_campaign_admission_start_service_factory=autonomous_campaign_admission_start_service_factory,
         operator_shell_context=operator_shell_context,
     )
 

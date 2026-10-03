@@ -133,11 +133,6 @@ class PostgresCampaignStatusOwner:
         campaigns = metadata.tables["campaigns"]
         outbox = metadata.tables["outbox_events"]
         effects = metadata.tables["campaign_effects"]
-        imports = metadata.tables["finding_import_sessions"]
-        import_records = metadata.tables["finding_import_records"]
-        occurrences = metadata.tables["finding_occurrences"]
-        issues = metadata.tables["managed_issues"]
-        retests = metadata.tables["finding_retests"]
         async with self._sessions() as session, session.begin():
             await session.execute(
                 select(func.set_config("redagent.tenant_id", tenant_id, True))
@@ -233,6 +228,7 @@ class PostgresCampaignCorePresentationOwner:
     ) -> dict[str, object]:
         offset = _campaign_core_offset(limit, cursor)
         campaigns = metadata.tables["campaigns"]
+        applications = metadata.tables["autonomous_campaign_applications"]
         async with self._sessions() as session, session.begin():
             await _tenant_context(session, tenant_id)
             await _require_campaign_core_principal(
@@ -246,7 +242,13 @@ class PostgresCampaignCorePresentationOwner:
                         campaigns.c.status,
                         campaigns.c.attention_reason,
                         campaigns.c.aggregate_sequence,
+                        applications.c.id.label("canonical_id"),
+                        applications.c.lifecycle_state.label("canonical_lifecycle"),
+                        applications.c.aggregate_revision.label("canonical_revision"),
+                        applications.c.attention_reason.label("canonical_attention"),
                     )
+                    .outerjoin(applications, (applications.c.tenant_id == campaigns.c.tenant_id)
+                               & (applications.c.id == campaigns.c.id))
                     .where(campaigns.c.tenant_id == tenant_id)
                     .order_by(campaigns.c.updated_at.desc(), campaigns.c.id)
                     .offset(offset)
@@ -259,17 +261,20 @@ class PostgresCampaignCorePresentationOwner:
                 {
                     "campaign_id": str(row["id"]),
                     "label": str(row["name"]),
-                    "status": str(row["status"]),
+                    "operator_kind": "canonical" if row["canonical_id"] is not None else "legacy",
+                    "status": str(row["canonical_lifecycle"] if row["canonical_id"] is not None else row["status"]),
                     "authority_state": (
+                        "requires_current_verification" if row["canonical_id"] is not None else
                         "requires_attention"
                         if row["attention_reason"] is not None
                         else "current_at_last_resolution"
                     ),
                     "attention_reason": (
+                        row["canonical_attention"] if row["canonical_id"] is not None else
                         str(row["attention_reason"])
                         if row["attention_reason"] is not None else None
                     ),
-                    "aggregate_sequence": int(row["aggregate_sequence"]),
+                    "aggregate_sequence": int(row["canonical_revision"] if row["canonical_id"] is not None else row["aggregate_sequence"]),
                 }
                 for row in selected
             ],
@@ -375,6 +380,13 @@ class PostgresCampaignCorePresentationOwner:
         campaigns = metadata.tables["campaigns"]
         outbox = metadata.tables["outbox_events"]
         effects = metadata.tables["campaign_effects"]
+        # IMPORTANT: these owners must be local to attention intake. Declaring them in another
+        # read method leaves confirmed execution receipts failing before finding/retest review.
+        imports = metadata.tables["finding_import_sessions"]
+        import_records = metadata.tables["finding_import_records"]
+        occurrences = metadata.tables["finding_occurrences"]
+        issues = metadata.tables["managed_issues"]
+        retests = metadata.tables["finding_retests"]
         async with self._sessions() as session, session.begin():
             await _tenant_context(session, tenant_id)
             await _require_campaign_core_principal(

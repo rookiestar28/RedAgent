@@ -323,6 +323,11 @@ async function campaignRoutes(page, onStart = async () => {}, options = {}) {
     if (path === "/api/v1/engagements") {
       return json(route, { data: [], page: { limit: 50, offset: 0, returned: 0 } });
     }
+    if (path === "/api/v1/campaign-core/operator-availability") {
+      return json(route, { data: { canonical_configured: false, create_available: false,
+        preparation_available: false, status_available: false, stop_available: false, revoke_available: false,
+        mode: "disabled", legacy_available: true, reason: "operator_owner_not_configured" } });
+    }
     if (path === "/api/v1/campaign-core/options/engagements") {
       return json(route, optionPage([
         option("opaque-engagement-a", "Owned loopback alpha"),

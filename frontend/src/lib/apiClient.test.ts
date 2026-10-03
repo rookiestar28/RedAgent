@@ -2,6 +2,67 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createConsoleClient } from "./apiClient";
 
+describe("normal autonomous campaign client", () => {
+  it("uses server tokens, distinct stage keys and strict bodies without client authority", async () => {
+    const requests: Request[] = [];
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input, init) => {
+      requests.push(new Request(input, init));
+      return Promise.resolve(new Response(JSON.stringify({ data: {} }), {
+        status: 200, headers: { "Content-Type": "application/json" },
+      }));
+    });
+    const client = createConsoleClient({ fetch: fetchMock, readCsrf: () => "csrf-fixture" });
+    await client.getAutonomousCampaignAvailability();
+    await client.createAutonomousCampaignIntent({ engagement_binding: "opaque-e", target_binding: "opaque-t",
+      objective: "Assess HTTP security posture", risk_profile: "opaque-r" }, "intent-key");
+    await client.getAutonomousCampaignStatus("server-campaign");
+    await client.prepareAutonomousCampaignPlan("server-campaign", 1, '"server-application-token"', "prepare-key");
+    await client.decideAutonomousCampaignPlan("approve", "server-campaign", {
+      preview_id: "server-preview", preview_sha256: "a".repeat(64),
+    }, '"server-preview-token"', "approval-key");
+    await client.admitAutonomousCampaign("server-campaign", {
+      approval_receipt_id: "server-approval", approval_receipt_sha256: "b".repeat(64),
+    }, '"server-approval-token"', "admission-key");
+    await client.prepareAutonomousCampaignChild("server-campaign", 7, "server-roe", "child-key");
+    await client.recoverAutonomousCampaign("stop", "server-campaign", 7,
+      '"server-current-token"', "Operator requests safe containment", "stop-key");
+    expect(requests.map((r) => new URL(r.url).pathname)).toEqual([
+      "/api/v1/campaign-core/operator-availability", "/api/v1/autonomous-campaigns",
+      "/api/v1/autonomous-campaigns/server-campaign", "/api/v1/autonomous-campaigns/server-campaign/prepare-plan",
+      "/api/v1/autonomous-campaigns/server-campaign/plan-approval",
+      "/api/v1/autonomous-campaigns/server-campaign/admission-start",
+      "/api/v1/autonomous-campaigns/server-campaign/child-replan",
+      "/api/v1/autonomous-campaigns/server-campaign/stop",
+    ]);
+    expect(requests.filter((r) => r.method === "POST").map((r) => r.headers.get("Idempotency-Key")))
+      .toEqual(["intent-key", "prepare-key", "approval-key", "admission-key", "child-key", "stop-key"]);
+    for (const request of requests) {
+      expect(request.credentials).toBe("include");
+      expect(request.headers.has("Authorization")).toBe(false);
+      expect(request.headers.get("X-CSRF-Token")).toBe(request.method === "POST" ? "csrf-fixture" : null);
+    }
+    expect(requests[3]?.headers.get("If-Match")).toBe('"server-application-token"');
+    expect(requests[4]?.headers.get("If-Match")).toBe('"server-preview-token"');
+    expect(requests[5]?.headers.get("If-Match")).toBe('"server-approval-token"');
+    expect(requests[7]?.headers.get("If-Match")).toBe('"server-current-token"');
+    expect(requests[6]?.headers.get("X-RedAgent-ROE-Version")).toBe("server-roe");
+    expect(await requests[3]?.json()).toEqual({ expected_revision: 1 });
+    expect(await requests[4]?.json()).toEqual({ preview_id: "server-preview", preview_sha256: "a".repeat(64) });
+    expect(await requests[6]?.json()).toEqual({ expected_revision: 7 });
+    expect(await requests[7]?.json()).toEqual({ expected_revision: 7, reason: "Operator requests safe containment" });
+  });
+
+  it("returns stale mutation conflicts once, without retry or legacy fallback", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ error: {
+      code: "application_revision_conflict", message: "Refresh before confirming again.",
+    } }), { status: 409, headers: { "Content-Type": "application/json" } }));
+    const client = createConsoleClient({ fetch: fetchMock, readCsrf: () => "csrf-fixture" });
+    await expect(client.recoverAutonomousCampaign("revoke", "server-campaign", 3, '"current-token"',
+      "Operator revokes future authority", "revoke-key")).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("console API client", () => {
   it("uses same-origin credentials and adds CSRF only to mutations", async () => {
     const fetchMock = vi

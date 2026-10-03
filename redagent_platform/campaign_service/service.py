@@ -1339,6 +1339,15 @@ class CampaignCoreAuthorizedOptionOwner(Protocol):
     ) -> tuple[CampaignCoreAuthorizedResource, ...]: ...
 
 
+@dataclass(frozen=True, slots=True)
+class CampaignCoreResolvedIntent:
+    """Current native selections retained for canonical intent source binding."""
+
+    engagement: CampaignCoreAuthorizedResource
+    target: CampaignCoreAuthorizedResource
+    request: CampaignStartRequest
+
+
 class CampaignCoreStarter(Protocol):
     async def replay(self, **values: object) -> object | None: ...
 
@@ -1405,6 +1414,38 @@ class CampaignCoreService:
         self._presentation = presentation
         self._recovery = recovery
         self._create_enabled = create_enabled
+
+    @property
+    def creation_enabled(self) -> bool:
+        return self._create_enabled
+
+    async def resolve_application_scope(
+        self, *, tenant_id: str, principal_id: str, engagement_id: str, target_id: str,
+        now: datetime, require_eligible: bool,
+    ) -> tuple[CampaignCoreAuthorizedResource, CampaignCoreAuthorizedResource]:
+        if type(require_eligible) is not bool:
+            raise ValueError("operator_scope_eligibility_invalid")
+        engagements = await self._options.list_engagements(
+            tenant_id=tenant_id, principal_id=principal_id, now=now,
+        )
+        matches = [resource for resource in engagements if resource.resource_id == engagement_id]
+        if len(matches) != 1:
+            raise ValueError("operator_application_scope_denied")
+        engagement = matches[0]
+        targets = await self._options.list_targets(
+            tenant_id=tenant_id, principal_id=principal_id, engagement_id=engagement_id, now=now,
+        )
+        matches = [resource for resource in targets if resource.resource_id == target_id]
+        if len(matches) != 1 or matches[0].parent_id != engagement_id:
+            raise ValueError("operator_application_scope_denied")
+        target = matches[0]
+        # CRITICAL: recovery reads need current principal/ownership, not fresh execution eligibility.
+        if require_eligible:
+            if not engagement.eligible:
+                raise ValueError("engagement_binding_ineligible")
+            if not target.eligible:
+                raise ValueError("target_binding_ineligible")
+        return engagement, target
 
     async def list_engagement_options(
         self,
@@ -1519,6 +1560,26 @@ class CampaignCoreService:
             return self._start_response(replay)
         if not self._create_enabled:
             raise CampaignCoreCreateDisabled("r124_campaign_create_disabled")
+        resolved = await self.resolve_operator_intent(
+            intent, tenant_id=tenant_id, principal_id=principal_id, now=now,
+        )
+        receipt = await self._starter.start(
+            resolved.request,
+            now=now,
+            idempotency_key=key,
+            request_sha256=request_sha256,
+        )
+        return self._start_response(receipt)
+
+    async def resolve_operator_intent(
+        self,
+        intent: object,
+        *,
+        tenant_id: str,
+        principal_id: str,
+        now: datetime,
+    ) -> CampaignCoreResolvedIntent:
+        """Resolve current opaque selections without replaying or starting execution."""
         engagement, target = await self._resolve_pair(
             tenant_id=tenant_id,
             principal_id=principal_id,
@@ -1546,8 +1607,11 @@ class CampaignCoreService:
         artifact_objective = objective_kind == "repository_snapshot_posture"
         if artifact_objective != (target.target_class == "repository-snapshot"):
             raise ValueError("objective_target_class_mismatch")
-        receipt = await self._starter.start(
-            CampaignStartRequest(
+        # IMPORTANT: resolution has no dispatch owner; intent creation must remain effect-free.
+        return CampaignCoreResolvedIntent(
+            engagement=engagement,
+            target=target,
+            request=CampaignStartRequest(
                 tenant_id=tenant_id,
                 principal_id=principal_id,
                 engagement_id=engagement.resource_id,
@@ -1558,11 +1622,7 @@ class CampaignCoreService:
                 require_corroboration=corroboration,
                 risk_profile="tier1_passive",
             ),
-            now=now,
-            idempotency_key=key,
-            request_sha256=request_sha256,
         )
-        return self._start_response(receipt)
 
     @staticmethod
     def _start_response(receipt: object) -> dict[str, object]:

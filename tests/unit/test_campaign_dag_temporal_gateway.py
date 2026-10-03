@@ -8,6 +8,7 @@ from redagent_platform.campaign_service.dag_execution_contracts import (
     DagNodeState,
     DagRunState,
     DagWorkflowInputV1,
+    DagStopSignalV1,
     dag_workflow_request_sha256,
     deterministic_dag_workflow_id,
 )
@@ -16,6 +17,30 @@ from redagent_platform.orchestration.dag_execution_gateway import (
     DagExecutionTemporalStartGateway,
     workflow_input_from_dag_start_payload,
 )
+from redagent_platform.orchestration.gateway import OrchestrationUnavailable
+
+
+@pytest.mark.parametrize("unavailable", [False, True])
+def test_dag_stop_gateway_uses_exact_native_workflow_run_and_never_claims_containment(unavailable):
+    calls = []
+    class SignalHandle:
+        async def signal(self, name, request):
+            calls.append((name, request))
+            if unavailable:
+                raise OSError("untrusted-transport-detail")
+    class SignalClient:
+        def get_workflow_handle(self, workflow_id, *, run_id):
+            calls.append((workflow_id, run_id))
+            return SignalHandle()
+    request = DagStopSignalV1(DAG_EXECUTION_SCHEMA_VERSION, "stop-a", "operator-a", "a" * 64)
+    gateway = DagExecutionTemporalStartGateway(SignalClient(), task_queue="queue-dag")
+    operation = gateway.stop_campaign_dag("workflow-a", request, run_id="run-a")
+    if unavailable:
+        with pytest.raises(OrchestrationUnavailable, match="dag_temporal_stop_outcome_unknown"):
+            asyncio.run(operation)
+    else:
+        assert asyncio.run(operation) is None
+    assert calls == [("workflow-a", "run-a"), ("stop", request)]
 
 
 def _request() -> DagWorkflowInputV1:

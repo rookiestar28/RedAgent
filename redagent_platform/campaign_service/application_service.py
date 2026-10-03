@@ -25,6 +25,7 @@ from redagent_platform.campaign_service.application_contracts import (
     AutonomousCampaignMutationResultV1,
     AutonomousCampaignReadinessV1,
     CreateAutonomousCampaignIntentV1,
+    PrepareAutonomousCampaignRootV1,
     RevokeAutonomousCampaignIntentV1,
 )
 from redagent_platform.campaign_service.admission import authority_budget, calculate_plan_budget
@@ -105,10 +106,25 @@ class AutonomousCampaignApplicationService:
 
     async def read(self, *, tenant_id: str, campaign_id: str) -> AutonomousCampaignReadinessV1:
         self._require_enabled()
+        return self.project(await self.read_current_state(tenant_id=tenant_id, campaign_id=campaign_id))
+
+    async def read_current_state(self, *, tenant_id: str, campaign_id: str) -> AutonomousCampaignApplicationStateV1:
+        # IMPORTANT: creation rollback must leave native state readable for authorized containment.
         state = await _await_repository(self._repository.read(tenant_id=tenant_id, campaign_id=campaign_id))
         if state is None:
             raise ApplicationNotFound("autonomous_campaign_not_found")
-        return self.project(state)
+        return state
+
+    async def read_operator_plan_replay(
+        self, command: PrepareAutonomousCampaignRootV1,
+    ) -> AutonomousCampaignPlanPreviewResultV1 | None:
+        self._require_enabled()
+        if not isinstance(command, PrepareAutonomousCampaignRootV1):
+            raise ValueError("operator_preparation_command_invalid")
+        read = getattr(self._repository, "read_operator_plan_replay", None)
+        if not callable(read):
+            raise ApplicationDependencyUnavailable("operator_preparation_replay_owner_unavailable")
+        return await _await_repository(read(command))
 
     async def revoke_intent(self, command: RevokeAutonomousCampaignIntentV1) -> AutonomousCampaignMutationResultV1:
         self._require_enabled()
@@ -116,11 +132,25 @@ class AutonomousCampaignApplicationService:
             raise ValueError("revoke_intent_command_invalid")
         return await _await_repository(self._repository.revoke_intent(command))
 
-    async def stage_plan(self, command: StageAutonomousCampaignPlanV1) -> AutonomousCampaignPlanPreviewResultV1:
+    async def stage_plan(
+        self, command: StageAutonomousCampaignPlanV1, *,
+        operator_request: PrepareAutonomousCampaignRootV1 | None = None,
+    ) -> AutonomousCampaignPlanPreviewResultV1:
         self._require_enabled()
         self._require_plan_staging_configured()
         if not isinstance(command, StageAutonomousCampaignPlanV1):
             raise ValueError("stage_plan_command_invalid")
+        if operator_request is not None:
+            if not isinstance(operator_request, PrepareAutonomousCampaignRootV1) or any(
+                getattr(operator_request, field) != getattr(command, field) for field in (
+                    "tenant_id", "campaign_id", "actor_user_id", "expected_revision",
+                    "idempotency_key", "correlation_id", "occurred_at",
+                )
+            ):
+                raise ApplicationPlanInvalid("operator_preparation_stage_binding_mismatch")
+            replay = await self.read_operator_plan_replay(operator_request)
+            if replay is not None:
+                return replay
         context = await self._read_current_approval_context(
             tenant_id=command.tenant_id,
             campaign_id=command.campaign_id,
@@ -131,6 +161,10 @@ class AutonomousCampaignApplicationService:
         if state is None:
             raise ApplicationNotFound("autonomous_campaign_not_found")
         if state.aggregate_revision != command.expected_revision:
+            if operator_request is not None:
+                replay = await self.read_operator_plan_replay(operator_request)
+                if replay is not None:
+                    return replay
             raise ApplicationRevisionConflict("application_revision_conflict")
         if state.lifecycle_state not in {
             AutonomousCampaignLifecycle.INTENT_CREATED,
@@ -143,6 +177,8 @@ class AutonomousCampaignApplicationService:
         stage = getattr(repository, "stage_plan", None)
         if not callable(stage):
             raise ApplicationDependencyUnavailable("application_dependency_unavailable")
+        if operator_request is not None:
+            return await _await_repository(stage(command, preview, operator_request=operator_request))
         return await _await_repository(stage(command, preview))
 
     async def prepare_child(self, command: PrepareAutonomousCampaignChildV1) -> AutonomousCampaignPlanPreviewResultV1:
@@ -581,7 +617,8 @@ class AutonomousCampaignApplicationService:
             raise ApplicationPlanInvalid("approval_authority_context_drift")
 
     def _require_enabled(self) -> None:
-        # CRITICAL: every entry point rejects DISABLED before repository access or tenant state leaks.
+        # CRITICAL: creation/planning/decision entry points reject DISABLED before repository access.
+        # Explicit authorized operator state/recovery reads remain available during rollback.
         if self._mode is AutonomousCampaignMode.DISABLED:
             raise ApplicationModeDisabled("autonomous_campaign_disabled")
 

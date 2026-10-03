@@ -16,6 +16,7 @@ from redagent_platform.campaign_service.admission_repository import CampaignAdmi
 from redagent_platform.campaign_service.admission import authority_budget
 from redagent_platform.campaign_service.authority_envelope import CampaignAuthorityEnvelopeV2
 from redagent_platform.campaign_service.application_contracts import AutonomousCampaignLifecycle, AutonomousCampaignMode
+from redagent_platform.campaign_service.operator_scope import assert_operator_scope_current
 from redagent_platform.campaign_service.application_repository import (
     _assert_actor_binding, _json_payload, _plan_preview_result_from_payload, _plan_preview_result_payload,
     _record_lifecycle_event, _state_from_row, _successor_state, _verified_preview_from_payload,
@@ -115,6 +116,7 @@ class PostgresCanonicalChildReplanStore:
                 applications.c.tenant_id == command.tenant_id, applications.c.id == command.campaign_id,
             ).with_for_update())).mappings().one()
             current = _state_from_row(app_row)
+            await assert_operator_scope_current(session, tenant_id=command.tenant_id, campaign_id=command.campaign_id)
             if (current.mode is not AutonomousCampaignMode.BOUNDED_REPLAN
                     or current.aggregate_revision != command.expected_revision
                     or current.target_id != parent.source.target_id
