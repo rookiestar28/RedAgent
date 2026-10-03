@@ -89,6 +89,8 @@ test("normal owned intent, fresh human gates, native stop and current results", 
   const evidence = page.locator("dl.record-grid > div").filter({ has: page.locator("dt", { hasText: /^Evidence$/ }) }).first();
   await expect(evidence.locator("dd")).toHaveText("verified");
   await expect(page.getByText("The server verified the retained bundle. An authorized export owner is not configured.")).toBeVisible();
+  await expect(page.getByText("The retained bundle is verified. Export is disabled because an authorized export owner is not configured.")).toBeVisible();
+  await expect(page.getByText(/A verified retained bundle is not available/)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Export evidence", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Admit and start", exact: true })).toHaveCount(0);
   const admissions = mutations.filter((item) => item.path.endsWith("/admission-start"));

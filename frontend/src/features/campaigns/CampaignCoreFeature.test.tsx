@@ -585,6 +585,29 @@ async function prepareNormal(api: CampaignCoreClient) {
 }
 
 describe("normal staged Campaign Core journey", () => {
+  it("keeps every evidence panel consistent when verified evidence is later lost or fails", async () => {
+    const api = normalClient();
+    const user = await prepareNormal(api);
+    const current = normalStatus("EVIDENCE_PENDING", 7);
+    current.result.evidence_state = "verified";
+    current.result.export_state = "unavailable_export_not_configured";
+    vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue(current);
+    await user.click(screen.getByRole("button", { name: "Refresh current status" }));
+    expect(screen.getByText("The server verified the retained bundle. An authorized export owner is not configured.")).toBeVisible();
+    expect(screen.queryByText(/A verified retained bundle is not available/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Export evidence" })).toBeDisabled();
+    for (const state of ["pending", "retained_pending_verification", "verification_failed"] as const) {
+      current.result.evidence_state = state;
+      current.result.export_state = "unavailable_without_verified_bundle";
+      vi.mocked(api.getAutonomousCampaignStatus).mockResolvedValue({ ...current });
+      await user.click(screen.getByRole("button", { name: "Refresh current status" }));
+      expect(screen.queryByText(/The server verified the retained bundle/)).toBeNull();
+      expect(screen.queryByText(/The retained bundle is verified/)).toBeNull();
+      expect(screen.getByText(/A verified retained bundle is not available/)).toBeVisible();
+      expect(screen.getByRole("button", { name: "Export evidence" })).toBeDisabled();
+    }
+  });
+
   it.each(["policy_denied", "authority_revoked", "budget_exhausted", "unknown_capability",
     "kill_switch_active", "manual_review_required", "reconciliation_required", "operator_native_source_changed"])(
     "blocks new gates for server attention %s while preserving recovery", async (reason) => {

@@ -402,8 +402,10 @@ async def _execute(prepared, capability, backend, lineage, client, policy, *, st
             relay = PostgresDagWorkflowRelayRepository(prepared.sessions, tenant_id=prepared.tenant,
                 actor_user_id=prepared.command.actor_user_id, correlation_prefix="owned-child-relay")
             claim = (await relay.claim_dag_workflow_starts(claim_owner="owned-child-dag", now=datetime.now(timezone.utc), lease_seconds=30, limit=1))[0]
-            await DagWorkflowRelay(repository=relay, gateway=DagExecutionTemporalStartGateway(client, task_queue=queue)).deliver(claim, now=datetime.now(timezone.utc))
+            # CRITICAL: delivery can lose its acknowledgement after starting the exact DAG.
+            # Track its deterministic identity first so that failure still attempts containment.
             handle = client.get_workflow_handle(deterministic_dag_workflow_id(prepared.tenant, admitted.execution_run_id), result_type=DagExecutionSnapshotV1)
+            await DagWorkflowRelay(repository=relay, gateway=DagExecutionTemporalStartGateway(client, task_queue=queue)).deliver(claim, now=datetime.now(timezone.utc))
             if stopper is not None:
                 ready = asyncio.create_task(stopper.ready.wait())
                 terminal = asyncio.create_task(handle.result())
@@ -430,33 +432,49 @@ async def _execute(prepared, capability, backend, lineage, client, policy, *, st
             assert result.state is expected, json.dumps({"state": result.state.value, "dispatch_failures": dispatcher.failures})
             history = await handle.fetch_history()
         finally:
-            try:
-                if handle is not None:
-                    await _execution_diagnostics(prepared, admitted.execution_run_id)
-                if stopper is not None:
-                    stopper.release.set()
-                if handle is not None:
-                    description = await handle.describe()
-                    if description.status.name == "RUNNING":
-                        await handle.signal("stop", DagStopSignalV1(DAG_EXECUTION_SCHEMA_VERSION, "owned-child-final-cleanup",
-                            prepared.command.actor_user_id, hashlib.sha256(b"owned-child-final-cleanup").hexdigest()))
-                        await asyncio.wait_for(handle.result(), timeout=120)
-            finally:
-                # CRITICAL: worker shutdown never closes the inert admission bridge. Pin and close
-                # only this fixture's exact run, or disposable DB removal leaves a running Workflow.
-                if bridge_handle is not None:
-                    try:
-                        description = await bridge_handle.describe()
-                    except RPCError as error:
-                        if error.status is not RPCStatusCode.NOT_FOUND:
-                            raise
-                    else:
-                        exact_bridge = client.get_workflow_handle(bridge_handle.id, run_id=description.run_id)
-                        if description.status.name == "RUNNING":
-                            await exact_bridge.terminate(reason="Owned fixture teardown: inert admission bridge")
-                        assert (await exact_bridge.describe()).status.name != "RUNNING"
+            await _cleanup_execution(prepared, admitted.execution_run_id if handle is not None else None,
+                                     handle, stopper, bridge_handle, client)
     await Replayer(workflows=[CampaignDagExecutionWorkflow]).replay_workflow(history)
     return admitted, history
+
+
+async def _cleanup_execution(prepared, run_id, handle, stopper, bridge_handle, client):
+    try:
+        try:
+            if handle is not None:
+                await _execution_diagnostics(prepared, run_id)
+        finally:
+            # CRITICAL: diagnostic DB reads can fail or be cancelled. They must never bypass
+            # frontier release and native DAG cleanup before the inert bridge is closed.
+            if stopper is not None:
+                stopper.release.set()
+            if handle is not None:
+                try:
+                    description = await handle.describe()
+                except RPCError as error:
+                    if error.status is not RPCStatusCode.NOT_FOUND:
+                        raise
+                else:
+                    exact_dag = client.get_workflow_handle(handle.id, run_id=description.run_id,
+                                                           result_type=DagExecutionSnapshotV1)
+                    if description.status.name == "RUNNING":
+                        await exact_dag.signal("stop", DagStopSignalV1(DAG_EXECUTION_SCHEMA_VERSION, "owned-child-final-cleanup",
+                            prepared.command.actor_user_id, hashlib.sha256(b"owned-child-final-cleanup").hexdigest()))
+                        await asyncio.wait_for(exact_dag.result(), timeout=120)
+    finally:
+        # CRITICAL: worker shutdown never closes the inert admission bridge. Pin and close
+        # only this fixture's exact run, or disposable DB removal leaves a running Workflow.
+        if bridge_handle is not None:
+            try:
+                description = await bridge_handle.describe()
+            except RPCError as error:
+                if error.status is not RPCStatusCode.NOT_FOUND:
+                    raise
+            else:
+                exact_bridge = client.get_workflow_handle(bridge_handle.id, run_id=description.run_id)
+                if description.status.name == "RUNNING":
+                    await exact_bridge.terminate(reason="Owned fixture teardown: inert admission bridge")
+                assert (await exact_bridge.describe()).status.name != "RUNNING"
 
 
 async def _execution_diagnostics(prepared, run_id):

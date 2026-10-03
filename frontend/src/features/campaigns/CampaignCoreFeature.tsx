@@ -476,11 +476,12 @@ function AutonomousCampaignJourney({ client, availability, intent, status, onSta
       {mayChild && <button disabled={busy} onClick={(event) => ask("child", event.currentTarget)}>Prepare child plan</button>}
       <button disabled aria-describedby="native-export-reason">Export evidence</button>
     </div>
-    <p id="native-export-reason">{status?.result.export_state === "unavailable_export_not_configured"
+    <p id="native-export-reason">{status?.result.evidence_state === "verified"
+      && status.result.export_state === "unavailable_export_not_configured"
       ? "The server verified the retained bundle. An authorized export owner is not configured."
       : "Export is unavailable until the server verifies a retained bundle against an independent trust anchor."}</p>
     {mayChild && <p>Child preparation rechecks trusted observations, cooldown and all bounds on the server. A denial requires refresh and a new confirmation.</p>}
-    {status && <CampaignOperationsWorkspace operations={status.operations} />}
+    {status && <CampaignOperationsWorkspace operations={status.operations} result={status.result} />}
     {confirmation && createPortal(<div ref={dialogRoot} className="navigation-drawer-backdrop">
       <section className="safety-dialog campaign-plan-dialog" role="dialog" aria-modal="true"
         aria-label={NATIVE_ACTION_LABELS[confirmation.action]} onKeyDown={dialogKeys}>
@@ -757,7 +758,9 @@ function CampaignTruthSummary({
 }
 
 
-function CampaignOperationsWorkspace({ operations }: { operations: CampaignOperations }) {
+function CampaignOperationsWorkspace({ operations, result }: {
+  operations: CampaignOperations; result?: AutonomousCampaignStatus["result"];
+}) {
   const budgetDimensions = Object.entries(operations.budget.dimensions);
   return <section className="campaign-operations" aria-labelledby="campaign-operations-title">
     <header className="campaign-operations__header">
@@ -889,7 +892,12 @@ function CampaignOperationsWorkspace({ operations }: { operations: CampaignOpera
           <div><dt>Cleanup</dt><dd>{human(operations.evidence.cleanup_state)}</dd></div>
           <div><dt>Terminal receipt</dt><dd>{operations.evidence.terminal_receipt_present ? "Present" : "Not present"}</dd></div>
         </dl>
-        <p className="campaign-operations__note">A verified retained bundle is not available. Export remains disabled until the server verifies the bundle and independent trust anchor.</p>
+        {/* CRITICAL: native receipt counts cannot establish bundle verification. Use the current
+            canonical result owner, or remain conservative; stale text can contradict verified evidence. */}
+        <p className="campaign-operations__note">{result?.evidence_state === "verified"
+          && result.export_state === "unavailable_export_not_configured"
+          ? "The retained bundle is verified. Export is disabled because an authorized export owner is not configured."
+          : "A verified retained bundle is not available. Export remains disabled until the server verifies the bundle and independent trust anchor."}</p>
       </article>
     </div>
   </section>;
